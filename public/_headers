@@ -1,0 +1,11 @@
+# Cloudflare Pages headers: always check for the newest build, and allow any site to load it.
+/*
+  Cache-Control: no-cache
+  Access-Control-Allow-Origin: *
+
+# The portal is only for signed-in people: no framing by other sites, no shared caching.
+/app/*
+  ! Access-Control-Allow-Origin
+  X-Frame-Options: DENY
+  Referrer-Policy: same-origin
+  X-Content-Type-Options: nosniff

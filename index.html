@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TapDot Editor</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='40' fill='%233b7de1'/><circle cx='50' cy='50' r='14' fill='white'/></svg>" />
+  <link rel="stylesheet" href="editor/styles.css" />
+</head>
+<body>
+  <header class="top">
+    <div class="brand"><span class="dot"></span>TapDot Editor</div>
+    <div class="actions">
+      <button id="newBtn" class="ghost" title="Start from a template">New</button>
+      <button id="openBtn" class="ghost" title="Open a .json project or an exported .html">Open</button>
+      <button id="saveBtn" class="ghost" title="Download the project file (Ctrl/Cmd+S)">Save project</button>
+      <button id="histBtn" class="ghost" title="Saved versions of this page">🕘 History</button>
+      <span class="sep"></span>
+      <button id="undo" class="ghost icon" title="Undo (Ctrl/Cmd+Z)">↶</button>
+      <button id="redo" class="ghost icon" title="Redo (Ctrl/Cmd+Shift+Z)">↷</button>
+      <span class="sep"></span>
+      <button id="copyBtn" class="primary" title="Copy the finished HTML">📋 Copy HTML</button>
+    </div>
+  </header>
+
+  <main>
+    <aside class="panel">
+      <nav class="tabs">
+        <button data-tab="blocks">Blocks</button>
+        <button data-tab="theme">Theme</button>
+        <button data-tab="sheets">Pop-ups</button>
+        <button data-tab="export">Export</button>
+      </nav>
+      <div id="panelBody" class="panel-body"></div>
+      <div class="panel-foot"><span id="saveState"></span></div>
+    </aside>
+
+    <section class="stage">
+      <div class="stage-bar">
+        <div class="seg">
+          <button data-dev="phone" class="on" title="Phone">📱 Phone</button>
+          <button data-dev="tablet" title="Tablet">Tablet</button>
+          <button data-dev="desktop" title="Desktop">Desktop</button>
+        </div>
+        <button id="pickBtn" class="ghost sm" title="Then tap a block in the preview to edit it">🎯 Tap to edit</button>
+        <label class="sched" title="Which version of the page the preview shows">🕒
+          <select id="schedSel">
+            <option value="tab">Preview: the time tab I'm editing</option>
+            <option value="live">Preview: what's live right now</option>
+          </select>
+        </label>
+      </div>
+      <div class="stage-scroll">
+        <div id="device" class="device" data-dev="phone">
+          <iframe id="preview" title="Live preview"></iframe>
+        </div>
+      </div>
+      <p class="stage-hint">Tip: Alt-click (Option-click) any block in the preview to jump to its settings.</p>
+    </section>
+  </main>
+
+  <button id="viewToggle" class="view-toggle"><span class="to-prev">👁 Preview</span><span class="to-edit">✎ Edit</span></button>
+
+  <dialog id="addDlg">
+    <div class="dlg-head"><h2>Add a block</h2><form method="dialog"><button class="ghost icon">✕</button></form></div>
+    <div id="addGrid" class="addgrid"></div>
+  </dialog>
+  <dialog id="tplDlg">
+    <div class="dlg-head"><h2>Start from a template</h2><form method="dialog"><button class="ghost icon">✕</button></form></div>
+    <div id="tplGrid" class="addgrid one"></div>
+  </dialog>
+  <dialog id="verDlg">
+    <div class="dlg-head"><h2>Version history</h2><form method="dialog"><button class="ghost icon">✕</button></form></div>
+    <div id="verList" class="verlist"></div>
+  </dialog>
+  <div id="toast" class="toast" role="status"></div>
+
+  <script src="editor/schema.js"></script>
+  <script src="editor/render.js"></script>
+  <script src="editor/app.js"></script>
+</body>
+</html>
