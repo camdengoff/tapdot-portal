@@ -21,6 +21,50 @@
   function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600); }
   const when = (iso) => iso ? new Date(iso).toLocaleString([], { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
 
+  // ── Tap stats helpers ────────────────────────────────────────────────
+  // Days are the visitor's local dates (YYYY-MM-DD), newest last.
+  const ymd = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  function lastDays(n) {
+    const out = [];
+    const d = new Date();
+    d.setHours(12, 0, 0, 0);
+    d.setDate(d.getDate() - (n - 1));
+    for (let i = 0; i < n; i++) { out.push(ymd(d)); d.setDate(d.getDate() + 1); }
+    return out;
+  }
+  // Totals for one page over the given days: visits per day, taps per day, and taps per button.
+  function sumStats(s, days) {
+    const views = days.map((day) => (s && s.views[day]) || 0);
+    const taps = days.map((day) => Object.values((s && s.taps[day]) || {}).reduce((a, b) => a + b, 0));
+    const buttons = {};
+    days.forEach((day) => Object.entries((s && s.taps[day]) || {}).forEach(([k, n]) => { buttons[k] = (buttons[k] || 0) + n; }));
+    const sum = (a) => a.reduce((x, y) => x + y, 0);
+    return { views, taps, buttons: Object.entries(buttons).sort((a, b) => b[1] - a[1]), totalViews: sum(views), totalTaps: sum(taps) };
+  }
+  const plural = (n, one, many) => n.toLocaleString() + ' ' + (n === 1 ? one : many);
+  const shortDay = (day) => new Date(day + 'T12:00:00').toLocaleDateString([], { month: 'short', day: 'numeric' });
+  // A small bar chart of visits per day; each bar's tooltip gives the date and count.
+  function bars(days, values, tall) {
+    const NS = 'http://www.w3.org/2000/svg';
+    const w = 100 / days.length;
+    const max = Math.max(1, ...values);
+    const svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 100 40');
+    svg.setAttribute('preserveAspectRatio', 'none');
+    svg.setAttribute('class', 'bars' + (tall ? ' tall' : ''));
+    days.forEach((day, i) => {
+      const r = document.createElementNS(NS, 'rect');
+      const bh = values[i] ? Math.max(2, (values[i] / max) * 38) : 1;
+      r.setAttribute('x', i * w + w * 0.15); r.setAttribute('width', w * 0.7);
+      r.setAttribute('y', 40 - bh); r.setAttribute('height', bh);
+      if (!values[i]) r.setAttribute('class', 'zero');
+      const t = document.createElementNS(NS, 'title');
+      t.textContent = shortDay(day) + ': ' + plural(values[i], 'visit', 'visits');
+      r.append(t); svg.append(r);
+    });
+    return svg;
+  }
+
   async function api(path, opts) {
     opts = opts || {};
     const init = { method: opts.method || 'GET', credentials: 'same-origin', headers: {} };
@@ -84,7 +128,7 @@
   // ── State and routing ────────────────────────────────────────────────
   let me = null;
   const route = () => decodeURIComponent(location.hash.slice(1));
-  window.addEventListener('hashchange', draw);
+  window.addEventListener('hashchange', () => { if (me) draw(); });
 
   async function start() {
     try { me = await api('/me'); } catch (e) { return; }
@@ -141,7 +185,10 @@
   async function drawChurch(id) {
     const main = $('#main');
     let data;
-    try { data = await api('/churches/' + enc(id)); }
+    let allStats = null;
+    try {
+      [data, allStats] = await Promise.all([api('/churches/' + enc(id)), api('/churches/' + enc(id) + '/stats?days=14').catch(() => null)]);
+    }
     catch (e) { fill(main, h('div', { class: 'card center' }, h('p', null, e.message), h('a', { href: '#' }, 'Back'))); return; }
     if (route() !== id) return; // moved on while loading
     const { church, role, pages, members } = data;
@@ -161,6 +208,7 @@
           p.draftAt ? 'Edited ' + when(p.draftAt) + (p.draftBy ? ' by ' + p.draftBy : '') : 'Not edited yet',
           p.publishedAt ? h('br') : null,
           p.publishedAt ? 'Published ' + when(p.publishedAt) + (p.publishedBy ? ' by ' + p.publishedBy : '') : null),
+        statStrip(p),
         h('div', { class: 'row wrap' },
           h('a', { class: 'primary btn', href: 'editor.html?church=' + enc(church.id) + '&page=' + enc(p.id) }, '✎ Edit'),
           p.publishedAt ? h('a', { class: 'ghost btn', href: live, target: '_blank', rel: 'noopener' }, '↗ Live page') : null,
@@ -187,6 +235,21 @@
                 await api('/churches/' + enc(church.id) + '/pages/' + enc(p.id), { method: 'DELETE' }); reload();
               }) }, 'Delete')))));
     };
+
+    // Last 7 days at a glance, with a 14-day chart. Clicking it opens the full stats.
+    function statStrip(p) {
+      const s = allStats && allStats.pages[p.id];
+      if (!p.publishedAt && !s) return null;
+      const days = lastDays(14);
+      const week = sumStats(s, days.slice(7));
+      const two = sumStats(s, days);
+      const top = week.buttons[0];
+      return h('button', { class: 'stats', title: 'See tap stats', onclick: () => showStats(church, p) },
+        h('div', { class: 'statnums' },
+          h('span', null, h('b', null, week.totalViews.toLocaleString()), ' ', week.totalViews === 1 ? 'visit' : 'visits', h('span', { class: 'muted' }, ' this week')),
+          h('span', { class: 'muted small' }, week.totalTaps ? plural(week.totalTaps, 'tap', 'taps') + (top ? ' · top: ' + top[0] + ' (' + top[1] + ')' : '') : 'No taps yet')),
+        bars(days, two.views));
+    }
 
     const roleName = { owner: 'Owner', editor: 'Editor' };
     const personRow = (m) => h('div', { class: 'person' },
@@ -244,6 +307,41 @@
         await api('/churches/' + enc(church.id), { method: 'DELETE' });
         me = await api('/me'); location.hash = '';
       }) }, 'Delete church')) : null);
+  }
+
+  // ── Tap stats for one page ───────────────────────────────────────────
+  async function showStats(church, p, n) {
+    n = n || 30;
+    const dlg = $('#dlg');
+    const body = h('div', { class: 'dlgform statsdlg' }, h('p', { class: 'muted' }, 'Loading…'));
+    fill($('#dlgBody'), body);
+    dlg.onclose = null;
+    if (!dlg.open) dlg.showModal();
+    let data;
+    try { data = await api('/churches/' + enc(church.id) + '/stats?days=' + n); }
+    catch (e) { fill(body, h('p', null, e.message)); return; }
+    const days = lastDays(n);
+    const t = sumStats(data.pages[p.id], days);
+    const maxB = t.buttons.length ? t.buttons[0][1] : 1;
+    fill(body,
+      h('div', { class: 'row' }, h('h2', { class: 'grow' }, p.name),
+        h('select', { class: 'sm', onchange: (e) => showStats(church, p, +e.target.value) },
+          [[7, 'Last 7 days'], [30, 'Last 30 days'], [90, 'Last 90 days'], [365, 'Last year']].map(([v, l]) => h('option', { value: v, selected: v === n }, l)))),
+      h('div', { class: 'statbig' },
+        h('div', null, h('b', null, t.totalViews.toLocaleString()), h('span', { class: 'muted small' }, t.totalViews === 1 ? 'visit' : 'visits')),
+        h('div', null, h('b', null, t.totalTaps.toLocaleString()), h('span', { class: 'muted small' }, t.totalTaps === 1 ? 'button tap' : 'button taps')),
+        h('div', null, h('b', null, t.totalViews ? Math.round((t.totalTaps / t.totalViews) * 10) / 10 : 0), h('span', { class: 'muted small' }, 'taps per visit'))),
+      h('div', { class: 'chart' }, bars(days, t.views, true),
+        h('div', { class: 'row muted small' }, h('span', { class: 'grow' }, shortDay(days[0])), h('span', null, 'Today'))),
+      h('h3', null, 'Buttons tapped'),
+      t.buttons.length
+        ? h('div', { class: 'taplist' }, t.buttons.map(([label, c]) => h('div', { class: 'tapRow' },
+          h('span', { class: 'tapLabel', title: label }, label),
+          h('span', { class: 'tapBar' }, h('i', { style: 'width:' + Math.max(3, (c / maxB) * 100) + '%' })),
+          h('b', null, c.toLocaleString()))))
+        : h('p', { class: 'muted' }, 'No taps in this time yet.'),
+      h('p', { class: 'muted small' }, 'A visit counts once per person every 30 minutes. Visits are counted on the site’s code block and the live link. No cookies are used and nothing about visitors is stored.'),
+      h('div', { class: 'row end' }, h('button', { class: 'ghost', onclick: () => dlg.close() }, 'Close')));
   }
 
   // ── Account: name, password, sign out ────────────────────────────────

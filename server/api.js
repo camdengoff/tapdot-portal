@@ -8,6 +8,7 @@
 //   live:<church>/<page>   the published HTML that the site's code block shows
 import { db, HttpError, now, all, one, run, slugify, isSlug, normEmail, isEmail } from './db.js';
 import * as auth from './auth.js';
+import * as stats from './stats.js';
 
 const MAX_BODY = 20 * 1024 * 1024;
 
@@ -74,6 +75,8 @@ async function uniqueSlug(d, table, base, churchId) {
 
 export async function handle({ request, env }) {
   try {
+    // Visit and tap beacons come from churches' own sites, so they skip the origin check.
+    if (new URL(request.url).pathname === '/api/track') return await trackBeacon(request, env);
     checkOrigin(request);
     const d = await db(env);
     const url = new URL(request.url);
@@ -171,12 +174,15 @@ export async function handle({ request, env }) {
         for (const p of pages) await Promise.all([env.PAGES.delete('draft:' + churchId + '/' + p.id), env.PAGES.delete('live:' + churchId + '/' + p.id)]);
         await d.batch([
           d.prepare('DELETE FROM pages WHERE church_id = ?').bind(churchId),
+          d.prepare('DELETE FROM stats WHERE church_id = ?').bind(churchId),
           d.prepare('DELETE FROM members WHERE church_id = ?').bind(churchId),
           d.prepare('DELETE FROM churches WHERE id = ?').bind(churchId),
         ]);
         return json({ ok: true });
       }
     }
+
+    if (route('GET', 3) && parts[2] === 'stats') return json(await stats.churchStats(d, churchId, url.searchParams.get('days')));
 
     // ── People ───────────────────────────────────────────────────────
     if (parts[2] === 'members') {
@@ -247,6 +253,7 @@ export async function handle({ request, env }) {
       if (route('DELETE', 4)) {
         await Promise.all([env.PAGES.delete('draft:' + key), env.PAGES.delete('live:' + key)]);
         await run(d, 'DELETE FROM pages WHERE church_id = ? AND id = ?', churchId, p.id);
+        await run(d, 'DELETE FROM stats WHERE church_id = ? AND page_id = ?', churchId, p.id);
         return json({ ok: true });
       }
       if (route('PUT', 5) && parts[4] === 'draft') {
@@ -289,6 +296,16 @@ export async function handle({ request, env }) {
   }
 }
 
+// POST /api/track: a visit or button tap on a live page (sent by embed.js with sendBeacon).
+const BEACON_HEADERS = { 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' };
+async function trackBeacon(request, env) {
+  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: Object.assign({ 'Access-Control-Allow-Methods': 'POST', 'Access-Control-Allow-Headers': 'Content-Type' }, BEACON_HEADERS) });
+  if (request.method !== 'POST') return new Response(null, { status: 405, headers: BEACON_HEADERS });
+  try { await stats.track(await db(env), request); }
+  catch (e) { if (!(e instanceof HttpError)) console.error(e); return new Response(null, { status: e.status || 500, headers: BEACON_HEADERS }); }
+  return new Response(null, { status: 204, headers: BEACON_HEADERS });
+}
+
 // ── Public live pages ─────────────────────────────────────────────────
 // GET /p/<church>/<page>     the published HTML fragment, for the site's code block
 // GET /view/<church>/<page>  the same page as a standalone web page (handy for QR codes)
@@ -309,5 +326,5 @@ export async function live({ request, env, params }, standalone) {
   if (html == null) return new Response('Page not found.', { status: 404, headers });
   if (!standalone) return new Response(html, { headers });
   const esc = (s) => String(s).replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]);
-  return new Response('<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="UTF-8" />\n<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />\n<title>' + esc(metaTitle(metadata)) + '</title>\n</head>\n<body style="margin:0">\n' + html + '\n</body>\n</html>\n', { headers });
+  return new Response('<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="UTF-8" />\n<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />\n<title>' + esc(metaTitle(metadata)) + '</title>\n</head>\n<body style="margin:0">\n<div class="tapdot-page" data-page="' + c + '/' + p + '" data-live>\n' + html + '\n</div>\n<script src="/embed.js"></script>\n</body>\n</html>\n', { headers });
 }

@@ -50,6 +50,16 @@ const SCHEMA = [
     published_by TEXT,
     PRIMARY KEY (church_id, id)
   )`,
+  // Tap stats: one row per page, day, kind ('view' or 'tap') and button label. See stats.js.
+  `CREATE TABLE IF NOT EXISTS stats (
+    church_id TEXT NOT NULL,
+    page_id TEXT NOT NULL,
+    day TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    label TEXT NOT NULL DEFAULT '',
+    n INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (church_id, page_id, day, kind, label)
+  )`,
   'CREATE INDEX IF NOT EXISTS members_email ON members (email)',
   'CREATE INDEX IF NOT EXISTS sessions_email ON sessions (email)',
   'CREATE INDEX IF NOT EXISTS login_fails_email ON login_fails (email)',

@@ -98,3 +98,25 @@ label .small { font-weight: 400; }
 .msg { margin: 14px 0 0; color: var(--danger); text-align: center; }
 .msg.good { color: var(--ok); }
 [hidden] { display: none !important; }
+
+/* tap stats */
+.stats { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+.stats:hover { border-color: var(--accent); }
+.statnums { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.statnums .small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bars { width: 96px; height: 32px; flex-shrink: 0; }
+.bars rect { fill: var(--accent); }
+.bars rect.zero { fill: var(--line); }
+.bars.tall { width: 100%; height: 120px; display: block; }
+dialog:has(.statsdlg) { width: min(600px, calc(100vw - 32px)); }
+.statsdlg h3 { font-size: 14px; margin: 6px 0 0; }
+.statbig { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.statbig > div { background: var(--panel2); border-radius: 10px; padding: 10px; display: flex; flex-direction: column; }
+.statbig b { font-size: 22px; }
+.chart { background: var(--panel2); border-radius: 10px; padding: 10px 10px 6px; }
+.taplist { display: flex; flex-direction: column; gap: 6px; max-height: 260px; overflow-y: auto; }
+.tapRow { display: grid; grid-template-columns: minmax(0, 1.2fr) 1fr 3.5em; gap: 10px; align-items: center; }
+.tapLabel { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tapBar { height: 8px; background: var(--panel2); border-radius: 4px; overflow: hidden; }
+.tapBar i { display: block; height: 100%; background: var(--accent); border-radius: 4px; }
+.tapRow b { text-align: right; }

@@ -26,6 +26,10 @@ every Publish updates the live page.
   only what was last published. If two people edit at once, the second save asks whose version to keep.
 - **Live pages:** `/p/<church>/<page>` is the published HTML the code block loads (via `/embed.js`), and
   `/view/<church>/<page>` is the same page on its own, handy for QR codes and tap tags.
+- **Tap stats:** each page card shows visits this week, button taps and a 14-day chart; click it for 7, 30,
+  90 or 365 days and a list of which buttons people tapped. Live pages send a beacon to `/api/track`; a
+  visit counts once per browser tab every 30 minutes. Only daily counts per page and button label are kept
+  (D1 table `stats`, about 400 days), with no cookies and nothing about the visitor.
 
 ### One-time setup in Cloudflare
 
@@ -102,7 +106,7 @@ Run `node tools/build.js` after changing `portal/`, `public/` or the editor.
 - `portal/`: the client portal pages (copied to `dist/app/` by the build)
 - `public/embed.js`: the loader that the live-page code block uses
 - `functions/` and `server/`: the portal API on Cloudflare Pages Functions (`server/api.js` routes,
-  `server/auth.js` sign-in, `server/db.js` tables)
+  `server/auth.js` sign-in, `server/db.js` tables, `server/stats.js` tap stats)
 
 ## Pop-up proxy (for sites that won't open in a pop-up)
 
