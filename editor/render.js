@@ -94,10 +94,15 @@
     if (!px || a.direct || !/^https?:/i.test(u)) return u;
     let url;
     try { url = new URL(u); if (url.host === new URL(px).host) return u; } catch (e) { return u; }
+    const host = url.hostname.replace(/^www\./, '');
     // The live BFC worker maps <worker>/<path> to bethanynaz.org/<path>, so only those links go
-    // through it. (worker/popup-proxy.js also takes ?url= for other sites once it is deployed.)
-    if (url.hostname.replace(/^www\./, '') !== 'bethanynaz.org') return u;
-    return px + url.pathname + url.search + url.hash;
+    // through it.
+    if (px === TD.DEFAULT_PROXY.replace(/\/+$/, '')) return host === 'bethanynaz.org' ? px + url.pathname + url.search + url.hash : u;
+    // Any other worker is the copy-and-paste one from the Export tab (editor/popup-worker.js):
+    // links to the sites ticked there go through it as ?url=.
+    const list = ctx.proxyHosts || [];
+    if (!list.some((h) => host === h || host.endsWith('.' + h))) return u;
+    return px + '/?url=' + encodeURIComponent(u);
   }
 
   // `<a>` when the action does something, `<div>` otherwise.
@@ -878,7 +883,7 @@ ${t.pressFx ? '.td-tap:active{transform:scale(.97)}' : ''}
    */
   TD.render = function (p, opts) {
     opts = opts || {};
-    const ctx = { title: p.title, proxy: p.exp.proxy, noAnim: !!opts.noAnim };
+    const ctx = { title: p.title, proxy: p.exp.proxy, proxyHosts: p.exp.proxyHosts, noAnim: !!opts.noAnim };
     const t = p.theme;
     const anim = t.anim !== 'none' && !opts.noAnim;
     let n = 0;

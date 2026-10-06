@@ -35,6 +35,28 @@
   // replaceChildren() that accepts nested arrays and skips null/false.
   const fill = (el, ...kids) => el.replaceChildren(...kids.flat(Infinity).filter((k) => k != null && k !== false));
   const $ = (s) => document.querySelector(s);
+  // An ⓘ button that shows a description on hover (or tap), instead of a line of small print.
+  const info = (text) => h('button', { type: 'button', class: 'info', 'data-tip': text, 'aria-label': text }, 'i');
+  let tipEl = null, tipFor = null;
+  function showTip(b) {
+    if (!tipEl) { tipEl = h('div', { class: 'tip', role: 'tooltip' }); document.body.append(tipEl); }
+    tipEl.textContent = b.dataset.tip;
+    tipEl.classList.add('show');
+    const r = b.getBoundingClientRect();
+    const x = Math.min(Math.max(8, r.left + r.width / 2 - tipEl.offsetWidth / 2), innerWidth - tipEl.offsetWidth - 8);
+    let y = r.bottom + 6;
+    if (y + tipEl.offsetHeight > innerHeight - 8) y = r.top - tipEl.offsetHeight - 6;
+    tipEl.style.left = x + 'px'; tipEl.style.top = y + 'px';
+    tipFor = b;
+  }
+  function hideTip() { if (tipEl) tipEl.classList.remove('show'); tipFor = null; }
+  const infoBtn = (e) => e.target.closest && e.target.closest('.info');
+  document.addEventListener('mouseover', (e) => { const b = infoBtn(e); if (b) showTip(b); });
+  document.addEventListener('mouseout', (e) => { if (infoBtn(e)) hideTip(); });
+  document.addEventListener('focusin', (e) => { const b = infoBtn(e); if (b) showTip(b); });
+  document.addEventListener('focusout', (e) => { if (infoBtn(e)) hideTip(); });
+  document.addEventListener('click', (e) => { const b = infoBtn(e); if (b) { e.preventDefault(); if (tipFor === b) hideTip(); else showTip(b); } });
+  document.addEventListener('scroll', hideTip, true);
   const getp = (o, path) => path.split('.').reduce((a, k) => (a == null ? a : a[k]), o);
   const setp = (o, path, v) => { const ks = path.split('.'); const last = ks.pop(); ks.reduce((a, k) => a[k], o)[last] = v; };
   const kb = (n) => (n / 1024).toFixed(n < 10240 ? 1 : 0) + ' KB';
@@ -895,10 +917,83 @@
       imgs ? ' · uploaded images are about ' + kb(imgs) + ' of that' : '',
       size > 400 * 1024 ? h('div', { class: 'warn' }, 'This is a large block. Squarespace can get slow or refuse to save very large code blocks; use image links instead of uploads, or turn off “Keep editable copy”.') : null);
   }
+  // ── Pop-up worker: which sites go through it, and the copy-and-paste worker code ──
+  const ownWorker = () => { const p = String(state.exp.proxy || '').trim(); return !!p && p.replace(/\/+$/, '') !== TD.DEFAULT_PROXY.replace(/\/+$/, ''); };
+  const hostOf = (u) => { try { const x = new URL(u); return /^https?:$/.test(x.protocol) ? x.hostname.replace(/^www\./, '').toLowerCase() : ''; } catch (e) { return ''; } };
+  // Every site that a pop-up link on this page points at.
+  function popupHosts() {
+    const out = new Set();
+    (function walk(o) {
+      if (!o || typeof o !== 'object') return;
+      if (Array.isArray(o)) { o.forEach(walk); return; }
+      if (o.type === 'popup' && o.url && hostOf(o.url)) out.add(hostOf(o.url));
+      for (const k in o) if (o[k] && typeof o[k] === 'object') walk(o[k]);
+    })([state.blocks, state.sheets]);
+    out.delete(hostOf(state.exp.proxy));
+    out.delete(hostOf(TD.DEFAULT_PROXY)); // links already on the BFC worker don't need another one
+    return out;
+  }
+  function proxySites() {
+    const e = state.exp;
+    const hosts = [...new Set([...popupHosts(), ...e.proxyHosts])].sort();
+    const toggle = (host, on) => { e.proxyHosts = on ? [...new Set(e.proxyHosts.concat(host))] : e.proxyHosts.filter((x) => x !== host); changed(true); };
+    const add = h('input', { type: 'text', placeholder: 'Add a site, e.g. mychurch.org', onkeydown: (ev) => {
+      if (ev.key !== 'Enter') return;
+      const host = hostOf(/^https?:/i.test(ev.target.value) ? ev.target.value.trim() : 'https://' + ev.target.value.trim());
+      if (host) toggle(host, true);
+    } });
+    return h('div', { class: 'field' },
+      h('div', { class: 'fl row' }, 'Sites that go through your worker',
+        info('Tick a site if its pages show up blank in a pop-up. Only ticked sites go through your worker; the rest load directly. After ticking a new site, copy the worker code again and paste it into Cloudflare.')),
+      hosts.length ? hosts.map((host) => h('label', { class: 'check small' },
+        h('input', { type: 'checkbox', checked: e.proxyHosts.includes(host), onchange: (ev) => toggle(host, ev.target.checked) }), h('span', null, host)))
+        : h('div', { class: 'hint' }, 'No pop-up links on this page yet.'),
+      add,
+      h('div', { id: 'workerStatus', class: 'hint' }));
+  }
+  // Ask the worker which sites it allows, so the editor can say when it needs the new code.
+  let workerCheck = { url: '', hosts: null, err: false };
+  async function checkWorker() {
+    const el = $('#workerStatus');
+    if (!el || !ownWorker()) return;
+    const base = state.exp.proxy.trim().replace(/\/+$/, '');
+    if (workerCheck.url !== base) {
+      workerCheck = { url: base, hosts: null, err: false };
+      try {
+        const r = await fetch(base + '/_tapdot/hosts', { cache: 'no-store' });
+        workerCheck.hosts = r.ok ? ((await r.json()).hosts || []) : null;
+        workerCheck.err = !r.ok;
+      } catch (x) { workerCheck.err = true; }
+    }
+    const el2 = $('#workerStatus');
+    if (!el2) return;
+    if (workerCheck.err || !workerCheck.hosts) { el2.textContent = 'Couldn’t check this worker. If it isn’t set up yet, follow “Set up your own worker” below.'; el2.className = 'hint warn'; return; }
+    const missing = state.exp.proxyHosts.filter((x) => !workerCheck.hosts.includes(x));
+    el2.textContent = missing.length ? 'Your worker doesn’t include ' + missing.join(', ') + ' yet. Copy the worker code again and paste it into Cloudflare.' : '✓ Your worker is up to date.';
+    el2.className = missing.length ? 'hint warn' : 'hint ok';
+  }
+  function workerSetup() {
+    const copy = async () => {
+      const code = TD.popupWorkerCode(state.exp.proxyHosts);
+      try { await navigator.clipboard.writeText(code); toast('Worker code copied'); }
+      catch (x) { download('tapdot-popup-worker.js', code, 'text/javascript'); }
+      workerCheck.url = ''; // check again next time
+    };
+    return h('details', { class: 'setup' },
+      h('summary', null, 'Set up your own worker'),
+      h('ol', null,
+        h('li', null, 'Make a free account at ', h('a', { href: 'https://dash.cloudflare.com/sign-up', target: '_blank', rel: 'noopener' }, 'cloudflare.com'), ' and sign in.'),
+        h('li', null, 'Go to Workers & Pages → Create → Start with Hello World. Name it (for example church-popups) and click Deploy.'),
+        h('li', null, 'Click Edit code, delete everything there, paste the worker code, and click Deploy.'),
+        h('li', null, 'Copy the worker’s address (it ends in .workers.dev) into Worker address above, then tick the sites that need it.'),
+        h('li', null, 'Whenever you tick a new site, copy the code again and paste it over the old code.')),
+      h('button', { class: 'primary', onclick: copy }, '📋 Copy worker code'));
+  }
+
   function exportTab() {
     const e = state.exp;
-    const opt = (k, label, hint) => h('div', { class: 'field' }, h('label', { class: 'check' },
-      h('input', { type: 'checkbox', checked: !!e[k], onchange: (ev) => { e[k] = ev.target.checked; changed(); drawExportCode(); } }), h('span', null, label)), hint ? h('div', { class: 'hint' }, hint) : null);
+    const opt = (k, label, hint) => h('div', { class: 'field row' }, h('label', { class: 'check' },
+      h('input', { type: 'checkbox', checked: !!e[k], onchange: (ev) => { e[k] = ev.target.checked; changed(); drawExportCode(); } }), h('span', null, label)), hint ? info(hint) : null);
     const wrap = h('div', null,
       h('div', { class: 'tabhead' },
         h('button', { class: 'primary', onclick: copyExport }, '📋 Copy HTML'),
@@ -907,10 +1002,12 @@
       h('div', { id: 'exportSize', class: 'size' }),
       h('textarea', { id: 'exportCode', class: 'mono code', readOnly: true, rows: 14, onfocus: (ev) => ev.target.select() }),
       h('h3', null, 'Pop-up proxy'),
-      h('div', { class: 'field' }, h('label', { class: 'fl' }, 'Worker address'),
-        h('input', { type: 'url', value: e.proxy || '', placeholder: TD.DEFAULT_PROXY, oninput: (ev) => { e.proxy = ev.target.value.trim(); e.proxyOff = !e.proxy; changed(); } }),
-        e.proxy === TD.DEFAULT_PROXY ? null : h('button', { class: 'ghost', onclick: () => { e.proxy = TD.DEFAULT_PROXY; e.proxyOff = false; changed(true); } }, 'Use the BFC worker'),
-        h('div', { class: 'hint' }, 'Every “Open page in pop-up sheet” link goes through this worker so sites that block framing still load. It defaults to the BFC worker; change it to use another one. If it is blank, pop-up links open in a new tab instead.')),
+      h('div', { class: 'field' }, h('div', { class: 'fl row' }, 'Worker address',
+          info('Pop-up links go through this worker so sites that block framing still load. It defaults to the BFC worker. If it is blank, pop-up links open in a new tab instead.')),
+        h('input', { type: 'url', value: e.proxy || '', placeholder: TD.DEFAULT_PROXY, onchange: (ev) => { e.proxy = ev.target.value.trim(); e.proxyOff = !e.proxy; changed(true); } }),
+        e.proxy === TD.DEFAULT_PROXY ? null : h('button', { class: 'ghost', onclick: () => { e.proxy = TD.DEFAULT_PROXY; e.proxyOff = false; changed(true); } }, 'Use the BFC worker')),
+      ownWorker() ? proxySites() : null,
+      workerSetup(),
       SHOW_PUBLISH || CLOUD ? publishSection() : null,
       h('h3', null, 'Export options'),
       opt('squarespace', 'Squarespace code block fixes', 'Forces the page background onto Squarespace wrappers, removes their padding and hides the site search bar, like base html does.'),
@@ -925,11 +1022,11 @@
         CTRL.range(e, { k: 'imgMax', min: 400, max: 2400, step: 100, unit: 'px' }, () => save())),
       h('div', { class: 'field' }, h('label', { class: 'fl' }, 'JPEG quality for new uploads'),
         CTRL.range(e, { k: 'imgQ', min: 0.4, max: 0.95, step: 0.05 }, () => save())),
-      h('h3', null, 'Restore from pasted HTML'),
-      h('p', { class: 'hint' }, 'Paste HTML that was exported with “Keep editable copy” on.'),
+      h('h3', { class: 'row' }, 'Restore from pasted HTML', info('Paste HTML that was exported with “Keep editable copy” on.')),
       h('textarea', { id: 'pasteIn', rows: 3, class: 'mono', placeholder: '<!DOCTYPE html>…' }),
       h('button', { class: 'ghost', onclick: () => importText($('#pasteIn').value) }, 'Restore'));
     setTimeout(drawExportCode, 0);
+    setTimeout(checkWorker, 0);
     return wrap;
   }
   // ── Publish to the site through the worker ───────────────────────────
@@ -984,14 +1081,12 @@
     const e = state.exp;
     const btn = h('button', { class: 'primary', onclick: () => publish(btn) }, '🚀 Publish');
     return h('div', null,
-      h('h3', null, 'Publish to your site'),
-      h('p', { class: 'hint' }, 'Publish saves this page on your worker. A code block on your Squarespace page always shows the latest published version, so you only paste the code block once.'),
-      h('div', { class: 'field' }, h('label', { class: 'fl' }, 'Page name'),
-        h('input', { type: 'text', value: e.pubName || '', placeholder: slug(), oninput: (ev) => { e.pubName = ev.target.value.trim(); changed(); } }),
-        h('div', { class: 'hint' }, 'Each page name is a separate page on your site. Use a new name for a different tap page.')),
-      h('div', { class: 'field' }, h('label', { class: 'fl' }, 'Publish key'),
+      h('h3', { class: 'row' }, 'Publish to your site', info('Publish saves this page on your worker. A code block on your Squarespace page always shows the latest published version, so you only paste the code block once.')),
+      h('div', { class: 'field' }, h('div', { class: 'fl row' }, 'Page name', info('Each page name is a separate page on your site. Use a new name for a different tap page.')),
+        h('input', { type: 'text', value: e.pubName || '', placeholder: slug(), oninput: (ev) => { e.pubName = ev.target.value.trim(); changed(); } })),
+      h('div', { class: 'field' }, h('div', { class: 'fl row' }, 'Publish key', info('Saved only in this browser. It is never included in projects or exports.')),
         h('input', { type: 'password', value: getKey(), placeholder: 'The PUBLISH_KEY secret on your worker', autocomplete: 'off', oninput: (ev) => { try { localStorage.setItem(PUBKEY, ev.target.value.trim()); } catch (x) { /* ignore */ } } }),
-        h('div', { class: 'hint' }, 'Saved only in this browser. It is never included in projects or exports.')),
+        ),
       h('div', { class: 'tabhead' }, btn,
         h('button', { class: 'ghost', onclick: async () => {
           const code = loaderCode();
@@ -1071,8 +1166,7 @@
     const btn = h('button', { class: 'primary', onclick: () => cloudPublish(btn) }, '🚀 Publish');
     const view = location.origin + '/view/' + CLOUD.church + '/' + CLOUD.page;
     return h('div', null,
-      h('h3', null, 'Publish'),
-      h('p', { class: 'hint' }, 'Your edits save to ' + (CLOUD.churchName || 'the portal') + ' as you go, but visitors only see them after you publish. Paste the code block into Squarespace once; after that, every publish updates the site.'),
+      h('h3', { class: 'row' }, 'Publish', info('Your edits save to ' + (CLOUD.churchName || 'the portal') + ' as you go, but visitors only see them after you publish. Paste the code block into Squarespace once; after that, every publish updates the site.')),
       h('div', { class: 'tabhead' }, btn,
         h('button', { class: 'ghost', onclick: async () => {
           try { await navigator.clipboard.writeText(cloudLoader()); toast('Code block copied. Paste it into a Squarespace code block once.'); }

@@ -96,6 +96,7 @@ Run `node tools/build.js` after changing `portal/`, `public/` or the editor.
 - `editor/schema.js`: block types, theme options and templates
 - `editor/render.js`: turns a project into the exported HTML (including the small runtime script)
 - `editor/app.js`: editor UI
+- `editor/popup-worker.js`: the copy-and-paste pop-up worker code
 - `editor/styles.css`: editor styles
 - `tools/build.js`: builds `dist/` for Cloudflare Pages, including `dist/tapdot-editor.js`, the single-file editor
 - `portal/`: the client portal pages (copied to `dist/app/` by the build)
@@ -106,17 +107,15 @@ Run `node tools/build.js` after changing `portal/`, `public/` or the editor.
 ## Pop-up proxy (for sites that won't open in a pop-up)
 
 Many sites send headers that forbid being shown inside another page, so "Open page in pop-up sheet"
-shows a blank or error box. `worker/popup-proxy.js` is a small Cloudflare Worker that fetches the page,
-removes those headers, and hands it back so the pop-up can show it.
+shows a blank box. A small Cloudflare Worker fetches the page, removes those headers, and hands it back.
 
-1. In Cloudflare, open Workers & Pages and either edit your existing proxy worker or create a new one.
-2. Replace its code with `worker/popup-proxy.js` and deploy.
-3. Edit `ALLOWED_HOSTS` at the top to list the sites you want to show in pop-ups. Only those sites are
-   proxied, so strangers can't use your worker as an open proxy.
-4. The editor already uses the BFC worker (`https://bethanynaz-proxy.cgoff.workers.dev`). To use a different one,
-   change **Export → Pop-up proxy → Worker address**; if it is blank, pop-up links open in a new tab instead.
+Each church can make its own from **Export → Pop-up proxy → Set up your own worker**: it walks through
+creating a free Hello World worker and has a **Copy worker code** button. The code
+(`editor/popup-worker.js`) comes with the sites ticked under "Sites that go through your worker" already
+filled in, and only those sites are proxied, so nobody can use the worker as an open proxy. The editor
+asks the worker which sites it allows and says when the code needs pasting again.
 
-After that, paste normal links into pop-up buttons and they go through the worker automatically.
-Old-style links such as `https://<worker>/prayer` still map to `https://bethanynaz.org/prayer`.
-A button can opt out with "Skip the pop-up proxy for this link". Logins, payments and some forms may
-not work when proxied; open those as normal links instead.
+BFC uses its own worker (`https://bethanynaz-proxy.cgoff.workers.dev`, the default), whose links look like
+`https://<worker>/prayer` for `https://bethanynaz.org/prayer`; `worker/popup-proxy.js` is that worker's
+newer code. Logins, payments and some forms may not work when proxied; open those as normal links, or
+use "Skip the pop-up proxy for this link".

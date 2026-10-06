@@ -337,6 +337,7 @@
     s.exp = Object.assign({}, base.exp, state.exp || {});
     // Blank proxy means the BFC worker, unless someone deliberately cleared it.
     if (!s.exp.proxy && !s.exp.proxyOff) s.exp.proxy = TD.DEFAULT_PROXY;
+    s.exp.proxyHosts = Array.isArray(s.exp.proxyHosts) ? s.exp.proxyHosts.slice() : [];
     s.times = (state.times || []).map((t) => Object.assign(TD.newTime(), t));
     s.blocks = (state.blocks || []).filter((b) => TD.BLOCKS[b.type]).map((b) => {
       const d = TD.newBlock(b.type);
@@ -449,7 +450,7 @@
       radius: 14, btnRadius: 50, imgRadius: 12, side: 14, gap: 10, padTop: 20, padBottom: 24, maxWidth: 480, widthMode: 'column',
       shadow: false, font: 'Inter', headFont: '', fontSize: 15, anim: 'slide', pressFx: false,
     }),
-    exp: { squarespace: true, layout: 'app', fullDoc: true, embed: true, imgMax: 1400, imgQ: 0.82, proxy: TD.DEFAULT_PROXY },
+    exp: { squarespace: true, layout: 'app', fullDoc: true, embed: true, imgMax: 1400, imgQ: 0.82, proxy: TD.DEFAULT_PROXY, proxyHosts: [] },
     times: [],
     blocks: [],
     sheets: [],

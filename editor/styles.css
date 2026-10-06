@@ -276,3 +276,16 @@ button.chip { padding: 0; cursor: pointer; }
 .btnlink { color: inherit; text-decoration: none; display: inline-block; }
 .cloud-err { margin: auto; text-align: center; padding: 40px; }
 .cloud-err a { color: var(--accent); }
+
+/* ⓘ descriptions */
+.field.row { flex-direction: row; }
+.info { flex: none; width: 17px; height: 17px; padding: 0; border-radius: 50%; border: 1px solid var(--line); background: var(--panel2); color: var(--muted); font: italic 700 11px/15px Georgia, serif; text-transform: none; letter-spacing: 0; }
+.info:hover, .info:focus-visible { color: var(--text); border-color: var(--accent); outline: none; }
+.tip { position: fixed; z-index: 1000; max-width: min(280px, calc(100vw - 16px)); background: #000d; color: #fff; font-size: 12px; line-height: 1.45; padding: 8px 10px; border-radius: 8px; pointer-events: none; opacity: 0; transition: opacity .12s; box-shadow: 0 6px 20px #0006; }
+.tip.show { opacity: 1; }
+.hint.ok { color: #3ecf8e; }
+.hint.warn { color: #f5b942; background: none; padding: 0; margin: 0; }
+details.setup { margin: 4px 0 6px; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+details.setup summary { cursor: pointer; font-size: 12px; font-weight: 600; color: var(--muted); }
+details.setup ol { margin: 8px 0 10px; padding-left: 18px; font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 4px; }
+details.setup a { color: var(--accent); }
