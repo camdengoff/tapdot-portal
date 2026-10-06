@@ -132,3 +132,14 @@ dialog:has(.answersdlg) { width: min(640px, calc(100vw - 32px)); }
 .answer dl { margin: 8px 0 0; display: grid; grid-template-columns: minmax(90px, 35%) 1fr; gap: 4px 12px; }
 .answer dt { color: var(--muted); font-size: 12px; padding-top: 1px; }
 .answer dd { margin: 0; white-space: pre-wrap; word-break: break-word; }
+
+/* template picker: page previews side by side */
+.tplgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 14px; padding: 16px; }
+.tplcard { font: inherit; color: inherit; text-align: left; background: transparent; border: 0; padding: 0; cursor: pointer; display: flex; flex-direction: column; gap: 4px; }
+.tplprev { position: relative; width: 100%; aspect-ratio: 195 / 300; border-radius: 12px; overflow: hidden; border: 2px solid var(--line); background: #000; margin-bottom: 6px; transition: border-color .15s, transform .15s; }
+.tplprev iframe { position: absolute; top: 0; left: 0; width: 200%; height: 200%; border: 0; transform: scale(.5); transform-origin: 0 0; pointer-events: none; }
+.tplprev.blank { display: flex; align-items: center; justify-content: center; background: transparent; border-style: dashed; font-size: 44px; color: var(--muted); }
+.tplcard:hover .tplprev, .tplcard:focus-visible .tplprev { border-color: var(--accent); transform: translateY(-2px); }
+.tplcard small { color: var(--muted); font-size: 12px; line-height: 1.35; }
+dialog:has(.newpage) { width: min(1080px, calc(100vw - 24px)); }
+.newpage .tplgrid { padding: 4px 0 0; max-height: 62vh; overflow-y: auto; }

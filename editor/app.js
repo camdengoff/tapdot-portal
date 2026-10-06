@@ -1266,10 +1266,17 @@
     $('#undo').onclick = () => travel(-1);
     $('#redo').onclick = () => travel(1);
     $('#newBtn').onclick = () => {
-      $('#tplGrid').replaceChildren(...Object.keys(TD.TEMPLATES).map((k) => h('button', { class: 'addopt', onclick: () => {
-        if (!confirm('Replace the current page with “' + TD.TEMPLATES[k].name + '”? (Undo can bring it back.)')) return;
-        snapshot(true); state = TD.TEMPLATES[k].build(); timeTab = 'normal'; open = new Set(); firstRender = true; $('#tplDlg').close(); tab = 'blocks'; changed(true); snapshot(true);
-      } }, h('b', null, TD.TEMPLATES[k].name), TD.TEMPLATES[k].desc ? h('small', null, TD.TEMPLATES[k].desc) : null)));
+      $('#tplGrid').replaceChildren(...['blank'].concat(Object.keys(TD.TEMPLATES).filter((k) => k !== 'blank')).map((k) => {
+        const t = TD.TEMPLATES[k];
+        const frame = h('iframe', { class: 'tplframe', tabindex: '-1', 'aria-hidden': 'true', loading: 'lazy' });
+        frame.setAttribute('sandbox', 'allow-scripts');
+        frame.srcdoc = k === 'blank' ? '' : TD.previewDoc(t.build());
+        return h('button', { class: 'tplcard', onclick: () => {
+          if (!confirm('Replace the current page with “' + t.name + '”? (Undo can bring it back.)')) return;
+          snapshot(true); state = t.build(); timeTab = 'normal'; open = new Set(); firstRender = true; $('#tplDlg').close(); tab = 'blocks'; changed(true); snapshot(true);
+        } }, h('div', { class: 'tplprev' + (k === 'blank' ? ' blank' : '') }, k === 'blank' ? h('span', null, '+') : frame),
+          h('b', null, k === 'blank' ? 'Start from scratch' : t.name), h('small', null, k === 'blank' ? 'An empty page. Add blocks one at a time.' : t.desc || ''));
+      }));
       $('#tplDlg').showModal();
     };
     $('#openBtn').onclick = () => {

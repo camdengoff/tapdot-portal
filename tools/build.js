@@ -50,5 +50,8 @@ const mkdir = (d) => fs.mkdirSync(path.join(root, d), { recursive: true });
 mkdir('dist/app');
 for (const f of fs.readdirSync(path.join(root, 'portal'))) fs.copyFileSync(path.join(root, 'portal', f), path.join(root, 'dist/app', f));
 fs.writeFileSync(path.join(root, 'dist/app/editor.html'), html);
+// The portal's New page picker draws template previews with the editor's own templates and renderer.
+mkdir('dist/app/td');
+for (const f of ['schema.js', 'render.js']) fs.copyFileSync(path.join(root, 'editor', f), path.join(root, 'dist/app/td', f));
 for (const f of fs.readdirSync(path.join(root, 'public'))) fs.copyFileSync(path.join(root, 'public', f), path.join(root, 'dist', f));
 console.log('dist/app/ (portal) and public/ files');

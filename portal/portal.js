@@ -125,16 +125,6 @@
     dlg.showModal();
   }
 
-  // Starter templates offered for a new page (built by the editor, see TD.TEMPLATES in editor/schema.js).
-  const STARTERS = [
-    ['welcome', 'Sunday welcome'],
-    ['connect', 'Connect card'],
-    ['event', 'Event sign-up'],
-    ['giving', 'Giving'],
-    ['links', 'Link list'],
-    ['blank', 'Blank page'],
-  ];
-
   // ── State and routing ────────────────────────────────────────────────
   let me = null;
   const route = () => decodeURIComponent(location.hash.slice(1));
@@ -292,15 +282,7 @@
           await api('/churches/' + enc(church.id), { method: 'PATCH', body: { name: v.name } }); me = await api('/me'); draw();
         }) }, 'Rename') : null,
         h('div', { class: 'grow' }),
-        h('button', { class: 'primary', onclick: act(async () => {
-          const v = await ask('New page', [
-            { k: 'name', l: 'Page name', placeholder: 'Sunday tap tag', max: 80 },
-            { k: 'template', l: 'Start from', value: 'welcome', options: STARTERS },
-          ], 'Create', 'You can change everything after. Photos and links in templates are examples to replace.');
-          if (!v) return;
-          const p = await api('/churches/' + enc(church.id) + '/pages', { method: 'POST', body: { name: v.name } });
-          location.href = 'editor.html?church=' + enc(church.id) + '&page=' + enc(p.id) + '&template=' + enc(v.template);
-        }) }, '+ New page')),
+        h('button', { class: 'primary', onclick: () => newPage(church) }, '+ New page')),
       pages.length ? h('div', { class: 'grid' }, pages.map(pageCard))
         : h('div', { class: 'card center muted' }, 'No pages yet. Create one to start editing.'),
       h('div', { class: 'head' }, h('h2', null, 'People'),
@@ -323,6 +305,46 @@
         await api('/churches/' + enc(church.id), { method: 'DELETE' });
         me = await api('/me'); location.hash = '';
       }) }, 'Delete church')) : null);
+  }
+
+  // ── New page: pick a template (previews side by side) or start from scratch ──
+  function newPage(church) {
+    const dlg = $('#dlg');
+    const TD = window.TD;
+    // Every church gets the general starters; BFC's own page and the feature tour are for admins.
+    const keys = TD && TD.TEMPLATES ? Object.keys(TD.TEMPLATES).filter((k) => k !== 'blank' && (me.admin || !['bethany', 'tour'].includes(k))) : [];
+    const name = h('input', { type: 'text', maxlength: 80, placeholder: 'Page name, e.g. Sunday tap tag', autocomplete: 'off' });
+    const create = async (key, btn) => {
+      const t = TD && TD.TEMPLATES[key];
+      const pageName = name.value.trim() || (key === 'blank' ? 'New page' : t.name);
+      btn.disabled = true;
+      try {
+        const p = await api('/churches/' + enc(church.id) + '/pages', { method: 'POST', body: { name: pageName } });
+        location.href = 'editor.html?church=' + enc(church.id) + '&page=' + enc(p.id) + '&template=' + enc(key);
+      } catch (e) { toast(e.message); btn.disabled = false; }
+    };
+    const card = (key) => {
+      const blank = key === 'blank';
+      const t = blank ? { name: 'Start from scratch', desc: 'An empty page. Add blocks one at a time.' } : TD.TEMPLATES[key];
+      let prev;
+      if (blank) prev = h('div', { class: 'tplprev blank' }, h('span', null, '+'));
+      else {
+        const f = h('iframe', { tabindex: '-1', 'aria-hidden': 'true', loading: 'lazy' });
+        f.setAttribute('sandbox', 'allow-scripts');
+        try { f.srcdoc = TD.previewDoc(t.build()); } catch (e) { /* preview is a nice-to-have */ }
+        prev = h('div', { class: 'tplprev' }, f);
+      }
+      const b = h('button', { class: 'tplcard', onclick: () => create(key, b) }, prev, h('b', null, t.name), t.desc ? h('small', null, t.desc) : null);
+      return b;
+    };
+    fill($('#dlgBody'), h('div', { class: 'dlgform newpage' },
+      h('div', { class: 'row' }, h('h2', { class: 'grow' }, 'New page'), h('button', { class: 'ghost sm', onclick: () => dlg.close() }, '✕')),
+      h('label', null, 'Name', name),
+      h('p', { class: 'muted small' }, 'Start from a template or from scratch. You can change everything after; photos and links in templates are examples to replace.'),
+      h('div', { class: 'tplgrid' }, card('blank'), keys.map(card))));
+    dlg.onclose = null;
+    dlg.showModal();
+    name.focus();
   }
 
   // ── Tap stats for one page ───────────────────────────────────────────

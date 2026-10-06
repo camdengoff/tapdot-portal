@@ -986,6 +986,12 @@ fieldset.td-bad legend,.td-f-check.td-bad span{color:#ef4444}
    * opts.forceTime: a time tab id ('normal' or a time id) to preview; '' follows the clock.
    * opts.formUrl: where Connect card answers are sent (only pages published from the portal).
    */
+  // A whole page as a still thumbnail (no entrance animation, no scrollbars), for template pickers.
+  TD.previewDoc = function (p) {
+    const q = Object.assign({}, p, { exp: Object.assign({}, p.exp, { fullDoc: true, embed: false }) });
+    return TD.render(q, { noAnim: true }).replace('</head>', '<style>html,body,#td-root{overflow:hidden!important;scrollbar-width:none}</style></head>');
+  };
+
   TD.render = function (p, opts) {
     opts = opts || {};
     const ctx = { title: p.title, proxy: p.exp.proxy, proxyHosts: p.exp.proxyHosts, noAnim: !!opts.noAnim, formUrl: opts.formUrl || '' };
