@@ -59,6 +59,11 @@
   ];
   TD.EMOJIS = '🙏 ✚ 💵 👋 🚧 🤝 📖 💧 👥 📅 ⛪ ✝️ ❤️ 🎉 📣 🎵 🎤 📺 ▶️ 📍 📞 ✉️ 💬 🔗 📋 🍕 ☕ 🎁 🙌 👶 🎮 📚 👴 🏠 🚗 🕒 ⭐ 🔥 🌱 💡 ✅ 📷 🎬 🧭 🛐 🕊️ 🌎 💒'.split(' ');
 
+  TD.FORM_KINDS = [
+    ['text', 'Short answer'], ['email', 'Email'], ['phone', 'Phone'], ['long', 'Long answer'],
+    ['choice', 'Pick one'], ['checks', 'Pick any (checkboxes)'], ['check', 'One checkbox (yes/no)'],
+  ];
+
   TD.newAction = (type) => ({ type: type || 'none', url: '', newTab: false, title: '', icon: '', sheet: '', text: '', toast: 'Copied!', phone: '', body: '', email: '', subject: '', target: '', direct: false });
 
   // ── Fields every block gets (style + visibility) ─────────────────────
@@ -306,6 +311,39 @@
       ],
       defaults: () => ({ label: 'Christmas Eve service starts in', target: '', tz: 'America/Chicago', done: 'Happening now!', hideDone: false, cdStyle: 'boxes', sub: '', btnLabel: 'Learn more', action: TD.newAction('link'), image: '', imgLayout: 'top', aspect: '16/9', dim: 50 }),
       summary: (b) => b.label,
+    },
+    form: {
+      name: 'Connect card', icon: '✍️', desc: 'A form visitors fill in; answers show up in your portal',
+      fields: [
+        { k: 'title', t: 'text', l: 'Title', rich: true },
+        { k: 'intro', t: 'textarea', l: 'Intro text (optional)', rich: true },
+        { k: 'items', t: 'list', l: 'Questions', itemName: 'Question', itemLabel: (i) => (i.required ? '* ' : '') + (i.label || 'Question'),
+          item: [
+            { k: 'label', t: 'text', l: 'Question' },
+            { k: 'kind', t: 'select', l: 'Answer type', opts: TD.FORM_KINDS },
+            { k: 'options', t: 'textarea', l: 'Choices (one per line)', when: (i) => i.kind === 'choice' || i.kind === 'checks' },
+            { k: 'ph', t: 'text', l: 'Placeholder (optional)', when: (i) => ['text', 'email', 'phone', 'long'].includes(i.kind) },
+            { k: 'required', t: 'checkbox', l: 'Required' },
+          ],
+          newItem: () => ({ label: 'Question', kind: 'text', options: '', ph: '', required: false }) },
+        { k: 'btnLabel', t: 'text', l: 'Send button text' },
+        { k: 'thanks', t: 'textarea', l: 'Message after sending', rich: true },
+        { k: 'notify', t: 'text', l: 'Also email answers to (optional)', ph: 'office@church.org, pastor@church.org',
+          hint: 'Answers always show in the TapDot portal. Email needs to be turned on for the portal. Up to 5 addresses, separated by commas.' },
+      ],
+      defaults: () => ({
+        title: 'Connect card', intro: 'We’re so glad you’re here! Tell us a little about yourself.',
+        items: [
+          { label: 'Name', kind: 'text', options: '', ph: 'First and last name', required: true },
+          { label: 'Email', kind: 'email', options: '', ph: 'you@example.com', required: false },
+          { label: 'Phone', kind: 'phone', options: '', ph: '', required: false },
+          { label: 'This is my…', kind: 'choice', options: 'First visit\nSecond visit\nI’m a regular', ph: '', required: false },
+          { label: 'I’d like to…', kind: 'checks', options: 'Learn more about the church\nGet involved serving\nTalk with a pastor', ph: '', required: false },
+          { label: 'How can we pray for you?', kind: 'long', options: '', ph: '', required: false },
+        ],
+        btnLabel: 'Send', thanks: 'Thank you! Someone from our team will reach out soon.', notify: '',
+      }),
+      summary: (b) => b.title + ' · ' + b.items.length + ' questions',
     },
     spacer: {
       name: 'Spacer / divider', icon: '➖', desc: 'Empty space or a thin line',

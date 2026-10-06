@@ -120,3 +120,15 @@ dialog:has(.statsdlg) { width: min(600px, calc(100vw - 32px)); }
 .tapBar { height: 8px; background: var(--panel2); border-radius: 4px; overflow: hidden; }
 .tapBar i { display: block; height: 100%; background: var(--accent); border-radius: 4px; }
 .tapRow b { text-align: right; }
+
+/* connect card answers */
+.answers { width: 100%; text-align: left; background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; display: flex; align-items: center; gap: 8px; }
+.answers:hover { border-color: var(--accent); }
+.answers .pill { margin-left: auto; }
+dialog:has(.answersdlg) { width: min(640px, calc(100vw - 32px)); }
+.answerlist { display: flex; flex-direction: column; gap: 10px; max-height: 60vh; overflow-y: auto; }
+.answer { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.answer.new { border-color: var(--ok); }
+.answer dl { margin: 8px 0 0; display: grid; grid-template-columns: minmax(90px, 35%) 1fr; gap: 4px 12px; }
+.answer dt { color: var(--muted); font-size: 12px; padding-top: 1px; }
+.answer dd { margin: 0; white-space: pre-wrap; word-break: break-word; }

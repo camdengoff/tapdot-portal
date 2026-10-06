@@ -192,6 +192,7 @@
     catch (e) { fill(main, h('div', { class: 'card center' }, h('p', null, e.message), h('a', { href: '#' }, 'Back'))); return; }
     if (route() !== id) return; // moved on while loading
     const { church, role, pages, members } = data;
+    const responses = data.responses || {};
     const manage = role === 'owner' || role === 'admin';
     document.title = church.name + ' · TapDot';
     const reload = () => drawChurch(id);
@@ -209,6 +210,9 @@
           p.publishedAt ? h('br') : null,
           p.publishedAt ? 'Published ' + when(p.publishedAt) + (p.publishedBy ? ' by ' + p.publishedBy : '') : null),
         statStrip(p),
+        responses[p.id] ? h('button', { class: 'answers' + (responses[p.id].unseen ? ' new' : ''), onclick: () => showResponses(church, p, reload) },
+          '📥 ', plural(responses[p.id].total, 'connect card answer', 'connect card answers'),
+          responses[p.id].unseen ? h('span', { class: 'pill ok' }, responses[p.id].unseen + ' new') : null) : null,
         h('div', { class: 'row wrap' },
           h('a', { class: 'primary btn', href: 'editor.html?church=' + enc(church.id) + '&page=' + enc(p.id) }, '✎ Edit'),
           p.publishedAt ? h('a', { class: 'ghost btn', href: live, target: '_blank', rel: 'noopener' }, '↗ Live page') : null,
@@ -342,6 +346,50 @@
         : h('p', { class: 'muted' }, 'No taps in this time yet.'),
       h('p', { class: 'muted small' }, 'A visit counts once per person every 30 minutes. Visits are counted on the site’s code block and the live link. No cookies are used and nothing about visitors is stored.'),
       h('div', { class: 'row end' }, h('button', { class: 'ghost', onclick: () => dlg.close() }, 'Close')));
+  }
+
+  // ── Connect card answers for one page ────────────────────────────────
+  function toCsv(list) {
+    const qs = [];
+    list.forEach((r) => r.answers.forEach((a) => { if (!qs.includes(a.q)) qs.push(a.q); }));
+    const cell = (v) => { v = String(v == null ? '' : v); if (/^[=+\-@]/.test(v)) v = "'" + v; return /[",\n\r]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+    const rows = [['Sent', 'Form'].concat(qs)].concat(list.map((r) => {
+      const by = {};
+      r.answers.forEach((a) => { by[a.q] = a.a; });
+      return [new Date(r.createdAt).toLocaleString(), r.form].concat(qs.map((q) => by[q] || ''));
+    }));
+    return '\ufeff' + rows.map((r) => r.map(cell).join(',')).join('\r\n') + '\r\n';
+  }
+  async function showResponses(church, p, reload) {
+    const dlg = $('#dlg');
+    const body = h('div', { class: 'dlgform answersdlg' }, h('p', { class: 'muted' }, 'Loading…'));
+    fill($('#dlgBody'), body);
+    dlg.onclose = reload;
+    dlg.showModal();
+    let list;
+    try { list = (await api('/churches/' + enc(church.id) + '/responses?page=' + enc(p.id))).responses; }
+    catch (e) { fill(body, h('p', null, e.message)); return; }
+    api('/churches/' + enc(church.id) + '/responses/seen', { method: 'POST', body: { page: p.id } }).catch(() => { /* stays "new" */ });
+    const draw = () => fill(body,
+      h('div', { class: 'row' }, h('h2', { class: 'grow' }, 'Connect card answers'),
+        list.length ? h('button', { class: 'ghost sm', onclick: () => {
+          const a = h('a', { href: URL.createObjectURL(new Blob([toCsv(list)], { type: 'text/csv' })), download: p.id + '-answers.csv' });
+          document.body.append(a); a.click(); a.remove();
+        } }, '⬇ Download for Excel') : null),
+      h('p', { class: 'muted small' }, p.name + ' · ' + plural(list.length, 'answer', 'answers') + ', newest first'),
+      list.length ? h('div', { class: 'answerlist' }, list.map((r) => h('div', { class: 'answer' + (r.seen ? '' : ' new') },
+        h('div', { class: 'row' },
+          h('b', { class: 'grow' }, r.form),
+          r.seen ? null : h('span', { class: 'pill ok' }, 'New'),
+          h('span', { class: 'muted small' }, when(r.createdAt)),
+          h('button', { class: 'ghost sm danger', title: 'Delete this answer', onclick: act(async () => {
+            if (!confirm('Delete this answer for good?')) return;
+            await api('/churches/' + enc(church.id) + '/responses/' + enc(r.id), { method: 'DELETE' });
+            list = list.filter((x) => x !== r); draw();
+          }) }, '🗑')),
+        h('dl', null, r.answers.filter((a) => a.a).map((a) => [h('dt', null, a.q), h('dd', null, a.a)]))))) : h('p', { class: 'muted' }, 'No answers yet.'),
+      h('div', { class: 'row end' }, h('button', { class: 'ghost', onclick: () => dlg.close() }, 'Close')));
+    draw();
   }
 
   // ── Account: name, password, sign out ────────────────────────────────

@@ -9,6 +9,7 @@
 import { db, HttpError, now, all, one, run, slugify, isSlug, normEmail, isEmail } from './db.js';
 import * as auth from './auth.js';
 import * as stats from './stats.js';
+import * as forms from './forms.js';
 
 const MAX_BODY = 20 * 1024 * 1024;
 
@@ -73,10 +74,12 @@ async function uniqueSlug(d, table, base, churchId) {
   throw new HttpError(409, 'Pick a different name.');
 }
 
-export async function handle({ request, env }) {
+export async function handle({ request, env, waitUntil }) {
   try {
-    // Visit and tap beacons come from churches' own sites, so they skip the origin check.
-    if (new URL(request.url).pathname === '/api/track') return await trackBeacon(request, env);
+    // Beacons and Connect card answers come from churches' own sites, so they skip the origin check.
+    const path = new URL(request.url).pathname;
+    if (path === '/api/track') return await trackBeacon(request, env);
+    if (path.startsWith('/api/form/')) return await formPost(request, env, path, waitUntil);
     checkOrigin(request);
     const d = await db(env);
     const url = new URL(request.url);
@@ -158,7 +161,7 @@ export async function handle({ request, env }) {
         const pages = (await all(d, 'SELECT * FROM pages WHERE church_id = ? ORDER BY name', churchId)).map(pageOut);
         const members = await all(d, 'SELECT m.email, m.role, m.added_at AS addedAt, u.name, (u.pw_hash IS NOT NULL) AS hasPassword, (u.google_sub IS NOT NULL) AS hasGoogle FROM members m LEFT JOIN users u ON u.email = m.email WHERE m.church_id = ? ORDER BY m.email', churchId);
         members.forEach((m) => { m.hasPassword = !!m.hasPassword; m.hasGoogle = !!m.hasGoogle; });
-        return json({ church, role, pages, members });
+        return json({ church, role, pages, members, responses: await forms.counts(d, churchId) });
       }
       if (M === 'PATCH') {
         if (!canManage(role)) throw new HttpError(403, 'Only an owner can rename the church.');
@@ -175,6 +178,7 @@ export async function handle({ request, env }) {
         await d.batch([
           d.prepare('DELETE FROM pages WHERE church_id = ?').bind(churchId),
           d.prepare('DELETE FROM stats WHERE church_id = ?').bind(churchId),
+          d.prepare('DELETE FROM responses WHERE church_id = ?').bind(churchId),
           d.prepare('DELETE FROM members WHERE church_id = ?').bind(churchId),
           d.prepare('DELETE FROM churches WHERE id = ?').bind(churchId),
         ]);
@@ -182,6 +186,21 @@ export async function handle({ request, env }) {
       }
     }
 
+    // ── Connect card answers ─────────────────────────────────────────
+    if (parts[2] === 'responses') {
+      if (route('GET', 3)) {
+        const p = await pageRow(d, churchId, url.searchParams.get('page'));
+        return json({ responses: await forms.list(d, churchId, p.id) });
+      }
+      if (route('POST', 4) && parts[3] === 'seen') {
+        const b = await body(request);
+        const p = await pageRow(d, churchId, b.page);
+        await forms.markSeen(d, churchId, p.id);
+        return json({ ok: true });
+      }
+      if (route('DELETE', 4)) { await forms.remove(d, churchId, parts[3]); return json({ ok: true }); }
+      throw new HttpError(404, 'Not found.');
+    }
     if (route('GET', 3) && parts[2] === 'stats') return json(await stats.churchStats(d, churchId, url.searchParams.get('days')));
 
     // ── People ───────────────────────────────────────────────────────
@@ -254,6 +273,7 @@ export async function handle({ request, env }) {
         await Promise.all([env.PAGES.delete('draft:' + key), env.PAGES.delete('live:' + key)]);
         await run(d, 'DELETE FROM pages WHERE church_id = ? AND id = ?', churchId, p.id);
         await run(d, 'DELETE FROM stats WHERE church_id = ? AND page_id = ?', churchId, p.id);
+        await run(d, 'DELETE FROM responses WHERE church_id = ? AND page_id = ?', churchId, p.id);
         return json({ ok: true });
       }
       if (route('PUT', 5) && parts[4] === 'draft') {
@@ -304,6 +324,22 @@ async function trackBeacon(request, env) {
   try { await stats.track(await db(env), request); }
   catch (e) { if (!(e instanceof HttpError)) console.error(e); return new Response(null, { status: e.status || 500, headers: BEACON_HEADERS }); }
   return new Response(null, { status: 204, headers: BEACON_HEADERS });
+}
+
+// POST /api/form/<church>/<page>: answers from a Connect card block on a live page.
+async function formPost(request, env, path, waitUntil) {
+  const cors = { 'Access-Control-Allow-Origin': '*' };
+  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: Object.assign({ 'Access-Control-Allow-Methods': 'POST', 'Access-Control-Allow-Headers': 'Content-Type' }, cors) });
+  const [c, p] = path.slice('/api/form/'.length).split('/').map(decodeURIComponent);
+  try {
+    if (request.method !== 'POST') throw new HttpError(405, 'Not allowed.');
+    if (!isSlug(c) || !isSlug(p)) throw new HttpError(404, 'This form is no longer taking answers.');
+    await forms.submit(await db(env), env, request, c, p, waitUntil);
+    return json({ ok: true }, 200, cors);
+  } catch (e) {
+    if (!(e instanceof HttpError)) console.error(e);
+    return json({ error: e instanceof HttpError ? e.message : 'Your answers could not be sent. Please try again.' }, e.status || 500, cors);
+  }
 }
 
 // ── Public live pages ─────────────────────────────────────────────────

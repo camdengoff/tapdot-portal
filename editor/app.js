@@ -1057,7 +1057,9 @@
   }
   function publishHtml() {
     // Always the lightweight fragment form: the site page supplies <html>/<head>/<body>.
-    return TD.render(Object.assign({}, state, { exp: Object.assign({}, state.exp, { fullDoc: false }) }), {});
+    // From the portal, Connect card answers go back to this page's account.
+    const formUrl = CLOUD ? location.origin + '/api/form/' + encodeURIComponent(CLOUD.church) + '/' + encodeURIComponent(CLOUD.page) : '';
+    return TD.render(Object.assign({}, state, { exp: Object.assign({}, state.exp, { fullDoc: false }) }), { formUrl });
   }
   async function publish(btn) {
     const key = getKey();

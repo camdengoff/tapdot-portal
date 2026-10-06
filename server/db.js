@@ -60,6 +60,24 @@ const SCHEMA = [
     n INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (church_id, page_id, day, kind, label)
   )`,
+  // Connect card answers sent from live pages. See forms.js.
+  `CREATE TABLE IF NOT EXISTS responses (
+    id TEXT PRIMARY KEY,
+    church_id TEXT NOT NULL,
+    page_id TEXT NOT NULL,
+    block_id TEXT NOT NULL DEFAULT '',
+    form TEXT NOT NULL DEFAULT '',
+    answers TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    seen INTEGER NOT NULL DEFAULT 0
+  )`,
+  'CREATE INDEX IF NOT EXISTS responses_page ON responses (church_id, page_id, created_at)',
+  // Recent form sends per visitor (a hash of their IP address and the page), to slow down spam.
+  `CREATE TABLE IF NOT EXISTS form_hits (
+    id TEXT NOT NULL,
+    at INTEGER NOT NULL
+  )`,
+  'CREATE INDEX IF NOT EXISTS form_hits_id ON form_hits (id)',
   'CREATE INDEX IF NOT EXISTS members_email ON members (email)',
   'CREATE INDEX IF NOT EXISTS sessions_email ON sessions (email)',
   'CREATE INDEX IF NOT EXISTS login_fails_email ON login_fails (email)',

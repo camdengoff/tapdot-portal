@@ -242,6 +242,40 @@
       }).join('');
       return '<div class="td-gallery" style="grid-template-columns:repeat(' + (+b.cols || 3) + ',1fr);gap:' + (+b.gap || 0) + 'px">' + items + '</div>';
     },
+    // Connect card: answers are sent to the portal page the form was published from (ctx.formUrl).
+    form(b, ctx) {
+      const kinds = { email: 'email', phone: 'tel' };
+      const q = b.items.map((it, i) => {
+        const id = 'td-f-' + b.id + '-' + i;
+        const req = it.required ? ' required' : '';
+        const star = it.required ? '<span class="td-req" aria-hidden="true">*</span>' : '';
+        const lab = esc(it.label || 'Question');
+        const ph = it.ph ? ' placeholder="' + esc(it.ph) + '"' : '';
+        const opts = String(it.options || '').split('\n').map((o) => o.trim()).filter(Boolean);
+        if (it.kind === 'check') {
+          return '<label class="td-f-check"><input type="checkbox" name="q' + i + '" value="Yes"' + req + ' /><span>' + lab + star + '</span></label>';
+        }
+        if (it.kind === 'choice' || it.kind === 'checks') {
+          const type = it.kind === 'choice' ? 'radio' : 'checkbox';
+          return '<fieldset class="td-f-q" data-td-label="' + lab + '"' + (it.required ? ' data-td-req' : '') + '><legend>' + lab + star + '</legend>' +
+            opts.map((o) => '<label class="td-f-check"><input type="' + type + '" name="q' + i + '" value="' + esc(o) + '"' + (type === 'radio' ? req : '') + ' /><span>' + esc(o) + '</span></label>').join('') + '</fieldset>';
+        }
+        const input = it.kind === 'long'
+          ? '<textarea id="' + id + '" name="q' + i + '" rows="3" maxlength="2000"' + ph + req + '></textarea>'
+          : '<input id="' + id + '" name="q' + i + '" type="' + (kinds[it.kind] || 'text') + '" maxlength="200"' + ph + req +
+            (it.kind === 'email' ? ' autocomplete="email"' : it.kind === 'phone' ? ' autocomplete="tel"' : /name/i.test(it.label) ? ' autocomplete="name"' : '') + ' />';
+        return '<div class="td-f-q"><label for="' + id + '">' + lab + star + '</label>' + input + '</div>';
+      }).join('');
+      const labels = b.items.map((it) => it.label || 'Question');
+      return '<form class="td-form td-card" novalidate data-td-form="' + esc(b.id) + '" data-td-post="' + esc(ctx.formUrl || '') + '" data-td-labels="' + esc(JSON.stringify(labels)) + '">' +
+        (b.title ? '<div class="td-form-title td-head">' + md(b.title) + '</div>' : '') +
+        (b.intro ? '<div class="td-form-intro">' + md(b.intro, true) + '</div>' : '') +
+        q +
+        '<input class="td-hp" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" />' +
+        '<div class="td-form-err" role="alert"></div>' +
+        '<button type="submit" class="td-form-btn">' + esc(b.btnLabel || 'Send') + '</button>' +
+        '</form><div class="td-form-done td-card" hidden>' + md(b.thanks || 'Thank you!', true) + '</div>';
+    },
     copy(b) {
       const rows = b.items.map((it) =>
         '<div class="td-copy-row"><div class="td-copy-text">' + (it.label ? '<div class="td-tag">' + md(it.label) + '</div>' : '') +
@@ -463,6 +497,30 @@ ${t.pressFx ? '.td-tap:active{transform:scale(.97)}' : ''}
 .td-copy-val{font-size:15px;font-weight:600;word-break:break-word}
 .td-copy-btn{flex-shrink:0;background:var(--td-accent);color:var(--td-accent-text) !important;border-radius:var(--td-btn-radius);padding:8px 14px;font-size:13px;font-weight:700}
 .td-copy-btn.td-tap:active{filter:brightness(.9)}
+/* connect card form */
+.td-form{padding:16px;display:flex;flex-direction:column;gap:14px}
+.td-form-title{font-weight:700;font-size:17px}
+.td-form-intro{color:var(--td-muted);font-size:14px;margin-top:-6px}
+.td-form-intro p{margin:0 0 6px}
+.td-f-q{display:flex;flex-direction:column;gap:6px;border:0;margin:0;padding:0;min-width:0}
+.td-f-q>label,.td-f-q legend{font-size:13px;font-weight:600;padding:0}
+.td-req{color:var(--td-accent);margin-left:3px}
+.td-form input[type=text],.td-form input[type=email],.td-form input[type=tel],.td-form textarea{font:inherit;font-size:16px;color:var(--td-text);background:rgba(128,128,128,.12);border:1.5px solid rgba(128,128,128,.25);border-radius:calc(var(--td-radius)*.6);padding:10px 12px;width:100%;box-sizing:border-box;outline:none;-webkit-appearance:none;appearance:none}
+.td-form input:focus,.td-form textarea:focus{border-color:var(--td-accent)}
+.td-form textarea{resize:vertical;min-height:72px}
+.td-f-check{display:flex;align-items:flex-start;gap:10px;font-size:15px;cursor:pointer;padding:3px 0}
+.td-f-check input{width:20px;height:20px;margin:1px 0 0;flex-shrink:0;accent-color:var(--td-accent)}
+.td-f-q .td-bad,.td-form .td-bad{border-color:#ef4444 !important}
+fieldset.td-bad legend,.td-f-check.td-bad span{color:#ef4444}
+.td-hp{position:absolute !important;left:-9999px !important;width:1px;height:1px;opacity:0}
+.td-form-err{color:#ef4444;font-size:13px;display:none}
+.td-form-err.show{display:block}
+.td-form-btn{font:inherit;font-weight:700;font-size:16px;background:var(--td-accent);color:var(--td-accent-text);border:0;border-radius:var(--td-btn-radius);padding:13px;cursor:pointer;-webkit-appearance:none}
+.td-form-btn:active{filter:brightness(.9)}
+.td-form-btn:disabled{opacity:.6}
+.td-form[hidden],.td-form-done[hidden]{display:none !important}
+.td-form-done{padding:22px 18px;text-align:center;font-size:16px;font-weight:600}
+.td-form-done p{margin:0}
 /* events */
 .td-events-msg{padding:20px;text-align:center;color:var(--td-muted);font-size:13px}
 .td-events-list{display:flex;flex-direction:column;gap:1px;background:rgba(0,0,0,.4);border-radius:var(--td-radius);overflow:hidden}
@@ -633,6 +691,52 @@ ${t.pressFx ? '.td-tap:active{transform:scale(.97)}' : ''}
       }
     });
     D.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeAll(); });
+
+    // connect card forms: check the answers, then send them to the portal
+    $$('[data-td-form]').forEach(function (f) {
+      var started = Date.now();
+      var err = $('.td-form-err', f), btn = $('.td-form-btn', f), done = f.nextElementSibling;
+      function fail(m) { err.textContent = m; err.classList.add('show'); }
+      f.addEventListener('input', function (e) { var x = e.target.closest('.td-bad'); if (x) x.classList.remove('td-bad'); });
+      f.addEventListener('change', function (e) { var x = e.target.closest('.td-bad'); if (x) x.classList.remove('td-bad'); });
+      f.addEventListener('submit', function (e) {
+        e.preventDefault();
+        err.classList.remove('show');
+        $$('.td-bad', f).forEach(function (el) { el.classList.remove('td-bad'); });
+        var labels = []; try { labels = JSON.parse(f.getAttribute('data-td-labels')) || []; } catch (x) {}
+        var missing = [], badEmail = null, first = null;
+        var answers = labels.map(function (label, i) {
+          var els = $$('[name="q' + i + '"]', f);
+          if (!els.length) return { q: label, a: '' };
+          var pick = els[0].type === 'checkbox' || els[0].type === 'radio';
+          var vals = els.filter(function (el) { return !pick || el.checked; }).map(function (el) { return el.value.trim(); }).filter(Boolean);
+          var box = els[0].closest('fieldset') || (pick ? els[0].closest('label') : els[0]);
+          var req = els[0].required || !!els[0].closest('[data-td-req]');
+          var bad = false;
+          if (req && !vals.length) { missing.push(label); bad = true; }
+          else if (els[0].type === 'email' && vals[0] && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(vals[0])) { badEmail = label; bad = true; }
+          if (bad) { box.classList.add('td-bad'); first = first || els[0]; }
+          return { q: label, a: vals.join(', ') };
+        });
+        if (missing.length) { fail('Please fill in: ' + missing.join(', ')); first.focus(); return; }
+        if (badEmail) { fail('Please check the ' + badEmail.toLowerCase() + ' address.'); first.focus(); return; }
+        if (!answers.some(function (a) { return a.a; })) { fail('Please fill in the form first.'); return; }
+        function finish() {
+          f.hidden = true; done.hidden = false;
+          try { done.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (x) {}
+        }
+        if (PREVIEW) { toast('Preview: answers are not sent'); finish(); return; }
+        var post = f.getAttribute('data-td-post');
+        if (!post) { fail('This form isn’t connected yet. Publish the page from the TapDot portal to collect answers.'); return; }
+        var label = btn.textContent;
+        btn.disabled = true; btn.textContent = 'Sending…';
+        var hp = $('.td-hp', f);
+        fetch(post, { method: 'POST', body: JSON.stringify({ block: f.getAttribute('data-td-form'), answers: answers, website: hp ? hp.value : '', ms: Date.now() - started }) })
+          .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok) throw { msg: j.error }; }); })
+          .then(finish, function (x) { fail((x && x.msg) || 'Your answers could not be sent. Check your connection and try again.'); })
+          .then(function () { btn.disabled = false; btn.textContent = label; });
+      });
+    });
 
     // accordion: one open at a time
     $$('[data-td-single] details').forEach(function (d) {
@@ -880,10 +984,11 @@ ${t.pressFx ? '.td-tap:active{transform:scale(.97)}' : ''}
    * opts.preview: adds editor hooks (click-to-select, link interception).
    * opts.noAnim: skips entrance animation (used for live re-renders).
    * opts.forceTime: a time tab id ('normal' or a time id) to preview; '' follows the clock.
+   * opts.formUrl: where Connect card answers are sent (only pages published from the portal).
    */
   TD.render = function (p, opts) {
     opts = opts || {};
-    const ctx = { title: p.title, proxy: p.exp.proxy, proxyHosts: p.exp.proxyHosts, noAnim: !!opts.noAnim };
+    const ctx = { title: p.title, proxy: p.exp.proxy, proxyHosts: p.exp.proxyHosts, noAnim: !!opts.noAnim, formUrl: opts.formUrl || '' };
     const t = p.theme;
     const anim = t.anim !== 'none' && !opts.noAnim;
     let n = 0;

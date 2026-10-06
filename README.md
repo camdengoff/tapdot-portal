@@ -30,6 +30,11 @@ every Publish updates the live page.
   90 or 365 days and a list of which buttons people tapped. Live pages send a beacon to `/api/track`; a
   visit counts once per browser tab every 30 minutes. Only daily counts per page and button label are kept
   (D1 table `stats`, about 400 days), with no cookies and nothing about the visitor.
+- **Connect card:** a form block (name, email, phone, pick-one, checkboxes, long answers). On pages published
+  from the portal, answers go to `/api/form/<church>/<page>` and show on the page card as "connect card
+  answers", with a download for Excel. Spam is slowed by a hidden field, a minimum fill time and 5 sends per
+  visitor every 10 minutes. To also email answers to the addresses set on the block, add `RESEND_API_KEY`
+  (Secret) and `MAIL_FROM` (Text, e.g. `TapDot <forms@camdengoff.com>`, on a domain verified at resend.com).
 
 ### One-time setup in Cloudflare
 
@@ -106,7 +111,7 @@ Run `node tools/build.js` after changing `portal/`, `public/` or the editor.
 - `portal/`: the client portal pages (copied to `dist/app/` by the build)
 - `public/embed.js`: the loader that the live-page code block uses
 - `functions/` and `server/`: the portal API on Cloudflare Pages Functions (`server/api.js` routes,
-  `server/auth.js` sign-in, `server/db.js` tables, `server/stats.js` tap stats)
+  `server/auth.js` sign-in, `server/db.js` tables, `server/stats.js` tap stats, `server/forms.js` connect card answers)
 
 ## Pop-up proxy (for sites that won't open in a pop-up)
 
