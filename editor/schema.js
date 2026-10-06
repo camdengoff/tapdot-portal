@@ -507,9 +507,146 @@
   };
   const PROXY = 'https://bethanynaz-proxy.cgoff.workers.dev';
 
-  TD.TEMPLATES = {
+  // Starter templates: generic pages any church can fill in. Photos are placeholders to replace.
+  const photo = (id) => 'https://picsum.photos/id/' + id + '/1200/800';
+  const starter = (title, palette) => {
+    const p = TD.newProject();
+    p.title = title;
+    Object.assign(p.theme, TD.PALETTES[palette]);
+    return p;
+  };
+  const visitSheet = () => Object.assign(TD.newSheet(), {
+    id: 'contact', title: 'Contact us', subtitle: 'We’d love to hear from you', icon: '💬', items: [
+      { icon: '📞', iconBg: '#10b98133', title: 'Call the office', desc: '(555) 010-2030', action: act('phone', { phone: '5550102030' }) },
+      { icon: '💬', iconBg: '#3b7de133', title: 'Send a text', desc: 'We usually reply within a day', action: act('sms', { phone: '5550102030', body: 'Hi! I have a question:' }) },
+      { icon: '✉️', iconBg: '#fbbf2433', title: 'Email us', desc: 'hello@yourchurch.org', action: act('email', { email: 'hello@yourchurch.org', subject: 'Hello!' }) },
+      { icon: '📍', iconBg: '#d36bff33', title: 'Get directions', desc: '123 Main St, Springfield', action: act('link', { url: 'https://maps.google.com/?q=123+Main+St+Springfield', newTab: true }) },
+    ] });
+
+  const STARTERS = {
+    welcome: {
+      name: 'Sunday welcome',
+      desc: 'Welcome hero, quick buttons, service times, connect card and guest Wi-Fi.',
+      build: () => {
+        const p = starter('Welcome', 'Light');
+        p.sheets = [visitSheet()];
+        p.blocks = [
+          blk('hero', { images: [photo(1018)], textPos: 'below', title: 'Welcome to ==Your Church==', subtitle: 'We’re so glad you’re here today.' }),
+          blk('buttons', { layout: 'scroll', style: { mt: 14 }, items: [
+            { label: 'Connect card', icon: '👋', iconBg: '#3b7de126', bg: '', color: '', action: act('scroll', { target: 'connect' }) },
+            { label: 'Give', icon: '💵', iconBg: '#10b98126', bg: '', color: '', action: act('link', { url: 'https://example.com/give' }) },
+            { label: 'Contact', icon: '💬', iconBg: '#fbbf2426', bg: '', color: '', action: act('sheet', { sheet: 'contact' }) },
+            { label: 'Share', icon: '🔗', iconBg: '#d36bff26', bg: '', color: '', action: act('share', {}) },
+          ] }),
+          blk('banner', { icon: '👋', eyebrow: 'New here?', title: 'Fill out a connect card', subtitle: 'Let us know you visited. It takes a minute.', action: act('scroll', { target: 'connect' }), style: { mt: 6 } }),
+          blk('heading', { title: 'Good to know', style: { mt: 12 } }),
+          blk('accordion', { items: [
+            { icon: '🕒', title: 'Service times', body: 'Sundays at **9:00** and **10:45 AM**.', image: '', btnLabel: '', action: TD.newAction(), open: true },
+            { icon: '👶', title: 'Kids and students', body: 'Kids check in at the ==Kids== desk by the main doors. Students meet in the youth room.', image: '', btnLabel: '', action: TD.newAction(), open: false },
+            { icon: '☕', title: 'Coffee and connection', body: 'Grab a free coffee in the lobby before and after each service.', image: '', btnLabel: '', action: TD.newAction(), open: false },
+          ] }),
+          blk('copy', { title: 'Guest Wi-Fi', style: { mt: 6 }, items: [{ label: 'Network', value: 'Guest', toast: 'Network name copied' }, { label: 'Password', value: 'welcome123', toast: 'Password copied' }] }),
+          blk('form', { anchor: 'connect', style: { mt: 12 } }),
+        ];
+        return p;
+      },
+    },
+    connect: {
+      name: 'Connect card',
+      desc: 'Just a connect card, for pew tags and seat-back QR codes.',
+      build: () => {
+        const p = starter('Connect Card', 'Warm');
+        p.blocks = [
+          blk('text', { body: '**Hi, friend!** 👋\nThanks for worshipping with us. Fill this out and we’ll be in touch.', size: 17, align: 'center' }),
+          blk('form', { title: '', intro: '' }),
+          blk('text', { body: 'We never share your information.', size: 12, align: 'center', muted: true }),
+        ];
+        return p;
+      },
+    },
+    event: {
+      name: 'Event sign-up',
+      desc: 'Photo, countdown, event details, FAQ and a sign-up form.',
+      build: () => {
+        const p = starter('Fall Festival', 'Midnight');
+        const d = new Date(); d.setDate(d.getDate() + 30);
+        const target = d.toISOString().slice(0, 10) + 'T17:00';
+        p.blocks = [
+          blk('hero', { images: [photo(1036)], textPos: 'overlay', title: 'Fall ==Festival==', subtitle: 'Food, games and fun for the whole family', titleSize: 30 }),
+          blk('countdown', { label: 'Starts in', target, btnLabel: '', style: { mt: 12 } }),
+          blk('text', { body: '**Saturday, 5:00 to 8:00 PM**\nOn the church lawn. Bring a lawn chair and a friend!', card: true, style: { mt: 6 } }),
+          blk('buttons', { layout: 'grid2', variant: 'card', items: [
+            { label: 'Sign up', icon: '✍️', iconBg: '#6c8cff33', bg: '', color: '', action: act('scroll', { target: 'signup' }) },
+            { label: 'Directions', icon: '📍', iconBg: '#fbbf2433', bg: '', color: '', action: act('link', { url: 'https://maps.google.com/?q=123+Main+St+Springfield', newTab: true }) },
+          ] }),
+          blk('heading', { title: 'Questions', style: { mt: 12 } }),
+          blk('accordion', { items: [
+            { icon: '💲', title: 'Does it cost anything?', body: 'No, it’s free for everyone.', image: '', btnLabel: '', action: TD.newAction(), open: false },
+            { icon: '🌧️', title: 'What if it rains?', body: 'We’ll move inside to the gym.', image: '', btnLabel: '', action: TD.newAction(), open: false },
+            { icon: '🙋', title: 'Can I volunteer?', body: 'Yes! Tick “I can help out” on the sign-up form.', image: '', btnLabel: '', action: TD.newAction(), open: false },
+          ] }),
+          blk('form', { anchor: 'signup', title: 'Sign up', intro: 'Let us know you’re coming so we have enough food.', btnLabel: 'Sign me up', thanks: 'You’re signed up! See you there. 🎉', style: { mt: 12 }, items: [
+            { label: 'Name', kind: 'text', options: '', ph: 'First and last name', required: true },
+            { label: 'Email', kind: 'email', options: '', ph: 'you@example.com', required: true },
+            { label: 'How many are coming?', kind: 'choice', options: '1\n2\n3\n4\n5 or more', ph: '', required: true },
+            { label: 'I can help out', kind: 'check', options: '', ph: '', required: false },
+          ] }),
+        ];
+        return p;
+      },
+    },
+    giving: {
+      name: 'Giving',
+      desc: 'Give online, text to give, mailing address and giving FAQ.',
+      build: () => {
+        const p = starter('Give', 'Forest');
+        p.blocks = [
+          blk('hero', { images: [photo(1015)], textPos: 'below', title: 'Thank you for ==giving==', subtitle: 'Your generosity helps our church serve our community.' }),
+          blk('buttons', { layout: 'stack', variant: 'accent', style: { mt: 14 }, items: [
+            { label: 'Give online', icon: '💳', iconBg: '', bg: '', color: '', action: act('link', { url: 'https://example.com/give' }) },
+          ] }),
+          blk('buttons', { layout: 'grid2', variant: 'card', items: [
+            { label: 'Text to give', icon: '💬', iconBg: '#34c47c33', bg: '', color: '', action: act('sms', { phone: '5550102030', body: 'Give' }) },
+            { label: 'Share', icon: '🔗', iconBg: '#34c47c33', bg: '', color: '', action: act('share', {}) },
+          ] }),
+          blk('copy', { title: 'Give by mail', style: { mt: 6 }, items: [{ label: 'Make checks out to “Your Church” and mail to', value: '123 Main St\nSpringfield, IL 62701', toast: 'Address copied' }] }),
+          blk('heading', { title: 'Questions', style: { mt: 12 } }),
+          blk('accordion', { items: [
+            { icon: '🧾', title: 'Will I get a giving statement?', body: 'Yes. Statements are emailed every January.', image: '', btnLabel: '', action: TD.newAction(), open: false },
+            { icon: '🔁', title: 'Can I set up recurring giving?', body: 'Yes, choose “Make this recurring” when you give online.', image: '', btnLabel: '', action: TD.newAction(), open: false },
+          ] }),
+        ];
+        return p;
+      },
+    },
+    links: {
+      name: 'Link list',
+      desc: 'Simple stack of buttons, like a link-in-bio page.',
+      build: () => {
+        const p = starter('Your Church', 'Plum');
+        p.sheets = [visitSheet()];
+        const b = (label, icon, action) => ({ label, icon, iconBg: '#d36bff26', bg: '', color: '', action });
+        p.blocks = [
+          blk('heading', { title: '==Your Church==', size: 26, align: 'center', style: { mt: 18 } }),
+          blk('text', { body: 'Everything you need, in one place.', align: 'center', muted: true }),
+          blk('buttons', { layout: 'stack', variant: 'card', shape: 14, size: 'lg', style: { mt: 12 }, items: [
+            b('Plan a visit', '📅', act('link', { url: 'https://example.com/visit' })),
+            b('Watch live', '📺', act('link', { url: 'https://youtube.com' })),
+            b('Sermon notes', '📖', act('popup', { url: 'https://example.com/notes', title: 'Sermon notes', icon: '📖' })),
+            b('Prayer request', '🙏', act('link', { url: 'https://example.com/prayer' })),
+            b('Give', '💵', act('link', { url: 'https://example.com/give' })),
+            b('Contact us', '💬', act('sheet', { sheet: 'contact' })),
+          ] }),
+        ];
+        return p;
+      },
+    },
+  };
+
+  TD.TEMPLATES = Object.assign({}, STARTERS, {
     bethany: {
       name: 'Bethany tap page (matches base html)',
+      desc: 'BFC’s own tap page, with chapel times.',
       build: () => {
         const p = TD.newProject();
         p.title = 'Bethany First Church';
@@ -565,6 +702,7 @@
     },
     tour: {
       name: 'Feature tour (every block type)',
+      desc: 'A sample of every block, for trying things out.',
       build: () => {
         const p = TD.newProject();
         p.title = 'Feature Tour';
@@ -607,6 +745,6 @@
         return p;
       },
     },
-    blank: { name: 'Blank page', build: () => TD.newProject() },
-  };
+    blank: { name: 'Blank page', desc: 'Start from nothing.', build: () => TD.newProject() },
+  });
 })();

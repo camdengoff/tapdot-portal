@@ -125,6 +125,16 @@
     dlg.showModal();
   }
 
+  // Starter templates offered for a new page (built by the editor, see TD.TEMPLATES in editor/schema.js).
+  const STARTERS = [
+    ['welcome', 'Sunday welcome'],
+    ['connect', 'Connect card'],
+    ['event', 'Event sign-up'],
+    ['giving', 'Giving'],
+    ['links', 'Link list'],
+    ['blank', 'Blank page'],
+  ];
+
   // ── State and routing ────────────────────────────────────────────────
   let me = null;
   const route = () => decodeURIComponent(location.hash.slice(1));
@@ -283,11 +293,13 @@
         }) }, 'Rename') : null,
         h('div', { class: 'grow' }),
         h('button', { class: 'primary', onclick: act(async () => {
-          const v = await ask('New page', [{ k: 'name', l: 'Page name', placeholder: 'Sunday tap tag', max: 80 }], 'Create',
-            'You’ll start from a blank page. Use New in the editor to pick a template.');
+          const v = await ask('New page', [
+            { k: 'name', l: 'Page name', placeholder: 'Sunday tap tag', max: 80 },
+            { k: 'template', l: 'Start from', value: 'welcome', options: STARTERS },
+          ], 'Create', 'You can change everything after. Photos and links in templates are examples to replace.');
           if (!v) return;
           const p = await api('/churches/' + enc(church.id) + '/pages', { method: 'POST', body: { name: v.name } });
-          location.href = 'editor.html?church=' + enc(church.id) + '&page=' + enc(p.id);
+          location.href = 'editor.html?church=' + enc(church.id) + '&page=' + enc(p.id) + '&template=' + enc(v.template);
         }) }, '+ New page')),
       pages.length ? h('div', { class: 'grid' }, pages.map(pageCard))
         : h('div', { class: 'card center muted' }, 'No pages yet. Create one to start editing.'),

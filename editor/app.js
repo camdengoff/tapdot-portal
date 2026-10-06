@@ -1232,8 +1232,11 @@
       try {
         const p = await cloudFetch('', {});
         CLOUD.draftAt = p.draftAt; CLOUD.name = p.name; CLOUD.churchName = p.church; CLOUD.publishedAt = p.publishedAt;
-        state = p.draft ? TD.normalize(p.draft) : TD.TEMPLATES.blank.build();
-        if (!p.draft) state.title = p.name;
+        // A brand-new page starts from the template picked in the portal (?template=…), or blank.
+        const tpl = new URLSearchParams(location.search).get('template');
+        state = p.draft ? TD.normalize(p.draft) : (TD.TEMPLATES[tpl] || TD.TEMPLATES.blank).build();
+        if (!p.draft) { state.title = p.name; if (TD.TEMPLATES[tpl]) setTimeout(cloudSaveNow, 0); CLOUD.dirty = !!TD.TEMPLATES[tpl]; }
+        if (tpl) history.replaceState(null, '', location.pathname + '?church=' + encodeURIComponent(CLOUD.church) + '&page=' + encodeURIComponent(CLOUD.page));
       } catch (e) {
         document.body.replaceChildren(h('div', { class: 'cloud-err' }, h('p', null, 'This page could not open: ' + e.message), h('a', { href: '/app/' }, 'Back to the portal')));
         return;
@@ -1266,7 +1269,7 @@
       $('#tplGrid').replaceChildren(...Object.keys(TD.TEMPLATES).map((k) => h('button', { class: 'addopt', onclick: () => {
         if (!confirm('Replace the current page with “' + TD.TEMPLATES[k].name + '”? (Undo can bring it back.)')) return;
         snapshot(true); state = TD.TEMPLATES[k].build(); timeTab = 'normal'; open = new Set(); firstRender = true; $('#tplDlg').close(); tab = 'blocks'; changed(true); snapshot(true);
-      } }, h('b', null, TD.TEMPLATES[k].name))));
+      } }, h('b', null, TD.TEMPLATES[k].name), TD.TEMPLATES[k].desc ? h('small', null, TD.TEMPLATES[k].desc) : null)));
       $('#tplDlg').showModal();
     };
     $('#openBtn').onclick = () => {
