@@ -150,3 +150,16 @@ dialog:has(.newpage) { width: min(1080px, calc(100vw - 24px)); }
 .tplitem .tplprev { margin-bottom: 2px; }
 .tplitem.off .tplprev { opacity: .45; }
 #tplBtn.on { border-color: var(--accent); }
+
+/* activity log */
+.activity { display: flex; flex-direction: column; gap: 8px; }
+.activity h3 { margin: 6px 0 0; }
+.activity input[type=date] { width: auto; padding: 4px 8px; font-size: 12px; }
+.log { display: flex; flex-direction: column; max-height: 300px; overflow-y: auto; border: 1px solid var(--line); border-radius: 10px; }
+.logrow { display: flex; gap: 12px; padding: 8px 10px; align-items: flex-start; }
+.logrow + .logrow { border-top: 1px solid var(--line); }
+.logtime { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 12px; min-width: 64px; padding-top: 2px; }
+.logwhat { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.logtaps { display: flex; flex-wrap: wrap; gap: 4px; }
+.logtap { background: var(--panel2); border-radius: 99px; padding: 2px 9px; font-size: 12px; display: inline-flex; gap: 6px; align-items: baseline; }
+.logtap small { color: var(--muted); font-size: 11px; }

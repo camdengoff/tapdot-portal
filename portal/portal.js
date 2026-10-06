@@ -44,7 +44,7 @@
   const plural = (n, one, many) => n.toLocaleString() + ' ' + (n === 1 ? one : many);
   const shortDay = (day) => new Date(day + 'T12:00:00').toLocaleDateString([], { month: 'short', day: 'numeric' });
   // A small bar chart of visits per day; each bar's tooltip gives the date and count.
-  function bars(days, values, tall) {
+  function bars(days, values, tall, tip) {
     const NS = 'http://www.w3.org/2000/svg';
     const w = 100 / days.length;
     const max = Math.max(1, ...values);
@@ -59,7 +59,7 @@
       r.setAttribute('y', 40 - bh); r.setAttribute('height', bh);
       if (!values[i]) r.setAttribute('class', 'zero');
       const t = document.createElementNS(NS, 'title');
-      t.textContent = shortDay(day) + ': ' + plural(values[i], 'visit', 'visits');
+      t.textContent = tip ? tip(day, values[i]) : shortDay(day) + ': ' + plural(values[i], 'visit', 'visits');
       r.append(t); svg.append(r);
     });
     return svg;
@@ -471,6 +471,7 @@
           h('span', { class: 'tapBar' }, h('i', { style: 'width:' + Math.max(3, (c / maxB) * 100) + '%' })),
           h('b', null, c.toLocaleString()))))
         : h('p', { class: 'muted' }, 'No taps in this time yet.'),
+      activityLog(church, p),
       h('p', { class: 'muted small' }, 'A visit counts once per person every 30 minutes. Visits are counted on the site’s code block and the live link. No cookies are used and nothing about visitors is stored.'),
       h('div', { class: 'row end' }, h('button', { class: 'ghost', onclick: () => dlg.close() }, 'Close')));
   }
@@ -517,6 +518,64 @@
         h('dl', null, r.answers.filter((a) => a.a).map((a) => [h('dt', null, a.q), h('dd', null, a.a)]))))) : h('p', { class: 'muted' }, 'No answers yet.'),
       h('div', { class: 'row end' }, h('button', { class: 'ghost', onclick: () => dlg.close() }, 'Close')));
     draw();
+  }
+
+  // ── Activity log: every visit and tap on one day, with times ────────
+  // Taps from the same browser tab are shown under the visit they belong to.
+  function activityLog(church, p) {
+    const wrap = h('div', { class: 'activity' });
+    let day = new Date(); day.setHours(0, 0, 0, 0);
+    const time = (ms) => new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    const hourName = (hr) => new Date(2000, 0, 1, hr).toLocaleTimeString([], { hour: 'numeric' });
+    async function load() {
+      const from = day.getTime();
+      const next = new Date(day); next.setDate(next.getDate() + 1);
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const isToday = from === today.getTime();
+      const head = h('div', { class: 'row' },
+        h('h3', { class: 'grow' }, 'Activity'),
+        h('button', { class: 'ghost sm', title: 'Day before', onclick: () => { day.setDate(day.getDate() - 1); load(); } }, '‹'),
+        h('input', { type: 'date', class: 'sm', value: ymd(day), max: ymd(today), onchange: (e) => { if (e.target.value) { day = new Date(e.target.value + 'T00:00:00'); load(); } } }),
+        h('button', { class: 'ghost sm', title: 'Day after', disabled: isToday, onclick: () => { day.setDate(day.getDate() + 1); load(); } }, '›'));
+      fill(wrap, head, h('p', { class: 'muted small' }, 'Loading…'));
+      let r;
+      try { r = await api('/churches/' + enc(church.id) + '/activity?page=' + enc(p.id) + '&from=' + from + '&to=' + next.getTime()); }
+      catch (e) { fill(wrap, head, h('p', { class: 'muted' }, e.message)); return; }
+      const ev = r.events;
+      if (!ev.length) {
+        fill(wrap, head, h('p', { class: 'muted' }, (isToday ? 'Nothing yet today.' : 'Nothing on this day.') + ' The log keeps the last ' + r.keepDays + ' days.'));
+        return;
+      }
+      // Busiest hours of the day.
+      const hours = Array.from({ length: 24 }, (_, i) => i);
+      const perHour = hours.map((hr) => ev.filter((e) => e.kind === 'view' && new Date(e.at).getHours() === hr).length);
+      // One entry per visit (browser tab), newest first, with its taps in order.
+      const groups = [];
+      const byVisit = {};
+      ev.forEach((e) => {
+        let g = e.visit && byVisit[e.visit];
+        if (!g || (e.kind === 'view' && g.view)) {
+          g = { at: e.at, view: null, taps: [] };
+          groups.push(g);
+          if (e.visit) byVisit[e.visit] = g;
+        }
+        if (e.kind === 'view') { g.view = e; g.at = Math.min(g.at, e.at); } else g.taps.push(e);
+      });
+      groups.sort((a, b) => b.at - a.at);
+      const views = ev.filter((e) => e.kind === 'view').length;
+      fill(wrap, head,
+        h('p', { class: 'muted small' }, plural(views, 'visit', 'visits') + ' and ' + plural(ev.length - views, 'tap', 'taps') + ' on ' +
+          day.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' }) + '. Times are in your time zone.'),
+        h('div', { class: 'chart' }, bars(hours, perHour, true, (hr, n) => hourName(hr) + ': ' + plural(n, 'visit', 'visits')),
+          h('div', { class: 'row muted small' }, h('span', { class: 'grow' }, hourName(0)), h('span', { class: 'grow center' }, hourName(12)), h('span', null, hourName(23)))),
+        h('div', { class: 'log' }, groups.map((g) => h('div', { class: 'logrow' },
+          h('span', { class: 'logtime' }, time(g.at)),
+          h('div', { class: 'logwhat' },
+            h('span', null, g.view ? 'Opened the page' : 'Came back'),
+            g.taps.length ? h('div', { class: 'logtaps' }, g.taps.map((t) => h('span', { class: 'logtap', title: 'Tapped at ' + time(t.at) }, t.label, h('small', null, time(t.at))))) : h('span', { class: 'muted small' }, 'No taps'))))));
+    }
+    load();
+    return wrap;
   }
 
   // ── Account: name, password, sign out ────────────────────────────────

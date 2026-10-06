@@ -34,7 +34,9 @@ every Publish updates the live page.
 - **Tap stats:** each page card shows visits this week, button taps and a 14-day chart; click it for 7, 30,
   90 or 365 days and a list of which buttons people tapped. Live pages send a beacon to `/api/track`; a
   visit counts once per browser tab every 30 minutes. Only daily counts per page and button label are kept
-  (D1 table `stats`, about 400 days), with no cookies and nothing about the visitor.
+  (D1 table `stats`, about 400 days), with no cookies and nothing about the visitor. The Activity log under
+  the stats lists each visit and tap with its time for any day (D1 table `events`, kept 90 days), with taps
+  grouped under their visit by a random per-tab id.
 - **Connect card:** a form block (name, email, phone, pick-one, checkboxes, long answers). On pages published
   from the portal, answers go to `/api/form/<church>/<page>` and show on the page card as "connect card
   answers", with a download for Excel. Spam is slowed by a hidden field, a minimum fill time and 5 sends per

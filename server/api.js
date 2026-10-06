@@ -181,6 +181,7 @@ export async function handle({ request, env, waitUntil }) {
         await d.batch([
           d.prepare('DELETE FROM pages WHERE church_id = ?').bind(churchId),
           d.prepare('DELETE FROM stats WHERE church_id = ?').bind(churchId),
+          d.prepare('DELETE FROM events WHERE church_id = ?').bind(churchId),
           d.prepare('DELETE FROM responses WHERE church_id = ?').bind(churchId),
           d.prepare('DELETE FROM members WHERE church_id = ?').bind(churchId),
           d.prepare('DELETE FROM churches WHERE id = ?').bind(churchId),
@@ -203,6 +204,10 @@ export async function handle({ request, env, waitUntil }) {
       }
       if (route('DELETE', 4)) { await forms.remove(d, churchId, parts[3]); return json({ ok: true }); }
       throw new HttpError(404, 'Not found.');
+    }
+    if (route('GET', 3) && parts[2] === 'activity') {
+      const p = await pageRow(d, churchId, url.searchParams.get('page'));
+      return json(await stats.activity(d, churchId, p.id, url.searchParams.get('from'), url.searchParams.get('to')));
     }
     if (route('GET', 3) && parts[2] === 'stats') return json(await stats.churchStats(d, churchId, url.searchParams.get('days')));
 
@@ -283,6 +288,7 @@ export async function handle({ request, env, waitUntil }) {
         await Promise.all([env.PAGES.delete('draft:' + key), env.PAGES.delete('live:' + key)]);
         await run(d, 'DELETE FROM pages WHERE church_id = ? AND id = ?', churchId, p.id);
         await run(d, 'DELETE FROM stats WHERE church_id = ? AND page_id = ?', churchId, p.id);
+        await run(d, 'DELETE FROM events WHERE church_id = ? AND page_id = ?', churchId, p.id);
         await run(d, 'DELETE FROM responses WHERE church_id = ? AND page_id = ?', churchId, p.id);
         return json({ ok: true });
       }

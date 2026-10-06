@@ -11,8 +11,16 @@
     var d = new Date();
     return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
   }
+  // A random id for this browser tab, so the activity log can show a visit and its taps together.
+  // It isn't stored anywhere else and says nothing about who the visitor is.
+  var visit = '';
+  try { visit = sessionStorage.getItem('tapdot-visit') || ''; } catch (e) { /* storage blocked */ }
+  if (!visit) {
+    visit = Math.random().toString(36).slice(2, 12);
+    try { sessionStorage.setItem('tapdot-visit', visit); } catch (e) { /* one id for this page load */ }
+  }
   function send(page, ev, label) {
-    var data = JSON.stringify({ page: page, ev: ev, label: label, day: today() });
+    var data = JSON.stringify({ page: page, ev: ev, label: label, day: today(), visit: visit });
     try { if (navigator.sendBeacon && navigator.sendBeacon(base + '/api/track', data)) return; } catch (e) { /* fall back to fetch */ }
     try { fetch(base + '/api/track', { method: 'POST', body: data, keepalive: true, mode: 'no-cors' }); } catch (e) { /* stats are best effort */ }
   }

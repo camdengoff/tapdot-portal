@@ -89,6 +89,17 @@ const SCHEMA = [
     draft_at TEXT,
     draft_by TEXT
   )`,
+  // Each visit and tap with its time, for the activity log (kept 90 days). `visit` is a random id per
+  // browser tab, so a visit and its taps can be shown together; nothing identifies the person.
+  `CREATE TABLE IF NOT EXISTS events (
+    church_id TEXT NOT NULL,
+    page_id TEXT NOT NULL,
+    at INTEGER NOT NULL,
+    kind TEXT NOT NULL,
+    label TEXT NOT NULL DEFAULT '',
+    visit TEXT NOT NULL DEFAULT ''
+  )`,
+  'CREATE INDEX IF NOT EXISTS events_page ON events (church_id, page_id, at)',
   'CREATE INDEX IF NOT EXISTS members_email ON members (email)',
   'CREATE INDEX IF NOT EXISTS sessions_email ON sessions (email)',
   'CREATE INDEX IF NOT EXISTS login_fails_email ON login_fails (email)',

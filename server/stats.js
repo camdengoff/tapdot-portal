@@ -6,6 +6,8 @@ import { HttpError, all, one, run, isSlug } from './db.js';
 
 const MAX_LABELS_PER_DAY = 200; // keeps junk beacons from filling the table
 const KEEP_DAYS = 400;
+const KEEP_EVENT_DAYS = 90;
+const MAX_EVENTS_PER_DAY = 20000; // per page
 
 const dayOf = (t) => new Date(t).toISOString().slice(0, 10);
 
@@ -33,7 +35,14 @@ export async function track(d, request) {
       SELECT ?, ?, ?, ?, ?, 1 WHERE (SELECT COUNT(*) FROM stats WHERE church_id = ? AND page_id = ? AND day = ?) < ?`,
     c, p, day, kind, label, c, p, day, MAX_LABELS_PER_DAY);
   }
-  if (Math.random() < 0.01) await run(d, 'DELETE FROM stats WHERE day < ?', dayOf(Date.now() - KEEP_DAYS * 864e5));
+  // The activity log: one row per visit or tap, with its time.
+  const visit = /^[a-z0-9]{6,16}$/.test(b.visit || '') ? b.visit : '';
+  const recent = await one(d, 'SELECT COUNT(*) AS n FROM events WHERE church_id = ? AND page_id = ? AND at > ?', c, p, Date.now() - 864e5);
+  if (recent.n < MAX_EVENTS_PER_DAY) await run(d, 'INSERT INTO events (church_id, page_id, at, kind, label, visit) VALUES (?, ?, ?, ?, ?, ?)', c, p, Date.now(), kind, label, visit);
+  if (Math.random() < 0.01) {
+    await run(d, 'DELETE FROM stats WHERE day < ?', dayOf(Date.now() - KEEP_DAYS * 864e5));
+    await run(d, 'DELETE FROM events WHERE at < ?', Date.now() - KEEP_EVENT_DAYS * 864e5);
+  }
 }
 
 // Every page's counts in a church over the last `days` days (today included).
@@ -48,4 +57,12 @@ export async function churchStats(d, churchId, days) {
     else (s.taps[r.day] || (s.taps[r.day] = {}))[r.label] = r.n;
   }
   return { from, pages };
+}
+
+// Every visit and tap on one page between two times (ms), oldest first.
+export async function activity(d, churchId, pageId, from, to) {
+  to = Math.min(+to || Date.now(), Date.now() + 864e5);
+  from = Math.max(+from || to - 864e5, to - 32 * 864e5);
+  const rows = await all(d, 'SELECT at, kind, label, visit FROM events WHERE church_id = ? AND page_id = ? AND at >= ? AND at < ? ORDER BY at LIMIT 5000', churchId, pageId, from, to);
+  return { from, to, keepDays: KEEP_EVENT_DAYS, events: rows };
 }
