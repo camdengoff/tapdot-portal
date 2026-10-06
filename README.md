@@ -33,7 +33,8 @@ every Publish updates the live page.
 - **Connect card:** a form block (name, email, phone, pick-one, checkboxes, long answers). On pages published
   from the portal, answers go to `/api/form/<church>/<page>` and show on the page card as "connect card
   answers", with a download for Excel. Spam is slowed by a hidden field, a minimum fill time and 5 sends per
-  visitor every 10 minutes. To also email answers to the addresses set on the block, add `RESEND_API_KEY`
+  visitor every 10 minutes. Email is hidden in the editor for now (`TD.FORM_EMAIL = false` in
+  `editor/schema.js`); to turn it on and also email answers to the addresses set on the block, add `RESEND_API_KEY`
   (Secret) and `MAIL_FROM` (Text, e.g. `TapDot <forms@camdengoff.com>`, on a domain verified at resend.com).
 
 ### One-time setup in Cloudflare

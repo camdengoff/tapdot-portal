@@ -59,6 +59,8 @@
   ];
   TD.EMOJIS = '🙏 ✚ 💵 👋 🚧 🤝 📖 💧 👥 📅 ⛪ ✝️ ❤️ 🎉 📣 🎵 🎤 📺 ▶️ 📍 📞 ✉️ 💬 🔗 📋 🍕 ☕ 🎁 🙌 👶 🎮 📚 👴 🏠 🚗 🕒 ⭐ 🔥 🌱 💡 ✅ 📷 🎬 🧭 🛐 🕊️ 🌎 💒'.split(' ');
 
+  // Emailing Connect card answers is set aside until Resend is set up (see README); flip to show it.
+  TD.FORM_EMAIL = false;
   TD.FORM_KINDS = [
     ['text', 'Short answer'], ['email', 'Email'], ['phone', 'Phone'], ['long', 'Long answer'],
     ['choice', 'Pick one'], ['checks', 'Pick any (checkboxes)'], ['check', 'One checkbox (yes/no)'],
@@ -328,7 +330,7 @@
           newItem: () => ({ label: 'Question', kind: 'text', options: '', ph: '', required: false }) },
         { k: 'btnLabel', t: 'text', l: 'Send button text' },
         { k: 'thanks', t: 'textarea', l: 'Message after sending', rich: true },
-        { k: 'notify', t: 'text', l: 'Also email answers to (optional)', ph: 'office@church.org, pastor@church.org',
+        { k: 'notify', t: 'text', l: 'Also email answers to (optional)', ph: 'office@church.org, pastor@church.org', when: () => TD.FORM_EMAIL,
           hint: 'Answers always show in the TapDot portal. Email needs to be turned on for the portal. Up to 5 addresses, separated by commas.' },
       ],
       defaults: () => ({
