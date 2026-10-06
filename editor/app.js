@@ -1113,14 +1113,26 @@
     el.textContent = msg;
     el.classList.toggle('bad', !!bad);
   }
+  // Each save is one write to Cloudflare KV, which allows 1,000 a day on the free plan, so edits are
+  // saved at most every 15 seconds, plus right away on Publish, Ctrl/Cmd+S, the back arrow and leaving.
+  const SAVE_EVERY = 15000;
+  function cloudLater(ms) {
+    clearTimeout(CLOUD.timer);
+    CLOUD.timer = setTimeout(() => { CLOUD.timer = null; cloudSave(); }, ms);
+  }
   function cloudQueue() {
     CLOUD.dirty = true;
-    cloudState('Saving…');
-    clearTimeout(CLOUD.timer);
-    CLOUD.timer = setTimeout(cloudSave, 1200);
+    if (!CLOUD.saving) cloudState('Unsaved changes · saving soon');
+    if (!CLOUD.timer) cloudLater(SAVE_EVERY);
+  }
+  async function cloudSaveNow() {
+    clearTimeout(CLOUD.timer); CLOUD.timer = null;
+    while (CLOUD.saving) await new Promise((r) => setTimeout(r, 100));
+    if (CLOUD.dirty) await cloudSave();
   }
   async function cloudSave(force) {
-    if (CLOUD.saving) { CLOUD.timer = setTimeout(cloudSave, 500); return; }
+    if (CLOUD.saving) { cloudLater(500); return; }
+    cloudState('Saving…');
     CLOUD.saving = true; CLOUD.dirty = false;
     const headers = { 'Content-Type': 'application/json' };
     if (CLOUD.draftAt) headers['X-TapDot-Base'] = CLOUD.draftAt;
@@ -1151,8 +1163,8 @@
   async function cloudPublish(btn) {
     btn.disabled = true; btn.textContent = 'Publishing…';
     try {
-      clearTimeout(CLOUD.timer);
-      if (CLOUD.dirty) await cloudSave();
+      await cloudSaveNow();
+      if (CLOUD.dirty) throw new Error('your latest edits could not be saved');
       const r = await cloudFetch('/publish', { method: 'POST', headers: { 'Content-Type': 'text/html; charset=utf-8', 'X-TapDot-Title': encodeURIComponent(state.title || CLOUD.name).slice(0, 120) }, body: publishHtml() });
       CLOUD.publishedAt = r.publishedAt;
       addVersion('export').catch(() => { /* best effort */ });
@@ -1229,13 +1241,20 @@
       document.title = CLOUD.name + ' · TapDot';
       // Pages can hold custom HTML, so the preview runs sandboxed, away from the portal's sign-in.
       $('#preview').setAttribute('sandbox', 'allow-scripts allow-popups allow-popups-to-escape-sandbox allow-forms allow-modals');
-      $('.brand').replaceChildren(h('a', { href: '/app/#' + CLOUD.church, class: 'back', title: 'Back to the portal' }, '←'), h('span', { class: 'dot' }), CLOUD.name);
+      $('.brand').replaceChildren(h('a', { href: '/app/#' + CLOUD.church, class: 'back', title: 'Back to the portal', onclick: async (e) => {
+        if (!CLOUD.dirty && !CLOUD.saving) return;
+        e.preventDefault();
+        await cloudSaveNow();
+        if (!CLOUD.dirty) location.href = '/app/#' + CLOUD.church;
+      } }, '←'), h('span', { class: 'dot' }), CLOUD.name);
+      document.addEventListener('keydown', (e) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') { e.preventDefault(); cloudSaveNow(); } });
       const pub = h('button', { class: 'primary', title: 'Make your saved edits live' }, '🚀 Publish');
       pub.onclick = () => cloudPublish(pub);
       $('#copyBtn').classList.replace('primary', 'ghost');
       $('#copyBtn').after(pub);
-      window.addEventListener('beforeunload', (e) => { if (CLOUD.dirty || CLOUD.saving) { e.preventDefault(); e.returnValue = ''; } });
-      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && CLOUD.dirty) { clearTimeout(CLOUD.timer); cloudSave(); } });
+      // Leaving with unsaved edits: start saving now, and ask the browser to hold the page until it's done.
+      window.addEventListener('beforeunload', (e) => { if (CLOUD.dirty || CLOUD.saving) { cloudSaveNow(); e.preventDefault(); e.returnValue = ''; } });
+      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && CLOUD.dirty) cloudSaveNow(); });
       cloudState('Saved to ' + (CLOUD.churchName || 'the portal'));
     } else {
       state = load();
