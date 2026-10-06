@@ -918,7 +918,7 @@
       size > 400 * 1024 ? h('div', { class: 'warn' }, 'This is a large block. Squarespace can get slow or refuse to save very large code blocks; use image links instead of uploads, or turn off “Keep editable copy”.') : null);
   }
   // ── Pop-up worker: which sites go through it, and the copy-and-paste worker code ──
-  const ownWorker = () => { const p = String(state.exp.proxy || '').trim(); return !!p && p.replace(/\/+$/, '') !== TD.DEFAULT_PROXY.replace(/\/+$/, ''); };
+  const ownWorker = () => { const p = String(state.exp.proxy || '').trim(); return !!p && p.replace(/\/+$/, '') !== TD.BFC_PROXY; };
   const hostOf = (u) => { try { const x = new URL(u); return /^https?:$/.test(x.protocol) ? x.hostname.replace(/^www\./, '').toLowerCase() : ''; } catch (e) { return ''; } };
   // Every site that a pop-up link on this page points at.
   function popupHosts() {
@@ -930,7 +930,7 @@
       for (const k in o) if (o[k] && typeof o[k] === 'object') walk(o[k]);
     })([state.blocks, state.sheets]);
     out.delete(hostOf(state.exp.proxy));
-    out.delete(hostOf(TD.DEFAULT_PROXY)); // links already on the BFC worker don't need another one
+    out.delete(hostOf(TD.BFC_PROXY)); // links already on the BFC worker don't need another one
     return out;
   }
   function proxySites() {
@@ -979,7 +979,7 @@
       catch (x) { download('tapdot-popup-worker.js', code, 'text/javascript'); }
       workerCheck.url = ''; // check again next time
     };
-    return h('details', { class: 'setup' },
+    return h('details', { class: 'setup', open: !String(state.exp.proxy || '').trim() },
       h('summary', null, 'Set up your own worker'),
       h('ol', null,
         h('li', null, 'Make a free account at ', h('a', { href: 'https://dash.cloudflare.com/sign-up', target: '_blank', rel: 'noopener' }, 'cloudflare.com'), ' and sign in.'),
@@ -1003,9 +1003,9 @@
       h('textarea', { id: 'exportCode', class: 'mono code', readOnly: true, rows: 14, onfocus: (ev) => ev.target.select() }),
       h('h3', null, 'Pop-up proxy'),
       h('div', { class: 'field' }, h('div', { class: 'fl row' }, 'Worker address',
-          info('Pop-up links go through this worker so sites that block framing still load. It defaults to the BFC worker. If it is blank, pop-up links open in a new tab instead.')),
-        h('input', { type: 'url', value: e.proxy || '', placeholder: TD.DEFAULT_PROXY, onchange: (ev) => { e.proxy = ev.target.value.trim(); e.proxyOff = !e.proxy; changed(true); } }),
-        e.proxy === TD.DEFAULT_PROXY ? null : h('button', { class: 'ghost', onclick: () => { e.proxy = TD.DEFAULT_PROXY; e.proxyOff = false; changed(true); } }, 'Use the BFC worker')),
+          info('Your Cloudflare worker, so sites that block framing still load in pop-ups. Until you add one, pop-up links open in a new tab instead.')),
+        h('input', { type: 'url', value: e.proxy || '', placeholder: 'https://your-worker.workers.dev', onchange: (ev) => { e.proxy = ev.target.value.trim(); changed(true); } }),
+      ),
       ownWorker() ? proxySites() : null,
       workerSetup(),
       SHOW_PUBLISH || CLOUD ? publishSection() : null,
@@ -1033,7 +1033,7 @@
   // The page is saved on the worker; a code block on the site always loads the latest version.
   // The publish key stays in this browser and is never saved into projects or exports.
   const PUBKEY = 'tapdot-publish-key';
-  const pubWorker = () => (state.exp.proxy || TD.DEFAULT_PROXY).replace(/\/+$/, '');
+  const pubWorker = () => (state.exp.proxy || TD.BFC_PROXY).replace(/\/+$/, '');
   const pubName = () => (state.exp.pubName || slug()).toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'page';
   const pubUrl = () => pubWorker() + '/_tapdot/page/' + pubName();
   const getKey = () => { try { return localStorage.getItem(PUBKEY) || ''; } catch (e) { return ''; } };

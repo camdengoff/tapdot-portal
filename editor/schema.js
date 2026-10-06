@@ -326,8 +326,9 @@
 
   TD.newBlock = (type) => Object.assign({ id: TD.uid('b'), type }, commonDefaults(), TD.BLOCKS[type].defaults());
 
-  // Pop-up proxy used unless the project picks another (see worker/popup-proxy.js).
-  TD.DEFAULT_PROXY = 'https://bethanynaz-proxy.cgoff.workers.dev';
+  // BFC's own pop-up worker (worker/popup-proxy.js), used by the Bethany template. It maps
+  // <worker>/<path> to bethanynaz.org/<path>. Other pages have no worker until they add their own.
+  TD.BFC_PROXY = 'https://bethanynaz-proxy.cgoff.workers.dev';
 
   // Fill in any fields missing from older/imported projects.
   TD.normalize = (state) => {
@@ -335,8 +336,6 @@
     const s = Object.assign({}, base, state);
     s.theme = Object.assign({}, base.theme, state.theme || {});
     s.exp = Object.assign({}, base.exp, state.exp || {});
-    // Blank proxy means the BFC worker, unless someone deliberately cleared it.
-    if (!s.exp.proxy && !s.exp.proxyOff) s.exp.proxy = TD.DEFAULT_PROXY;
     s.exp.proxyHosts = Array.isArray(s.exp.proxyHosts) ? s.exp.proxyHosts.slice() : [];
     s.times = (state.times || []).map((t) => Object.assign(TD.newTime(), t));
     s.blocks = (state.blocks || []).filter((b) => TD.BLOCKS[b.type]).map((b) => {
@@ -450,7 +449,7 @@
       radius: 14, btnRadius: 50, imgRadius: 12, side: 14, gap: 10, padTop: 20, padBottom: 24, maxWidth: 480, widthMode: 'column',
       shadow: false, font: 'Inter', headFont: '', fontSize: 15, anim: 'slide', pressFx: false,
     }),
-    exp: { squarespace: true, layout: 'app', fullDoc: true, embed: true, imgMax: 1400, imgQ: 0.82, proxy: TD.DEFAULT_PROXY, proxyHosts: [] },
+    exp: { squarespace: true, layout: 'app', fullDoc: true, embed: true, imgMax: 1400, imgQ: 0.82, proxy: '', proxyHosts: [] },
     times: [],
     blocks: [],
     sheets: [],
@@ -474,6 +473,7 @@
       build: () => {
         const p = TD.newProject();
         p.title = 'Bethany First Church';
+        p.exp.proxy = TD.BFC_PROXY;
         const ns = Object.assign(TD.newSheet(), {
           id: 'nextsteps', title: 'Next Steps', subtitle: 'Grow in your faith journey.', icon: '✚',
           items: [

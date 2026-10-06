@@ -97,7 +97,7 @@
     const host = url.hostname.replace(/^www\./, '');
     // The live BFC worker maps <worker>/<path> to bethanynaz.org/<path>, so only those links go
     // through it.
-    if (px === TD.DEFAULT_PROXY.replace(/\/+$/, '')) return host === 'bethanynaz.org' ? px + url.pathname + url.search + url.hash : u;
+    if (px === TD.BFC_PROXY.replace(/\/+$/, '')) return host === 'bethanynaz.org' ? px + url.pathname + url.search + url.hash : u;
     // Any other worker is the copy-and-paste one from the Export tab (editor/popup-worker.js):
     // links to the sites ticked there go through it as ?url=.
     const list = ctx.proxyHosts || [];

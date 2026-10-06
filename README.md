@@ -115,7 +115,8 @@ creating a free Hello World worker and has a **Copy worker code** button. The co
 filled in, and only those sites are proxied, so nobody can use the worker as an open proxy. The editor
 asks the worker which sites it allows and says when the code needs pasting again.
 
-BFC uses its own worker (`https://bethanynaz-proxy.cgoff.workers.dev`, the default), whose links look like
+There is no default worker: until a page has one, pop-up links open in a new tab. The Bethany template
+uses BFC's own worker (`https://bethanynaz-proxy.cgoff.workers.dev`), whose links look like
 `https://<worker>/prayer` for `https://bethanynaz.org/prayer`; `worker/popup-proxy.js` is that worker's
 newer code. Logins, payments and some forms may not work when proxied; open those as normal links, or
 use "Skip the pop-up proxy for this link".
