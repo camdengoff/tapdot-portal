@@ -10,9 +10,12 @@
     try {
       if (!/^\/app\//.test(location.pathname)) return null;
       const q = new URLSearchParams(location.search);
+      // Admins edit a starter template the same way, at /app/editor?tpl=<id> (no publishing).
+      const tpl = q.get('tpl');
+      if (tpl) return { isTemplate: true, church: 'templates', page: tpl, back: '/app/#templates', api: '/api/templates/' + encodeURIComponent(tpl), draftAt: null, name: '', churchName: '', timer: null, saving: false, dirty: false };
       const church = q.get('church'), page = q.get('page');
       if (!church || !page) return null;
-      return { church, page, api: '/api/churches/' + encodeURIComponent(church) + '/pages/' + encodeURIComponent(page), draftAt: null, name: '', churchName: '', timer: null, saving: false, dirty: false };
+      return { church, page, back: '/app/#' + church, api: '/api/churches/' + encodeURIComponent(church) + '/pages/' + encodeURIComponent(page), draftAt: null, name: '', churchName: '', timer: null, saving: false, dirty: false };
     } catch (e) { return null; }
   })();
 
@@ -1079,6 +1082,9 @@
   }
   const SHOW_PUBLISH = false; // Publish to the site is set aside for now; flip to bring it back.
   function publishSection() {
+    if (CLOUD && CLOUD.isTemplate) {
+      return h('div', null, h('h3', null, 'Template'), h('div', { class: 'hint' }, 'You’re editing the “' + CLOUD.name + '” template. Edits save as you go, and new pages made from it start from this version. Pages made earlier don’t change.'));
+    }
     if (CLOUD) return cloudPublishSection();
     const e = state.exp;
     const btn = h('button', { class: 'primary', onclick: () => publish(btn) }, '🚀 Publish');
@@ -1244,17 +1250,19 @@
       document.title = CLOUD.name + ' · TapDot';
       // Pages can hold custom HTML, so the preview runs sandboxed, away from the portal's sign-in.
       $('#preview').setAttribute('sandbox', 'allow-scripts allow-popups allow-popups-to-escape-sandbox allow-forms allow-modals');
-      $('.brand').replaceChildren(h('a', { href: '/app/#' + CLOUD.church, class: 'back', title: 'Back to the portal', onclick: async (e) => {
+      $('.brand').replaceChildren(h('a', { href: CLOUD.back, class: 'back', title: 'Back to the portal', onclick: async (e) => {
         if (!CLOUD.dirty && !CLOUD.saving) return;
         e.preventDefault();
         await cloudSaveNow();
-        if (!CLOUD.dirty) location.href = '/app/#' + CLOUD.church;
+        if (!CLOUD.dirty) location.href = CLOUD.back;
       } }, '←'), h('span', { class: 'dot' }), CLOUD.name);
       document.addEventListener('keydown', (e) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') { e.preventDefault(); cloudSaveNow(); } });
-      const pub = h('button', { class: 'primary', title: 'Make your saved edits live' }, '🚀 Publish');
-      pub.onclick = () => cloudPublish(pub);
-      $('#copyBtn').classList.replace('primary', 'ghost');
-      $('#copyBtn').after(pub);
+      if (!CLOUD.isTemplate) {
+        const pub = h('button', { class: 'primary', title: 'Make your saved edits live' }, '🚀 Publish');
+        pub.onclick = () => cloudPublish(pub);
+        $('#copyBtn').classList.replace('primary', 'ghost');
+        $('#copyBtn').after(pub);
+      }
       // Leaving with unsaved edits: start saving now, and ask the browser to hold the page until it's done.
       window.addEventListener('beforeunload', (e) => { if (CLOUD.dirty || CLOUD.saving) { cloudSaveNow(); e.preventDefault(); e.returnValue = ''; } });
       document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && CLOUD.dirty) cloudSaveNow(); });
@@ -1265,9 +1273,18 @@
     document.querySelectorAll('.tabs button').forEach((b) => b.addEventListener('click', () => { tab = b.dataset.tab; drawPanel(); }));
     $('#undo').onclick = () => travel(-1);
     $('#redo').onclick = () => travel(1);
-    $('#newBtn').onclick = () => {
-      $('#tplGrid').replaceChildren(...['blank'].concat(Object.keys(TD.TEMPLATES).filter((k) => k !== 'blank')).map((k) => {
-        const t = TD.TEMPLATES[k];
+    $('#newBtn').onclick = async () => {
+      // In the portal, the admin-edited templates replace the built-in ones once there are any.
+      let list = Object.keys(TD.TEMPLATES).filter((k) => k !== 'blank').map((k) => [k, TD.TEMPLATES[k]]);
+      if (CLOUD) {
+        try {
+          const r = await (await fetch('/api/templates?full=1', { credentials: 'same-origin' })).json();
+          const mine = (r.templates || []).filter((t) => !t.hidden && t.project);
+          if (mine.length) list = mine.map((t) => [t.id, { name: t.name, desc: t.desc, build: () => TD.normalize(TD.clone(t.project)) }]);
+        } catch (e) { /* keep the built-in ones */ }
+      }
+      list.unshift(['blank', TD.TEMPLATES.blank]);
+      $('#tplGrid').replaceChildren(...list.map(([k, t]) => {
         const frame = h('iframe', { class: 'tplframe', tabindex: '-1', 'aria-hidden': 'true', loading: 'lazy' });
         frame.setAttribute('sandbox', 'allow-scripts');
         frame.srcdoc = k === 'blank' ? '' : TD.previewDoc(t.build());

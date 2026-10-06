@@ -26,6 +26,11 @@ every Publish updates the live page.
   only what was last published. If two people edit at once, the second save asks whose version to keep.
 - **Live pages:** `/p/<church>/<page>` is the published HTML the code block loads (via `/embed.js`), and
   `/view/<church>/<page>` is the same page on its own, handy for QR codes and tap tags.
+- **Templates (admins):** 🧩 Templates in the portal's top bar lists the starting points churches see on
+  + New page. Edit one in the editor (`/app/editor?tpl=<id>`, no publishing), rename it, add a description,
+  hide or show it, reorder, duplicate, delete, or make a new one (blank, a copy, or any church page via
+  its ••• menu → Save as template). Stored in D1 `templates` and KV `template:<id>`. The first visit
+  saves the editor's built-in starters there; until then the built-in ones are offered.
 - **Tap stats:** each page card shows visits this week, button taps and a 14-day chart; click it for 7, 30,
   90 or 365 days and a list of which buttons people tapped. Live pages send a beacon to `/api/track`; a
   visit counts once per browser tab every 30 minutes. Only daily counts per page and button label are kept
@@ -112,7 +117,7 @@ Run `node tools/build.js` after changing `portal/`, `public/` or the editor.
 - `portal/`: the client portal pages (copied to `dist/app/` by the build)
 - `public/embed.js`: the loader that the live-page code block uses
 - `functions/` and `server/`: the portal API on Cloudflare Pages Functions (`server/api.js` routes,
-  `server/auth.js` sign-in, `server/db.js` tables, `server/stats.js` tap stats, `server/forms.js` connect card answers)
+  `server/auth.js` sign-in, `server/db.js` tables, `server/stats.js` tap stats, `server/forms.js` connect card answers, `server/templates.js` templates)
 
 ## Pop-up proxy (for sites that won't open in a pop-up)
 

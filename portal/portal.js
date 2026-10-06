@@ -136,6 +136,7 @@
     acct.hidden = false;
     acct.textContent = me.name || me.email;
     acct.onclick = account;
+    $('#tplBtn').hidden = !me.admin;
     draw();
   }
   function churchPicker(current) {
@@ -150,6 +151,8 @@
 
   async function draw() {
     const id = route();
+    $('#tplBtn').classList.toggle('on', id === 'templates');
+    if (id === 'templates' && me.admin) { churchPicker(''); return drawTemplates(); }
     if (!id) {
       if (!me.admin && me.churches.length) { location.replace('#' + me.churches[0].id); return; }
       churchPicker('');
@@ -225,6 +228,13 @@
                 if (!v) return;
                 await api('/churches/' + enc(church.id) + '/pages/' + enc(p.id), { method: 'PATCH', body: { name: v.name } }); reload();
               }) }, 'Rename'),
+              me.admin ? h('button', { onclick: act(async () => {
+                const v = await ask('Save as a template', [{ k: 'name', l: 'Template name', value: p.name, max: 80 }, { k: 'desc', l: 'Description', max: 200, required: false }], 'Save',
+                  'Makes a copy of this page’s latest saved version for the Templates list. It starts hidden from churches.');
+                if (!v) return;
+                await api('/templates', { method: 'POST', body: { name: v.name, desc: v.desc, fromPage: church.id + '/' + p.id, hidden: true } });
+                toast('Saved. Find it under 🧩 Templates.');
+              }) }, 'Save as template') : null,
               h('button', { onclick: act(async () => {
                 const v = await ask('Duplicate page', [{ k: 'name', l: 'Name for the copy', value: p.name + ' copy', max: 80 }], 'Duplicate');
                 if (!v) return;
@@ -308,43 +318,126 @@
   }
 
   // ── New page: pick a template (previews side by side) or start from scratch ──
-  function newPage(church) {
-    const dlg = $('#dlg');
+  // Templates offered for new pages: the admin-edited ones (Templates panel) once there are any,
+  // otherwise the editor's built-in starters. Each is { key, name, desc, project(), server }.
+  async function templateChoices() {
+    try {
+      const r = await api('/templates?full=1');
+      const mine = r.templates.filter((t) => !t.hidden && t.project);
+      if (mine.length) return mine.map((t) => ({ key: t.id, name: t.name, desc: t.desc, project: () => t.project, server: true }));
+    } catch (e) { /* fall back to the built-in starters */ }
     const TD = window.TD;
-    // Every church gets the general starters; BFC's own page and the feature tour are for admins.
-    const keys = TD && TD.TEMPLATES ? Object.keys(TD.TEMPLATES).filter((k) => k !== 'blank' && (me.admin || !['bethany', 'tour'].includes(k))) : [];
+    if (!TD || !TD.TEMPLATES) return [];
+    return Object.keys(TD.TEMPLATES).filter((k) => k !== 'blank' && (me.admin || !['bethany', 'tour'].includes(k)))
+      .map((k) => ({ key: k, name: TD.TEMPLATES[k].name, desc: TD.TEMPLATES[k].desc, project: () => TD.TEMPLATES[k].build(), server: false }));
+  }
+  // A small picture of a page (the editor's own renderer in a sandboxed frame).
+  function preview(project) {
+    const f = h('iframe', { tabindex: '-1', 'aria-hidden': 'true', loading: 'lazy' });
+    f.setAttribute('sandbox', 'allow-scripts');
+    try { f.srcdoc = window.TD.previewDoc(window.TD.normalize(JSON.parse(JSON.stringify(project)))); } catch (e) { /* preview is a nice-to-have */ }
+    return h('div', { class: 'tplprev' }, f);
+  }
+
+  // ── New page: pick a template (previews side by side) or start from scratch ──
+  async function newPage(church) {
+    const dlg = $('#dlg');
     const name = h('input', { type: 'text', maxlength: 80, placeholder: 'Page name, e.g. Sunday tap tag', autocomplete: 'off' });
-    const create = async (key, btn) => {
-      const t = TD && TD.TEMPLATES[key];
-      const pageName = name.value.trim() || (key === 'blank' ? 'New page' : t.name);
-      btn.disabled = true;
-      try {
-        const p = await api('/churches/' + enc(church.id) + '/pages', { method: 'POST', body: { name: pageName } });
-        location.href = 'editor.html?church=' + enc(church.id) + '&page=' + enc(p.id) + '&template=' + enc(key);
-      } catch (e) { toast(e.message); btn.disabled = false; }
-    };
-    const card = (key) => {
-      const blank = key === 'blank';
-      const t = blank ? { name: 'Start from scratch', desc: 'An empty page. Add blocks one at a time.' } : TD.TEMPLATES[key];
-      let prev;
-      if (blank) prev = h('div', { class: 'tplprev blank' }, h('span', null, '+'));
-      else {
-        const f = h('iframe', { tabindex: '-1', 'aria-hidden': 'true', loading: 'lazy' });
-        f.setAttribute('sandbox', 'allow-scripts');
-        try { f.srcdoc = TD.previewDoc(t.build()); } catch (e) { /* preview is a nice-to-have */ }
-        prev = h('div', { class: 'tplprev' }, f);
-      }
-      const b = h('button', { class: 'tplcard', onclick: () => create(key, b) }, prev, h('b', null, t.name), t.desc ? h('small', null, t.desc) : null);
-      return b;
-    };
+    const grid = h('div', { class: 'tplgrid' }, h('p', { class: 'muted' }, 'Loading templates…'));
     fill($('#dlgBody'), h('div', { class: 'dlgform newpage' },
       h('div', { class: 'row' }, h('h2', { class: 'grow' }, 'New page'), h('button', { class: 'ghost sm', onclick: () => dlg.close() }, '✕')),
       h('label', null, 'Name', name),
       h('p', { class: 'muted small' }, 'Start from a template or from scratch. You can change everything after; photos and links in templates are examples to replace.'),
-      h('div', { class: 'tplgrid' }, card('blank'), keys.map(card))));
+      grid));
     dlg.onclose = null;
     dlg.showModal();
     name.focus();
+    const create = async (t, btn) => {
+      btn.disabled = true;
+      try {
+        const body = { name: name.value.trim() || (t ? t.name : 'New page') };
+        if (t && t.server) body.template = t.key;
+        const p = await api('/churches/' + enc(church.id) + '/pages', { method: 'POST', body });
+        location.href = 'editor.html?church=' + enc(church.id) + '&page=' + enc(p.id) + (t && !t.server ? '&template=' + enc(t.key) : '');
+      } catch (e) { toast(e.message); btn.disabled = false; }
+    };
+    const blank = h('button', { class: 'tplcard', onclick: () => create(null, blank) }, h('div', { class: 'tplprev blank' }, h('span', null, '+')), h('b', null, 'Start from scratch'), h('small', null, 'An empty page. Add blocks one at a time.'));
+    const list = await templateChoices();
+    fill(grid, blank, list.map((t) => {
+      const b = h('button', { class: 'tplcard', onclick: () => create(t, b) }, preview(t.project()), h('b', null, t.name), t.desc ? h('small', null, t.desc) : null);
+      return b;
+    }));
+  }
+
+  // ── Admin: the starter templates churches pick from ────────────────────
+  async function drawTemplates() {
+    const main = $('#main');
+    document.title = 'Templates · TapDot';
+    let list;
+    try {
+      list = (await api('/templates?full=1')).templates;
+      if (!list.length && window.TD && window.TD.TEMPLATES) {
+        // First visit: save the built-in starters so they can be edited here.
+        const TD = window.TD;
+        const items = Object.keys(TD.TEMPLATES).filter((k) => k !== 'blank')
+          .map((k) => ({ name: TD.TEMPLATES[k].name, desc: TD.TEMPLATES[k].desc || '', project: TD.TEMPLATES[k].build(), hidden: k === 'bethany' || k === 'tour' }));
+        await api('/templates/seed', { method: 'POST', body: { items } });
+        list = (await api('/templates?full=1')).templates;
+      }
+    } catch (e) { fill(main, h('div', { class: 'card center' }, h('p', null, e.message))); return; }
+    if (route() !== 'templates') return;
+    const reload = () => drawTemplates();
+    const T = (id) => '/templates/' + enc(id);
+    const move = async (i, d) => {
+      const ids = list.map((t) => t.id);
+      const j = i + d;
+      if (j < 0 || j >= ids.length) return;
+      ids.splice(j, 0, ids.splice(i, 1)[0]);
+      await api('/templates/order', { method: 'POST', body: { ids } }); reload();
+    };
+    const card = (t, i) => h('div', { class: 'card tplitem' + (t.hidden ? ' off' : '') },
+      t.project ? preview(t.project) : h('div', { class: 'tplprev blank' }, h('span', null, '?')),
+      h('div', { class: 'pagehead' }, h('b', null, t.name), t.hidden ? h('span', { class: 'pill' }, 'Hidden') : h('span', { class: 'pill ok' }, 'Shown')),
+      h('div', { class: 'muted small' }, t.desc || 'No description'),
+      h('div', { class: 'muted small' }, t.draftAt ? 'Edited ' + when(t.draftAt) + (t.draftBy ? ' by ' + t.draftBy : '') : ''),
+      h('div', { class: 'row wrap' },
+        h('a', { class: 'primary btn', href: 'editor.html?tpl=' + enc(t.id) }, '✎ Edit'),
+        h('button', { class: 'ghost', title: 'Move earlier', disabled: i === 0, onclick: act(() => move(i, -1)) }, '←'),
+        h('button', { class: 'ghost', title: 'Move later', disabled: i === list.length - 1, onclick: act(() => move(i, 1)) }, '→'),
+        h('details', { class: 'more' }, h('summary', { class: 'ghost' }, '•••'),
+          h('div', { class: 'menu' },
+            h('button', { onclick: act(async () => {
+              const v = await ask('Template details', [
+                { k: 'name', l: 'Name', value: t.name, max: 80 },
+                { k: 'desc', l: 'Description', value: t.desc, max: 200, required: false, hint: 'Shown under the preview when someone makes a new page.' },
+              ], 'Save');
+              if (!v) return;
+              await api(T(t.id), { method: 'PATCH', body: v }); reload();
+            }) }, 'Name and description'),
+            h('button', { onclick: act(async () => { await api(T(t.id), { method: 'PATCH', body: { hidden: !t.hidden } }); reload(); }) }, t.hidden ? 'Show to churches' : 'Hide from churches'),
+            h('button', { onclick: act(async () => {
+              const r = await api('/templates', { method: 'POST', body: { name: t.name + ' copy', desc: t.desc, copyFrom: t.id, hidden: true } }); reload();
+              toast('Copied as a hidden template');
+              return r;
+            }) }, 'Duplicate'),
+            h('button', { class: 'danger', onclick: act(async () => {
+              if (!confirm('Delete the “' + t.name + '” template? Pages already made from it stay as they are.')) return;
+              await api(T(t.id), { method: 'DELETE' }); reload();
+            }) }, 'Delete')))));
+    fill(main,
+      h('div', { class: 'head' }, h('h1', null, 'Templates'), h('div', { class: 'grow' }),
+        h('button', { class: 'primary', onclick: act(async () => {
+          const v = await ask('New template', [
+            { k: 'name', l: 'Name', placeholder: 'Christmas Eve', max: 80 },
+            { k: 'desc', l: 'Description', max: 200, required: false },
+            { k: 'from', l: 'Start from', value: '', options: [['', 'A blank page']].concat(list.map((t) => [t.id, 'A copy of “' + t.name + '”'])) },
+          ], 'Create', 'New templates start hidden, so churches don’t see them until you choose Show.');
+          if (!v) return;
+          const r = await api('/templates', { method: 'POST', body: { name: v.name, desc: v.desc, copyFrom: v.from || undefined, hidden: true } });
+          location.href = 'editor.html?tpl=' + enc(r.id);
+        }) }, '+ New template')),
+      h('p', { class: 'muted' }, 'These are the starting points every church sees when they click + New page, in this order. Editing a template only changes new pages; pages made earlier stay as they are. You can also turn any church page into a template from its ••• menu.'),
+      list.length ? h('div', { class: 'grid tplpanel' }, list.map(card)) : h('div', { class: 'card center muted' }, 'No templates yet.'));
   }
 
   // ── Tap stats for one page ───────────────────────────────────────────

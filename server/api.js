@@ -10,6 +10,7 @@ import { db, HttpError, now, all, one, run, slugify, isSlug, normEmail, isEmail 
 import * as auth from './auth.js';
 import * as stats from './stats.js';
 import * as forms from './forms.js';
+import * as templates from './templates.js';
 
 const MAX_BODY = 20 * 1024 * 1024;
 
@@ -141,6 +142,8 @@ export async function handle({ request, env, waitUntil }) {
       return json({ ok: true });
     }
 
+    if (parts[0] === 'templates') return await templates.route({ d, env, request, user, parts, url, json, body });
+
     if (parts[0] !== 'churches') throw new HttpError(404, 'Not found.');
 
     if (route('POST', 1)) {
@@ -247,7 +250,14 @@ export async function handle({ request, env, waitUntil }) {
         if (!name) throw new HttpError(400, 'Give the page a name.');
         const id = await uniqueSlug(d, 'pages', name, churchId);
         await run(d, 'INSERT INTO pages (church_id, id, name, created_at) VALUES (?, ?, ?, ?)', churchId, id, name, now());
-        if (b.copyFrom && isSlug(b.copyFrom)) {
+        // Start from one of the portal's templates (see templates.js).
+        const fromTemplate = b.template ? await templates.projectFor(d, env, String(b.template)) : null;
+        if (fromTemplate) {
+          const proj = JSON.parse(fromTemplate);
+          proj.title = name;
+          await env.PAGES.put('draft:' + churchId + '/' + id, JSON.stringify(proj));
+          await run(d, 'UPDATE pages SET draft_at = ?, draft_by = ? WHERE church_id = ? AND id = ?', now(), user.email, churchId, id);
+        } else if (b.copyFrom && isSlug(b.copyFrom)) {
           const src = await env.PAGES.get('draft:' + churchId + '/' + b.copyFrom);
           if (src) {
             await env.PAGES.put('draft:' + churchId + '/' + id, src);

@@ -78,6 +78,17 @@ const SCHEMA = [
     at INTEGER NOT NULL
   )`,
   'CREATE INDEX IF NOT EXISTS form_hits_id ON form_hits (id)',
+  // Starter templates for new pages, edited by admins. See templates.js.
+  `CREATE TABLE IF NOT EXISTS templates (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    descr TEXT NOT NULL DEFAULT '',
+    position INTEGER NOT NULL DEFAULT 0,
+    hidden INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    draft_at TEXT,
+    draft_by TEXT
+  )`,
   'CREATE INDEX IF NOT EXISTS members_email ON members (email)',
   'CREATE INDEX IF NOT EXISTS sessions_email ON sessions (email)',
   'CREATE INDEX IF NOT EXISTS login_fails_email ON login_fails (email)',

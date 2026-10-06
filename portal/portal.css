@@ -143,3 +143,10 @@ dialog:has(.answersdlg) { width: min(640px, calc(100vw - 32px)); }
 .tplcard small { color: var(--muted); font-size: 12px; line-height: 1.35; }
 dialog:has(.newpage) { width: min(1080px, calc(100vw - 24px)); }
 .newpage .tplgrid { padding: 4px 0 0; max-height: 62vh; overflow-y: auto; }
+
+/* admin templates panel */
+.tplpanel { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
+.tplitem { display: flex; flex-direction: column; gap: 8px; }
+.tplitem .tplprev { margin-bottom: 2px; }
+.tplitem.off .tplprev { opacity: .45; }
+#tplBtn.on { border-color: var(--accent); }
