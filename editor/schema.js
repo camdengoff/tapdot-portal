@@ -395,7 +395,7 @@
     ],
     defaults: () => ({
       eyebrow: 'Baptism Sunday', title: 'Take the ==plunge==', when: '', intro: 'Baptism is a public way to say you’re following Jesus. Sign up and we’ll walk you through every step.',
-      look: 'real', tiles: '#e9f6f8', sky: '#bfe8ff', water: '#2aa8e6', deep: '#0b3a78', speed: 'normal', bubbles: true, rays: true, height: 230,
+      look: 'real', tiles: '#5d6b70', sky: '#bfe8ff', water: '#1c5f6e', deep: '#040d16', speed: 'normal', bubbles: true, rays: true, height: 230,
       signup: 'link',
       items: [
         { label: 'Name', kind: 'text', options: '', ph: 'First and last name', required: true },

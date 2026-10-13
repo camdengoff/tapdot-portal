@@ -783,13 +783,14 @@ fieldset.td-bad legend,.td-f-check.td-bad span{color:#ef4444}
       'void main(){vec2 uv=gl_FragCoord.xy/R.y;' +
       'vec2 d=vec2(sin(uv.y*9.0+T*1.1)+sin(uv.x*4.0-T*0.7)+0.5*sin((uv.x+uv.y)*15.0+T*1.7),cos(uv.x*8.0+T*0.9)+cos(uv.y*5.0+T*0.6)+0.5*cos((uv.x-uv.y)*13.0-T*1.5))*0.0035;' +
       'd+=rip(P0,uv)+rip(P1,uv)+rip(P2,uv)+rip(P3,uv);vec2 p=uv+d;' +
-      'vec2 g=abs(fract(p*vec2(9.0))-0.5);float grout=smoothstep(0.43,0.48,max(g.x,g.y));' +
-      'vec3 floor_=mix(TL,TL*0.78,grout);' +
-      'float depth=1.0-gl_FragCoord.y/R.y;vec3 tint=mix(vec3(1.0),WA,0.62);vec3 col=floor_*tint;col=mix(col,DE,0.12+depth*0.3);' +
-      'float c=cau(p*0.9,T*0.5)*0.6+cau(p*0.9+vec2(0.37,0.21),T*0.5+1.3)*0.4;col+=vec3(0.9,1.0,1.0)*min(c,1.3)*0.8*(1.0-depth*0.3);' +
-      'float sh=0.5+0.5*sin(uv.x*2.3+uv.y*1.7+T*0.4+d.x*120.0);col+=vec3(0.85,0.95,1.0)*sh*0.05;' +
-      'float sp=pow(max(0.0,sin((uv.x*14.0+uv.y*9.0)+d.x*900.0)),60.0);col+=sp*0.1;' +
-      'vec2 v=gl_FragCoord.xy/R-0.5;col*=1.0-dot(v,v)*0.35;gl_FragColor=vec4(col,1.0);}';
+      'vec2 g=abs(fract(p*vec2(3.2))-0.5);float grout=smoothstep(0.47,0.495,max(g.x,g.y));' +
+      'vec3 floor_=mix(TL,TL*0.72,grout);' +
+      'vec2 v=gl_FragCoord.xy/R-vec2(0.5,0.55);float glow=exp(-dot(v*vec2(1.3,1.8),v*vec2(1.3,1.8))*3.0);' +
+      'vec3 col=floor_*mix(vec3(1.0),WA*1.6,0.75)*(0.25+0.6*glow);col=mix(DE,col,0.35+0.65*glow);' +
+      'float c=cau(p*0.6,T*0.35)*0.6+cau(p*0.6+vec2(0.37,0.21),T*0.35+1.3)*0.4;col+=mix(WA,vec3(0.8,0.95,1.0),0.5)*min(c,1.2)*0.32*glow;' +
+      'float sh=0.5+0.5*sin(uv.x*2.3+uv.y*1.7+T*0.3+d.x*120.0);col+=WA*sh*0.06;' +
+      'float sp=pow(max(0.0,sin((uv.x*14.0+uv.y*9.0)+d.x*900.0)),80.0);col+=vec3(0.8,0.9,1.0)*sp*0.12*glow;' +
+      'gl_FragColor=vec4(col,1.0);}';
     var CALM = W.matchMedia && W.matchMedia('(prefers-reduced-motion: reduce)').matches;
     function hexRGB(h) { h = String(h || '').replace('#', ''); if (h.length === 3) h = h.replace(/./g, '$&$&'); var n = parseInt(h.slice(0, 6), 16) || 0; return [(n >> 16 & 255) / 255, (n >> 8 & 255) / 255, (n & 255) / 255]; }
     $$('.td-bap-gl').forEach(function (cv) {
