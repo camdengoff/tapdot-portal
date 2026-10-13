@@ -374,6 +374,9 @@
       { k: 'title', t: 'text', l: 'Title', rich: true },
       { k: 'when', t: 'text', l: 'Date and time (optional)', ph: 'Sunday, Nov 9 · 10:45 AM' },
       { k: 'intro', t: 'textarea', l: 'Text under the water (optional)', rich: true },
+      { k: 'layout', t: 'select', l: 'Layout', opts: [['below', 'Text and button under the photo'], ['over', 'Text and button on top of the photo']],
+        hint: 'With a custom form, the form itself stays under the photo.' },
+      { k: 'align', t: 'select', l: 'Text alignment', opts: [['left', 'Left'], ['center', 'Center']] },
       { group: 'Photo or video', open: true, fields: [
         { k: 'media', t: 'select', l: 'Show', opts: [['photo', 'A photo'], ['video', 'A video (plays silently on a loop)']] },
         { k: 'image', t: 'image', l: 'Photo', when: (b) => b.media !== 'video' },
@@ -396,7 +399,7 @@
     ],
     defaults: () => ({
       eyebrow: 'Baptism Sunday', title: 'Take the ==plunge==', when: '', intro: 'Baptism is a public way to say you’re following Jesus. Sign up and we’ll walk you through every step.',
-      media: 'photo', image: '', video: '', zoom: 100, posX: 50, posY: 50, shade: 45, height: 230,
+      layout: 'below', align: 'left', media: 'photo', image: '', video: '', zoom: 100, posX: 50, posY: 50, shade: 45, height: 230,
       signup: 'link',
       items: [
         { label: 'Name', kind: 'text', options: '', ph: 'First and last name', required: true },

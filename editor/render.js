@@ -265,17 +265,19 @@
       const media = vid
         ? '<video class="td-bap-media"' + frame + ' src="' + esc(vid) + '"' + (pic ? ' poster="' + esc(pic) + '"' : '') + ' autoplay muted loop playsinline preload="metadata" aria-hidden="true"></video>'
         : pic ? '<img class="td-bap-media"' + frame + ' src="' + esc(pic) + '" alt="" loading="lazy" />' : '';
-      const head = '<div class="td-bap-head' + (media ? '' : ' td-bap-empty') + '" style="height:' + h + 'px">' + media +
-        '<div class="td-bap-text" style="background:linear-gradient(180deg,rgba(0,0,0,' + (shade * 0.35).toFixed(2) + '),rgba(0,0,0,' + shade.toFixed(2) + '))">' +
+      const over = b.layout === 'over';
+      const intro = b.intro ? '<div class="td-bap-intro">' + md(b.intro, true) + '</div>' : '';
+      const cta = b.signup === 'form' ? '' : '<div class="td-bap-cta">' + tap('td-btn td-inline-btn', b.action, esc(b.btnLabel || 'Sign up'), ctx, '', b.btnLabel) + '</div>';
+      const form = b.signup === 'form' ? R.form(Object.assign({}, b, { title: '', intro: '' }), ctx) : '';
+      const head = '<div class="td-bap-head' + (media ? '' : ' td-bap-empty') + '" style="' + (over ? 'min-' : '') + 'height:' + h + 'px">' + media +
+        '<div class="td-bap-text" style="background:linear-gradient(180deg,rgba(0,0,0,' + (shade * (over ? 0.6 : 0.35)).toFixed(2) + '),rgba(0,0,0,' + shade.toFixed(2) + '))">' +
           (b.eyebrow ? '<div class="td-bap-eyebrow">' + esc(b.eyebrow) + '</div>' : '') +
           (b.title ? '<div class="td-bap-title td-head">' + md(b.title) + '</div>' : '') +
           (b.when ? '<div class="td-bap-when">' + esc(b.when) + '</div>' : '') +
+          (over ? intro + cta : '') +
         '</div></div>';
-      const intro = b.intro ? '<div class="td-bap-intro">' + md(b.intro, true) + '</div>' : '';
-      const body = b.signup === 'form'
-        ? R.form(Object.assign({}, b, { title: '', intro: '' }), ctx)
-        : '<div class="td-bap-cta">' + tap('td-btn td-inline-btn', b.action, esc(b.btnLabel || 'Sign up'), ctx, '', b.btnLabel) + '</div>';
-      return '<div class="td-bap td-card">' + head + intro + body + '</div>';
+      const cls = 'td-bap td-card' + (over ? ' td-bap-over' : '') + (b.align === 'center' ? ' td-bap-center' : '');
+      return '<div class="' + cls + '">' + head + (over ? '' : intro + cta) + form + '</div>';
     },
     // Connect card: answers are sent to the portal page the form was published from (ctx.formUrl).
     form(b, ctx) {
@@ -545,6 +547,13 @@ ${t.pressFx ? '.td-tap:active{transform:scale(.97)}' : ''}
 .td-bap-intro p{margin:0 0 6px}
 .td-bap .td-form,.td-bap .td-form-done{background:transparent;border-radius:0;box-shadow:none;margin:0}
 .td-bap-cta{padding:4px 16px 16px;text-align:center}
+.td-bap-center .td-bap-text,.td-bap-center .td-bap-intro{text-align:center;align-items:center}
+.td-bap-over .td-bap-text{position:relative;min-height:inherit;padding:24px 18px 20px}
+.td-bap-over.td-bap-center .td-bap-text{justify-content:center}
+.td-bap-over .td-bap-intro{padding:10px 0 0;color:rgba(255,255,255,.88)}
+.td-bap-over .td-bap-cta{padding:14px 0 0;text-align:left}
+.td-bap-over.td-bap-center .td-bap-cta{text-align:center}
+.td-bap-over .td-bap-cta .td-inline-btn{margin-top:0}
 /* connect card form */
 .td-form{padding:16px;display:flex;flex-direction:column;gap:14px}
 .td-form-title{font-weight:700;font-size:17px}
