@@ -274,7 +274,7 @@
       const intro = b.intro ? '<div class="td-bap-intro">' + md(b.intro, true) + '</div>' : '';
       const body = b.signup === 'form'
         ? R.form(Object.assign({}, b, { title: '', intro: '' }), ctx)
-        : '<div class="td-bap-cta">' + tap('td-form-btn td-bap-btn', b.action, esc(b.btnLabel || 'Sign up'), ctx, '', b.btnLabel) + '</div>';
+        : '<div class="td-bap-cta td-btns td-btns-stack td-btn-' + cssv(b.btnStyle || 'card') + ' td-btn-md">' + tap('td-btn', b.action, '<span class="td-btn-label">' + esc(b.btnLabel || 'Sign up') + '</span>', ctx, '', b.btnLabel) + '</div>';
       return '<div class="td-bap td-card">' + head + intro + body + '</div>';
     },
     // Connect card: answers are sent to the portal page the form was published from (ctx.formUrl).
@@ -545,7 +545,8 @@ ${t.pressFx ? '.td-tap:active{transform:scale(.97)}' : ''}
 .td-bap-intro p{margin:0 0 6px}
 .td-bap .td-form,.td-bap .td-form-done{background:transparent;border-radius:0;box-shadow:none;margin:0}
 .td-bap-cta{padding:16px}
-.td-bap-btn{display:block;text-align:center;text-decoration:none}
+.td-bap-cta .td-btn{width:100%}
+.td-bap .td-btn-card .td-btn{background:var(--td-card2);border-color:var(--td-card2)}
 /* connect card form */
 .td-form{padding:16px;display:flex;flex-direction:column;gap:14px}
 .td-form-title{font-weight:700;font-size:17px}
