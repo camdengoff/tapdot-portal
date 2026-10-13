@@ -364,26 +364,24 @@
     },
   };
 
-  // Baptism sign-up: an animated water banner (waves, light rays, rising bubbles) with its own
-  // sign-up form. Answers arrive with the Connect card answers in the portal.
+  // Baptism sign-up: a photo or silent looping video banner with a sign-up button or its own form.
+  // Custom form answers arrive with the Connect card answers in the portal.
   const formField = (k) => TD.BLOCKS.form.fields.find((f) => f.k === k);
   TD.BLOCKS.baptism = {
-    name: 'Baptism sign-up', icon: '💧', desc: 'Animated water banner with a sign-up form',
+    name: 'Baptism sign-up', icon: '💧', desc: 'Photo or video banner with a sign-up button or form',
     fields: [
       { k: 'eyebrow', t: 'text', l: 'Small text above the title', ph: 'Baptism Sunday' },
       { k: 'title', t: 'text', l: 'Title', rich: true },
       { k: 'when', t: 'text', l: 'Date and time (optional)', ph: 'Sunday, Nov 9 · 10:45 AM' },
       { k: 'intro', t: 'textarea', l: 'Text under the water (optional)', rich: true },
-      { group: 'Water', open: true, fields: [
-        { k: 'look', t: 'select', l: 'Water style', opts: [['real', 'Realistic baptistry (seen from above)'], ['waves', 'Illustrated waves and bubbles']] },
-        { k: 'tiles', t: 'color', l: 'Tile color', when: (b) => b.look !== 'waves' },
-        { k: 'sky', t: 'color', l: 'Above the water', when: (b) => b.look === 'waves' },
-        { k: 'water', t: 'color', l: 'Water at the surface' },
-        { k: 'deep', t: 'color', l: 'Deep water' },
-        { k: 'speed', t: 'select', l: 'Wave speed', opts: [['calm', 'Calm'], ['normal', 'Normal'], ['lively', 'Lively']] },
-        { k: 'bubbles', t: 'checkbox', l: 'Rising bubbles', when: (b) => b.look === 'waves' },
-        { k: 'rays', t: 'checkbox', l: 'Light rays in the water', when: (b) => b.look === 'waves' },
-        { k: 'height', t: 'range', l: 'Banner height', min: 160, max: 360, unit: 'px' },
+      { group: 'Photo or video', open: true, fields: [
+        { k: 'media', t: 'select', l: 'Show', opts: [['photo', 'A photo'], ['video', 'A video (plays silently on a loop)']] },
+        { k: 'image', t: 'image', l: 'Photo', when: (b) => b.media !== 'video' },
+        { k: 'video', t: 'video', l: 'Video', when: (b) => b.media === 'video',
+          hint: 'Upload a short clip (under 6 MB) or paste a link to an .mp4 file. It plays muted, like a moving photo.' },
+        { k: 'image', t: 'image', l: 'Cover photo while the video loads (optional)', when: (b) => b.media === 'video' },
+        { k: 'shade', t: 'range', l: 'Darken behind the text', min: 0, max: 90, unit: '%' },
+        { k: 'height', t: 'range', l: 'Banner height', min: 160, max: 420, unit: 'px' },
       ] },
       { k: 'signup', t: 'select', l: 'How people sign up', opts: [['link', 'Button to a form you already have'], ['form', 'Custom form on this page']],
         hint: 'A custom form’s answers show in the portal with your Connect card answers.' },
@@ -395,7 +393,7 @@
     ],
     defaults: () => ({
       eyebrow: 'Baptism Sunday', title: 'Take the ==plunge==', when: '', intro: 'Baptism is a public way to say you’re following Jesus. Sign up and we’ll walk you through every step.',
-      look: 'real', tiles: '#5d6b70', sky: '#bfe8ff', water: '#1c5f6e', deep: '#040d16', speed: 'normal', bubbles: true, rays: true, height: 230,
+      media: 'photo', image: '', video: '', shade: 45, height: 230,
       signup: 'link',
       items: [
         { label: 'Name', kind: 'text', options: '', ph: 'First and last name', required: true },

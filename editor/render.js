@@ -242,40 +242,18 @@
       }).join('');
       return '<div class="td-gallery" style="grid-template-columns:repeat(' + (+b.cols || 3) + ',1fr);gap:' + (+b.gap || 0) + 'px">' + items + '</div>';
     },
-    // Baptism sign-up: layered waves drift sideways, light rays shimmer and bubbles rise (CSS only).
+    // Baptism sign-up: an uploaded photo or silent looping video with the title over it, then a
+    // button to the church's own form or a custom form on the page.
     baptism(b, ctx) {
-      const sp = { calm: 1.6, normal: 1, lively: 0.6 }[b.speed] || 1;
-      const wave = (cls, dur, y) => '<svg class="td-bap-wave ' + cls + '" style="animation-duration:' + (dur * sp).toFixed(1) + 's;top:' + y + 'px" viewBox="0 0 1200 40" preserveAspectRatio="none" aria-hidden="true">' +
-        '<path d="M0 20 Q150 4 300 20 T600 20 T900 20 T1200 20 V40 H0Z"/></svg>';
-      // Bubble sizes and timings come from the index, so the page renders the same every time.
-      const bubbles = b.bubbles ? Array.from({ length: 14 }, (_, i) => {
-        const size = 4 + ((i * 7) % 11);
-        return '<i style="left:' + ((i * 37 + 11) % 96 + 2) + '%;width:' + size + 'px;height:' + size + 'px;animation-duration:' + ((5 + (i * 3) % 6) * sp).toFixed(1) + 's;animation-delay:-' + ((i * 1.7) % 7).toFixed(1) + 's"></i>';
-      }).join('') : '';
-      const h = Math.max(160, Math.min(360, +b.height || 230));
-      const vars = '--bap-sky:' + cssv(b.sky || '#bfe8ff') + ';--bap-w:' + cssv(b.water || '#2aa8e6') + ';--bap-d:' + cssv(b.deep || '#0b3a78') + ';--td-bap-h:' + h + 'px;height:' + h + 'px';
-      if (b.look !== 'waves') {
-        // Realistic: a WebGL baptistry (tiled floor, moving light, ripples) drawn by the runtime.
-        const cfg = { tiles: TD.hex(b.tiles || '#e9f6f8'), water: TD.hex(b.water || '#2aa8e6'), deep: TD.hex(b.deep || '#0b3a78'), speed: 1 / sp };
-        const realHead = '<div class="td-bap-head td-bap-real" style="' + vars + '">' +
-          '<canvas class="td-bap-gl" data-td-water="' + esc(JSON.stringify(cfg)) + '" aria-hidden="true"></canvas>' +
-          '<div class="td-bap-text">' +
-            (b.eyebrow ? '<div class="td-bap-eyebrow">' + esc(b.eyebrow) + '</div>' : '') +
-            (b.title ? '<div class="td-bap-title td-head">' + md(b.title) + '</div>' : '') +
-            (b.when ? '<div class="td-bap-when">' + esc(b.when) + '</div>' : '') +
-          '</div></div>';
-        const introR = b.intro ? '<div class="td-bap-intro">' + md(b.intro, true) + '</div>' : '';
-        const bodyR = b.signup === 'form'
-          ? R.form(Object.assign({}, b, { title: '', intro: '' }), ctx)
-          : '<div class="td-bap-cta">' + tap('td-form-btn td-bap-btn', b.action, esc(b.btnLabel || 'Sign up'), ctx, '', b.btnLabel) + '</div>';
-        return '<div class="td-bap td-card">' + realHead + introR + bodyR + '</div>';
-      }
-      const head = '<div class="td-bap-head" style="' + vars + '">' +
-        (b.rays ? '<div class="td-bap-rays" style="animation-duration:' + (6 * sp).toFixed(1) + 's"></div>' : '') +
-        '<div class="td-bap-bubbles" aria-hidden="true">' + bubbles + '</div>' +
-        wave('w1', 11, 22) + wave('w2', 7, 26) + wave('w3', 15, 30) +
-        '<div class="td-bap-splash" aria-hidden="true"><i></i><i></i><i></i></div>' +
-        '<div class="td-bap-text">' +
+      const h = Math.max(160, Math.min(420, +b.height || 230));
+      const shade = Math.max(0, Math.min(90, b.shade == null ? 45 : +b.shade)) / 100;
+      const pic = safeUrl(b.image, true);
+      const vid = b.media === 'video' ? (/^data:video\//i.test(b.video || '') ? b.video : safeUrl(b.video)) : '';
+      const media = vid
+        ? '<video class="td-bap-media" src="' + esc(vid) + '"' + (pic ? ' poster="' + esc(pic) + '"' : '') + ' autoplay muted loop playsinline preload="metadata" aria-hidden="true"></video>'
+        : pic ? '<img class="td-bap-media" src="' + esc(pic) + '" alt="" loading="lazy" />' : '';
+      const head = '<div class="td-bap-head' + (media ? '' : ' td-bap-empty') + '" style="height:' + h + 'px">' + media +
+        '<div class="td-bap-text" style="background:linear-gradient(180deg,rgba(0,0,0,' + (shade * 0.35).toFixed(2) + '),rgba(0,0,0,' + shade.toFixed(2) + '))">' +
           (b.eyebrow ? '<div class="td-bap-eyebrow">' + esc(b.eyebrow) + '</div>' : '') +
           (b.title ? '<div class="td-bap-title td-head">' + md(b.title) + '</div>' : '') +
           (b.when ? '<div class="td-bap-when">' + esc(b.when) + '</div>' : '') +
@@ -543,40 +521,18 @@ ${t.pressFx ? '.td-tap:active{transform:scale(.97)}' : ''}
 .td-copy-btn.td-tap:active{filter:brightness(.9)}
 /* baptism sign-up */
 .td-bap{overflow:hidden;padding:0}
-.td-bap-head{position:relative;overflow:hidden;background:linear-gradient(180deg,var(--bap-sky) 0,var(--bap-sky) 40px,var(--bap-w) 41px,var(--bap-d) 100%);isolation:isolate}
-.td-bap-wave{position:absolute;left:0;width:200%;height:30px;animation:td-bap-drift 10s linear infinite;z-index:2}
-.td-bap-wave path{fill:var(--bap-w)}
-.td-bap-wave.w1{opacity:.45;animation-direction:reverse}
-.td-bap-wave.w2{opacity:.7}
-.td-bap-wave.w3{opacity:1}
-@keyframes td-bap-drift{from{transform:translateX(0)}to{transform:translateX(-50%)}}
-.td-bap-rays{position:absolute;inset:40px -40% 0;z-index:1;background:repeating-linear-gradient(100deg,rgba(255,255,255,0) 0 40px,rgba(255,255,255,.13) 60px 75px,rgba(255,255,255,0) 95px 140px);transform-origin:50% 0;-webkit-mask-image:linear-gradient(180deg,#000,transparent 85%);mask-image:linear-gradient(180deg,#000,transparent 85%);animation:td-bap-rays 6s ease-in-out infinite alternate}
-@keyframes td-bap-rays{from{transform:translateX(-6%) skewX(-6deg);opacity:.7}to{transform:translateX(6%) skewX(6deg);opacity:1}}
-.td-bap-bubbles{position:absolute;inset:44px 0 0;z-index:1}
-.td-bap-bubbles i{position:absolute;bottom:-16px;border-radius:50%;border:1.5px solid rgba(255,255,255,.6);background:radial-gradient(circle at 30% 30%,rgba(255,255,255,.7),rgba(255,255,255,.08) 60%);animation:td-bap-rise 6s ease-in infinite}
-@keyframes td-bap-rise{0%{transform:translate(0,0);opacity:0}10%{opacity:1}50%{transform:translate(8px,-55%)}90%{opacity:.9}100%{transform:translate(-6px,calc(-1 * (var(--td-bap-h,260px))));opacity:0}}
-.td-bap-text{position:absolute;left:0;right:0;bottom:0;z-index:3;padding:18px 18px 16px;color:#fff;text-shadow:0 1px 12px rgba(0,0,0,.35)}
+.td-bap-head{position:relative;overflow:hidden;background:#0b1620}
+.td-bap-empty{background:linear-gradient(160deg,#1d3a4a,#060e16)}
+.td-bap-media{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.td-bap-text{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;padding:18px 18px 16px;color:#fff;text-shadow:0 1px 12px rgba(0,0,0,.35)}
 .td-bap-eyebrow{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;opacity:.9}
 .td-bap-title{font-size:28px;font-weight:800;line-height:1.1;margin-top:2px}
-.td-bap-title .td-accent{color:var(--bap-sky)}
 .td-bap-when{font-size:14px;font-weight:600;margin-top:6px;opacity:.95}
 .td-bap-intro{padding:16px 16px 0;font-size:14px;color:var(--td-muted)}
 .td-bap-intro p{margin:0 0 6px}
 .td-bap .td-form,.td-bap .td-form-done{background:transparent;border-radius:0;box-shadow:none;margin:0}
-.td-bap .td-form-btn{background:linear-gradient(90deg,var(--td-accent),var(--td-accent));position:relative;overflow:hidden}
 .td-bap-cta{padding:16px}
 .td-bap-btn{display:block;text-align:center;text-decoration:none}
-.td-bap-real{background:linear-gradient(160deg,var(--bap-w),var(--bap-d))}
-.td-bap-gl{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:manipulation;cursor:pointer}
-.td-bap-real .td-bap-text{pointer-events:none;background:linear-gradient(180deg,transparent,rgba(0,20,40,.45))}
-.td-bap-splash{position:absolute;inset:0;z-index:2;pointer-events:none}
-.td-bap-splash i{position:absolute;left:50%;top:55%;width:20px;height:20px;margin:-10px 0 0 -10px;border:2px solid rgba(255,255,255,.85);border-radius:50%;opacity:0}
-.td-bap-done .td-bap-splash i{animation:td-bap-ring 1.6s ease-out forwards}
-.td-bap-done .td-bap-splash i:nth-child(2){animation-delay:.25s}
-.td-bap-done .td-bap-splash i:nth-child(3){animation-delay:.5s}
-@keyframes td-bap-ring{0%{transform:scale(.3) scaleY(.45);opacity:1}100%{transform:scale(14) scaleY(.45);opacity:0}}
-.td-bap-done .td-bap-bubbles i{animation-duration:2.2s !important}
-@media (prefers-reduced-motion:reduce){.td-bap-wave,.td-bap-rays,.td-bap-bubbles i,.td-bap-splash i{animation:none !important}.td-bap-bubbles{display:none}}
 /* connect card form */
 .td-form{padding:16px;display:flex;flex-direction:column;gap:14px}
 .td-form-title{font-weight:700;font-size:17px}
@@ -772,70 +728,6 @@ fieldset.td-bad legend,.td-f-check.td-bad span{color:#ef4444}
     });
     D.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeAll(); });
 
-    // realistic baptistry water (WebGL): a tiled floor seen through moving water, with caustic light
-    // and ripples where people tap. Pauses off-screen; one still frame for reduced motion.
-    var WATER_FS = 'precision mediump float;uniform vec2 R;uniform float T;uniform vec3 TL,WA,DE;uniform vec4 P0,P1,P2,P3;' +
-      'float cau(vec2 uv,float t){vec2 p=mod(uv*6.2831,6.2831)-250.0;vec2 i=p;float c=1.0;float k=0.005;' +
-      'for(int n=0;n<5;n++){float tt=t*(1.0-(3.5/float(n+1)));i=p+vec2(cos(tt-i.x)+sin(tt+i.y),sin(tt-i.y)+cos(tt+i.x));c+=1.0/length(vec2(p.x/(sin(i.x+tt)/k),p.y/(cos(i.y+tt)/k)));}' +
-      'c/=5.0;c=1.17-pow(c,1.4);return pow(abs(c),8.0);}' +
-      'vec2 rip(vec4 r,vec2 uv){float a=T-r.z;if(a<0.0||a>4.0)return vec2(0.0);vec2 q=uv-r.xy;float d=length(q)+1e-4;' +
-      'float w=sin(d*70.0-a*14.0)*exp(-d*4.0)*exp(-a*1.2)*r.w*smoothstep(a*0.32+0.05,a*0.32-0.05,d);return q/d*w*0.012;}' +
-      'void main(){vec2 uv=gl_FragCoord.xy/R.y;' +
-      'vec2 d=vec2(sin(uv.y*9.0+T*1.1)+sin(uv.x*4.0-T*0.7)+0.5*sin((uv.x+uv.y)*15.0+T*1.7),cos(uv.x*8.0+T*0.9)+cos(uv.y*5.0+T*0.6)+0.5*cos((uv.x-uv.y)*13.0-T*1.5))*0.0035;' +
-      'd+=rip(P0,uv)+rip(P1,uv)+rip(P2,uv)+rip(P3,uv);vec2 p=uv+d;' +
-      'vec2 g=abs(fract(p*vec2(3.2))-0.5);float grout=smoothstep(0.47,0.495,max(g.x,g.y));' +
-      'vec3 floor_=mix(TL,TL*0.72,grout);' +
-      'vec2 v=gl_FragCoord.xy/R-vec2(0.5,0.55);float glow=exp(-dot(v*vec2(1.3,1.8),v*vec2(1.3,1.8))*3.0);' +
-      'vec3 col=floor_*mix(vec3(1.0),WA*1.6,0.75)*(0.25+0.6*glow);col=mix(DE,col,0.35+0.65*glow);' +
-      'float c=cau(p*0.6,T*0.35)*0.6+cau(p*0.6+vec2(0.37,0.21),T*0.35+1.3)*0.4;col+=mix(WA,vec3(0.8,0.95,1.0),0.5)*min(c,1.2)*0.32*glow;' +
-      'float sh=0.5+0.5*sin(uv.x*2.3+uv.y*1.7+T*0.3+d.x*120.0);col+=WA*sh*0.06;' +
-      'float sp=pow(max(0.0,sin((uv.x*14.0+uv.y*9.0)+d.x*900.0)),80.0);col+=vec3(0.8,0.9,1.0)*sp*0.12*glow;' +
-      'gl_FragColor=vec4(col,1.0);}';
-    var CALM = W.matchMedia && W.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    function hexRGB(h) { h = String(h || '').replace('#', ''); if (h.length === 3) h = h.replace(/./g, '$&$&'); var n = parseInt(h.slice(0, 6), 16) || 0; return [(n >> 16 & 255) / 255, (n >> 8 & 255) / 255, (n & 255) / 255]; }
-    $$('.td-bap-gl').forEach(function (cv) {
-      var cfg = {}; try { cfg = JSON.parse(cv.getAttribute('data-td-water')) || {}; } catch (e) {}
-      var gl = null; try { gl = cv.getContext('webgl', { antialias: false, premultipliedAlpha: false }); } catch (e) {}
-      if (!gl) return; // the CSS gradient behind it stays
-      function sh(type, src) { var s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); return s; }
-      var pr = gl.createProgram();
-      gl.attachShader(pr, sh(gl.VERTEX_SHADER, 'attribute vec2 a;void main(){gl_Position=vec4(a,0.0,1.0);}'));
-      gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, WATER_FS));
-      gl.linkProgram(pr);
-      if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) return;
-      gl.useProgram(pr);
-      gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
-      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
-      var loc = gl.getAttribLocation(pr, 'a'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-      var U = {}; ['R', 'T', 'TL', 'WA', 'DE', 'P0', 'P1', 'P2', 'P3'].forEach(function (n) { U[n] = gl.getUniformLocation(pr, n); });
-      gl.uniform3fv(U.TL, hexRGB(cfg.tiles)); gl.uniform3fv(U.WA, hexRGB(cfg.water)); gl.uniform3fv(U.DE, hexRGB(cfg.deep));
-      var speed = +cfg.speed || 1, t0 = performance.now(), ripples = [[0, 0, -9, 0], [0, 0, -9, 0], [0, 0, -9, 0], [0, 0, -9, 0]], ri = 0;
-      var now = function () { return (performance.now() - t0) / 1000 * speed; };
-      function size() {
-        var dpr = Math.min(W.devicePixelRatio || 1, 1.5), w = Math.round(cv.clientWidth * dpr), h = Math.round(cv.clientHeight * dpr);
-        if (w && h && (cv.width !== w || cv.height !== h)) { cv.width = w; cv.height = h; gl.viewport(0, 0, w, h); }
-      }
-      function draw() {
-        size();
-        gl.uniform2f(U.R, cv.width, cv.height); gl.uniform1f(U.T, now());
-        for (var k = 0; k < 4; k++) gl.uniform4fv(U['P' + k], ripples[k]);
-        gl.drawArrays(gl.TRIANGLES, 0, 3);
-      }
-      // A ripple at a point in the canvas (CSS pixels); strength 1 is a finger tap.
-      function ripple(x, y, amp) {
-        ripples[ri] = [x / cv.clientHeight, (cv.clientHeight - y) / cv.clientHeight, now(), amp || 1];
-        ri = (ri + 1) % 4; if (CALM) draw();
-      }
-      cv.addEventListener('pointerdown', function (e) { var r = cv.getBoundingClientRect(); ripple(e.clientX - r.left, e.clientY - r.top, 1); });
-      cv._tdRipple = function () { ripple(cv.clientWidth / 2, cv.clientHeight * 0.45, 2.2); setTimeout(function () { ripple(cv.clientWidth * 0.3, cv.clientHeight * 0.6, 1.2); }, 350); setTimeout(function () { ripple(cv.clientWidth * 0.72, cv.clientHeight * 0.35, 1.2); }, 650); };
-      if (CALM) { draw(); W.addEventListener('resize', draw); return; }
-      var on = true, raf = 0;
-      function loop() { raf = 0; if (!on || D.hidden) return; draw(); raf = requestAnimationFrame(loop); }
-      if ('IntersectionObserver' in W) new IntersectionObserver(function (es) { on = es[0].isIntersecting; if (on && !raf) loop(); }).observe(cv);
-      D.addEventListener('visibilitychange', function () { if (!D.hidden && on && !raf) loop(); });
-      loop();
-    });
-
     // connect card forms: check the answers, then send them to the portal
     $$('[data-td-form]').forEach(function (f) {
       var started = Date.now();
@@ -867,12 +759,6 @@ fieldset.td-bad legend,.td-f-check.td-bad span{color:#ef4444}
         if (!answers.some(function (a) { return a.a; })) { fail('Please fill in the form first.'); return; }
         function finish() {
           f.hidden = true; done.hidden = false;
-          // Baptism sign-up: a splash of ripples on the water.
-          var bap = f.closest('.td-bap');
-          if (bap) {
-            bap.classList.remove('td-bap-done'); void bap.offsetWidth; bap.classList.add('td-bap-done');
-            var cv = $('.td-bap-gl', bap); if (cv && cv._tdRipple) cv._tdRipple();
-          }
           try { done.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (x) {}
         }
         if (PREVIEW) { toast('Preview: answers are not sent'); finish(); return; }

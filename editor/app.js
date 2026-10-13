@@ -488,6 +488,38 @@
       draw();
       return wrap;
     },
+    // Video: upload a short clip (kept in the page, so capped) or paste a link to a video file.
+    video(o, f, ch) {
+      const wrap = h('div', { class: 'imgf' });
+      const MAX = 6 * 1024 * 1024;
+      const draw = (msg) => {
+        const v = getp(o, f.k) || '';
+        const isData = /^data:/.test(v);
+        wrap.replaceChildren(
+          h('div', { class: 'thumb' + (v ? '' : ' empty') }, v ? h('video', { src: v, muted: true, autoplay: true, loop: true, playsinline: true }) : '🎬'),
+          h('div', { class: 'imgf-r' },
+            isData
+              ? h('div', { class: 'uploaded' }, 'Uploaded video · ' + kb(dataSize(v)))
+              : h('input', { type: 'url', value: v, placeholder: 'Paste link to an .mp4…', oninput: (e) => { setp(o, f.k, e.target.value.trim()); ch(); }, onchange: () => { ch(true); draw(); } }),
+            msg ? h('div', { class: 'warn' }, msg) : null,
+            h('div', { class: 'row' },
+              h('button', { type: 'button', class: 'ghost sm', onclick: () => {
+                const inp = h('input', { type: 'file', accept: 'video/mp4,video/webm,video/quicktime,video/*' });
+                inp.onchange = () => {
+                  const file = inp.files[0];
+                  if (!file) return;
+                  if (file.size > MAX) return draw('That video is ' + (file.size / 1048576).toFixed(1) + ' MB. Please trim it to under 6 MB (a 5–10 second clip is plenty), or paste a link instead.');
+                  const fr = new FileReader();
+                  fr.onload = () => { setp(o, f.k, fr.result); draw(); ch(true); };
+                  fr.readAsDataURL(file);
+                };
+                inp.click();
+              } }, '⬆ Upload'),
+              v ? h('button', { type: 'button', class: 'ghost sm', onclick: () => { setp(o, f.k, ''); draw(); ch(true); } }, 'Remove') : null)));
+      };
+      draw();
+      return wrap;
+    },
     images(o, f, ch) {
       const wrap = h('div', { class: 'imgs' });
       const draw = () => {
