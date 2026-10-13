@@ -378,7 +378,7 @@
         { k: 'media', t: 'select', l: 'Show', opts: [['photo', 'A photo'], ['video', 'A video (plays silently on a loop)']] },
         { k: 'image', t: 'image', l: 'Photo', when: (b) => b.media !== 'video' },
         { k: 'video', t: 'video', l: 'Video', when: (b) => b.media === 'video',
-          hint: 'Upload a short clip (under 6 MB) or paste a link to an .mp4 file. It plays muted, like a moving photo.' },
+          hint: 'Upload a short clip (under 6 MB) or paste a link to an .mp4 file (Dropbox share links work). It plays muted, like a moving photo.' },
         { k: 'image', t: 'image', l: 'Cover photo while the video loads (optional)', when: (b) => b.media === 'video' },
         { k: 'shade', t: 'range', l: 'Darken behind the text', min: 0, max: 90, unit: '%' },
         { k: 'height', t: 'range', l: 'Banner height', min: 160, max: 420, unit: 'px' },

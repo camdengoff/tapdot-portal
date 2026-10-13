@@ -496,7 +496,7 @@
         const v = getp(o, f.k) || '';
         const isData = /^data:/.test(v);
         wrap.replaceChildren(
-          h('div', { class: 'thumb' + (v ? '' : ' empty') }, v ? h('video', { src: v, muted: true, autoplay: true, loop: true, playsinline: true }) : '🎬'),
+          h('div', { class: 'thumb' + (v ? '' : ' empty') }, v ? h('video', { src: TD.mediaUrl(v), muted: true, autoplay: true, loop: true, playsinline: true }) : '🎬'),
           h('div', { class: 'imgf-r' },
             isData
               ? h('div', { class: 'uploaded' }, 'Uploaded video · ' + kb(dataSize(v)))

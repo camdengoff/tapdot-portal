@@ -17,6 +17,16 @@
   };
   TD.esc = esc;
   TD.safeUrl = safeUrl;
+  // Dropbox share links open a preview page; raw=1 makes them serve the file itself.
+  const mediaUrl = (u) => {
+    u = safeUrl(u, true);
+    if (/^https:\/\/(www\.)?dropbox\.com\//i.test(u)) {
+      u = u.replace(/([?&])(dl|raw)=[^&]*&?/gi, '$1').replace(/[?&]$/, '');
+      u += (u.indexOf('?') < 0 ? '?' : '&') + 'raw=1';
+    }
+    return u;
+  };
+  TD.mediaUrl = mediaUrl;
 
   // Mini markup: **bold**, *italic*, ==accent==, [text](url), newlines.
   function md(src, paragraphs) {
@@ -247,8 +257,8 @@
     baptism(b, ctx) {
       const h = Math.max(160, Math.min(420, +b.height || 230));
       const shade = Math.max(0, Math.min(90, b.shade == null ? 45 : +b.shade)) / 100;
-      const pic = safeUrl(b.image, true);
-      const vid = b.media === 'video' ? (/^data:video\//i.test(b.video || '') ? b.video : safeUrl(b.video)) : '';
+      const pic = mediaUrl(b.image);
+      const vid = b.media === 'video' ? (/^data:video\//i.test(b.video || '') ? b.video : mediaUrl(b.video)) : '';
       const media = vid
         ? '<video class="td-bap-media" src="' + esc(vid) + '"' + (pic ? ' poster="' + esc(pic) + '"' : '') + ' autoplay muted loop playsinline preload="metadata" aria-hidden="true"></video>'
         : pic ? '<img class="td-bap-media" src="' + esc(pic) + '" alt="" loading="lazy" />' : '';
