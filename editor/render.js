@@ -259,9 +259,12 @@
       const shade = Math.max(0, Math.min(90, b.shade == null ? 45 : +b.shade)) / 100;
       const pic = mediaUrl(b.image);
       const vid = b.media === 'video' ? (/^data:video\//i.test(b.video || '') ? b.video : mediaUrl(b.video)) : '';
+      const pct = (v, d, lo, hi) => Math.max(lo, Math.min(hi, v == null || v === '' ? d : +v || 0));
+      const fx = pct(b.posX, 50, 0, 100), fy = pct(b.posY, 50, 0, 100), z = pct(b.zoom, 100, 100, 300) / 100;
+      const frame = ' style="object-position:' + fx + '% ' + fy + '%' + (z > 1 ? ';transform:scale(' + z + ');transform-origin:' + fx + '% ' + fy + '%' : '') + '"';
       const media = vid
-        ? '<video class="td-bap-media" src="' + esc(vid) + '"' + (pic ? ' poster="' + esc(pic) + '"' : '') + ' autoplay muted loop playsinline preload="metadata" aria-hidden="true"></video>'
-        : pic ? '<img class="td-bap-media" src="' + esc(pic) + '" alt="" loading="lazy" />' : '';
+        ? '<video class="td-bap-media"' + frame + ' src="' + esc(vid) + '"' + (pic ? ' poster="' + esc(pic) + '"' : '') + ' autoplay muted loop playsinline preload="metadata" aria-hidden="true"></video>'
+        : pic ? '<img class="td-bap-media"' + frame + ' src="' + esc(pic) + '" alt="" loading="lazy" />' : '';
       const head = '<div class="td-bap-head' + (media ? '' : ' td-bap-empty') + '" style="height:' + h + 'px">' + media +
         '<div class="td-bap-text" style="background:linear-gradient(180deg,rgba(0,0,0,' + (shade * 0.35).toFixed(2) + '),rgba(0,0,0,' + shade.toFixed(2) + '))">' +
           (b.eyebrow ? '<div class="td-bap-eyebrow">' + esc(b.eyebrow) + '</div>' : '') +

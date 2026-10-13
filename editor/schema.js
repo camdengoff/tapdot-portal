@@ -380,6 +380,9 @@
         { k: 'video', t: 'video', l: 'Video', when: (b) => b.media === 'video',
           hint: 'Upload a short clip (under 6 MB) or paste a link to an .mp4 file (Dropbox share links work). It plays muted, like a moving photo.' },
         { k: 'image', t: 'image', l: 'Cover photo while the video loads (optional)', when: (b) => b.media === 'video' },
+        { k: 'zoom', t: 'range', l: 'Zoom', min: 100, max: 300, unit: '%' },
+        { k: 'posX', t: 'range', l: 'Move left / right', min: 0, max: 100, unit: '%', hint: '0 shows the left edge, 100 the right edge.' },
+        { k: 'posY', t: 'range', l: 'Move up / down', min: 0, max: 100, unit: '%', hint: '0 shows the top, 100 the bottom.' },
         { k: 'shade', t: 'range', l: 'Darken behind the text', min: 0, max: 90, unit: '%' },
         { k: 'height', t: 'range', l: 'Banner height', min: 160, max: 420, unit: 'px' },
       ] },
@@ -393,7 +396,7 @@
     ],
     defaults: () => ({
       eyebrow: 'Baptism Sunday', title: 'Take the ==plunge==', when: '', intro: 'Baptism is a public way to say you’re following Jesus. Sign up and we’ll walk you through every step.',
-      media: 'photo', image: '', video: '', shade: 45, height: 230,
+      media: 'photo', image: '', video: '', zoom: 100, posX: 50, posY: 50, shade: 45, height: 230,
       signup: 'link',
       items: [
         { label: 'Name', kind: 'text', options: '', ph: 'First and last name', required: true },
