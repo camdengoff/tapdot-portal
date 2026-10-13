@@ -242,6 +242,34 @@
       }).join('');
       return '<div class="td-gallery" style="grid-template-columns:repeat(' + (+b.cols || 3) + ',1fr);gap:' + (+b.gap || 0) + 'px">' + items + '</div>';
     },
+    // Baptism sign-up: layered waves drift sideways, light rays shimmer and bubbles rise (CSS only).
+    baptism(b, ctx) {
+      const sp = { calm: 1.6, normal: 1, lively: 0.6 }[b.speed] || 1;
+      const wave = (cls, dur, y) => '<svg class="td-bap-wave ' + cls + '" style="animation-duration:' + (dur * sp).toFixed(1) + 's;top:' + y + 'px" viewBox="0 0 1200 40" preserveAspectRatio="none" aria-hidden="true">' +
+        '<path d="M0 20 Q150 4 300 20 T600 20 T900 20 T1200 20 V40 H0Z"/></svg>';
+      // Bubble sizes and timings come from the index, so the page renders the same every time.
+      const bubbles = b.bubbles ? Array.from({ length: 14 }, (_, i) => {
+        const size = 4 + ((i * 7) % 11);
+        return '<i style="left:' + ((i * 37 + 11) % 96 + 2) + '%;width:' + size + 'px;height:' + size + 'px;animation-duration:' + ((5 + (i * 3) % 6) * sp).toFixed(1) + 's;animation-delay:-' + ((i * 1.7) % 7).toFixed(1) + 's"></i>';
+      }).join('') : '';
+      const h = Math.max(160, Math.min(360, +b.height || 230));
+      const vars = '--bap-sky:' + cssv(b.sky || '#bfe8ff') + ';--bap-w:' + cssv(b.water || '#2aa8e6') + ';--bap-d:' + cssv(b.deep || '#0b3a78') + ';--td-bap-h:' + h + 'px;height:' + h + 'px';
+      const head = '<div class="td-bap-head" style="' + vars + '">' +
+        (b.rays ? '<div class="td-bap-rays" style="animation-duration:' + (6 * sp).toFixed(1) + 's"></div>' : '') +
+        '<div class="td-bap-bubbles" aria-hidden="true">' + bubbles + '</div>' +
+        wave('w1', 11, 22) + wave('w2', 7, 26) + wave('w3', 15, 30) +
+        '<div class="td-bap-splash" aria-hidden="true"><i></i><i></i><i></i></div>' +
+        '<div class="td-bap-text">' +
+          (b.eyebrow ? '<div class="td-bap-eyebrow">' + esc(b.eyebrow) + '</div>' : '') +
+          (b.title ? '<div class="td-bap-title td-head">' + md(b.title) + '</div>' : '') +
+          (b.when ? '<div class="td-bap-when">' + esc(b.when) + '</div>' : '') +
+        '</div></div>';
+      const intro = b.intro ? '<div class="td-bap-intro">' + md(b.intro, true) + '</div>' : '';
+      const body = b.signup === 'form'
+        ? R.form(Object.assign({}, b, { title: '', intro: '' }), ctx)
+        : '<div class="td-bap-cta">' + tap('td-form-btn td-bap-btn', b.action, esc(b.btnLabel || 'Sign up'), ctx, '', b.btnLabel) + '</div>';
+      return '<div class="td-bap td-card">' + head + intro + body + '</div>';
+    },
     // Connect card: answers are sent to the portal page the form was published from (ctx.formUrl).
     form(b, ctx) {
       const kinds = { email: 'email', phone: 'tel' };
@@ -497,6 +525,39 @@ ${t.pressFx ? '.td-tap:active{transform:scale(.97)}' : ''}
 .td-copy-val{font-size:15px;font-weight:600;word-break:break-word}
 .td-copy-btn{flex-shrink:0;background:var(--td-accent);color:var(--td-accent-text) !important;border-radius:var(--td-btn-radius);padding:8px 14px;font-size:13px;font-weight:700}
 .td-copy-btn.td-tap:active{filter:brightness(.9)}
+/* baptism sign-up */
+.td-bap{overflow:hidden;padding:0}
+.td-bap-head{position:relative;overflow:hidden;background:linear-gradient(180deg,var(--bap-sky) 0,var(--bap-sky) 40px,var(--bap-w) 41px,var(--bap-d) 100%);isolation:isolate}
+.td-bap-wave{position:absolute;left:0;width:200%;height:30px;animation:td-bap-drift 10s linear infinite;z-index:2}
+.td-bap-wave path{fill:var(--bap-w)}
+.td-bap-wave.w1{opacity:.45;animation-direction:reverse}
+.td-bap-wave.w2{opacity:.7}
+.td-bap-wave.w3{opacity:1}
+@keyframes td-bap-drift{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.td-bap-rays{position:absolute;inset:40px -40% 0;z-index:1;background:repeating-linear-gradient(100deg,rgba(255,255,255,0) 0 40px,rgba(255,255,255,.13) 60px 75px,rgba(255,255,255,0) 95px 140px);transform-origin:50% 0;-webkit-mask-image:linear-gradient(180deg,#000,transparent 85%);mask-image:linear-gradient(180deg,#000,transparent 85%);animation:td-bap-rays 6s ease-in-out infinite alternate}
+@keyframes td-bap-rays{from{transform:translateX(-6%) skewX(-6deg);opacity:.7}to{transform:translateX(6%) skewX(6deg);opacity:1}}
+.td-bap-bubbles{position:absolute;inset:44px 0 0;z-index:1}
+.td-bap-bubbles i{position:absolute;bottom:-16px;border-radius:50%;border:1.5px solid rgba(255,255,255,.6);background:radial-gradient(circle at 30% 30%,rgba(255,255,255,.7),rgba(255,255,255,.08) 60%);animation:td-bap-rise 6s ease-in infinite}
+@keyframes td-bap-rise{0%{transform:translate(0,0);opacity:0}10%{opacity:1}50%{transform:translate(8px,-55%)}90%{opacity:.9}100%{transform:translate(-6px,calc(-1 * (var(--td-bap-h,260px))));opacity:0}}
+.td-bap-text{position:absolute;left:0;right:0;bottom:0;z-index:3;padding:18px 18px 16px;color:#fff;text-shadow:0 1px 12px rgba(0,0,0,.35)}
+.td-bap-eyebrow{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;opacity:.9}
+.td-bap-title{font-size:28px;font-weight:800;line-height:1.1;margin-top:2px}
+.td-bap-title .td-accent{color:var(--bap-sky)}
+.td-bap-when{font-size:14px;font-weight:600;margin-top:6px;opacity:.95}
+.td-bap-intro{padding:16px 16px 0;font-size:14px;color:var(--td-muted)}
+.td-bap-intro p{margin:0 0 6px}
+.td-bap .td-form,.td-bap .td-form-done{background:transparent;border-radius:0;box-shadow:none;margin:0}
+.td-bap .td-form-btn{background:linear-gradient(90deg,var(--td-accent),var(--td-accent));position:relative;overflow:hidden}
+.td-bap-cta{padding:16px}
+.td-bap-btn{display:block;text-align:center;text-decoration:none}
+.td-bap-splash{position:absolute;inset:0;z-index:2;pointer-events:none}
+.td-bap-splash i{position:absolute;left:50%;top:55%;width:20px;height:20px;margin:-10px 0 0 -10px;border:2px solid rgba(255,255,255,.85);border-radius:50%;opacity:0}
+.td-bap-done .td-bap-splash i{animation:td-bap-ring 1.6s ease-out forwards}
+.td-bap-done .td-bap-splash i:nth-child(2){animation-delay:.25s}
+.td-bap-done .td-bap-splash i:nth-child(3){animation-delay:.5s}
+@keyframes td-bap-ring{0%{transform:scale(.3) scaleY(.45);opacity:1}100%{transform:scale(14) scaleY(.45);opacity:0}}
+.td-bap-done .td-bap-bubbles i{animation-duration:2.2s !important}
+@media (prefers-reduced-motion:reduce){.td-bap-wave,.td-bap-rays,.td-bap-bubbles i,.td-bap-splash i{animation:none !important}.td-bap-bubbles{display:none}}
 /* connect card form */
 .td-form{padding:16px;display:flex;flex-direction:column;gap:14px}
 .td-form-title{font-weight:700;font-size:17px}
@@ -723,6 +784,9 @@ fieldset.td-bad legend,.td-f-check.td-bad span{color:#ef4444}
         if (!answers.some(function (a) { return a.a; })) { fail('Please fill in the form first.'); return; }
         function finish() {
           f.hidden = true; done.hidden = false;
+          // Baptism sign-up: a splash of ripples on the water.
+          var bap = f.closest('.td-bap');
+          if (bap) { bap.classList.remove('td-bap-done'); void bap.offsetWidth; bap.classList.add('td-bap-done'); }
           try { done.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (x) {}
         }
         if (PREVIEW) { toast('Preview: answers are not sent'); finish(); return; }

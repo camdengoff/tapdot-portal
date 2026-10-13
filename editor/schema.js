@@ -364,6 +364,50 @@
     },
   };
 
+  // Baptism sign-up: an animated water banner (waves, light rays, rising bubbles) with its own
+  // sign-up form. Answers arrive with the Connect card answers in the portal.
+  const formField = (k) => TD.BLOCKS.form.fields.find((f) => f.k === k);
+  TD.BLOCKS.baptism = {
+    name: 'Baptism sign-up', icon: '💧', desc: 'Animated water banner with a sign-up form',
+    fields: [
+      { k: 'eyebrow', t: 'text', l: 'Small text above the title', ph: 'Baptism Sunday' },
+      { k: 'title', t: 'text', l: 'Title', rich: true },
+      { k: 'when', t: 'text', l: 'Date and time (optional)', ph: 'Sunday, Nov 9 · 10:45 AM' },
+      { k: 'intro', t: 'textarea', l: 'Text under the water (optional)', rich: true },
+      { group: 'Water', open: true, fields: [
+        { k: 'sky', t: 'color', l: 'Above the water' },
+        { k: 'water', t: 'color', l: 'Water at the surface' },
+        { k: 'deep', t: 'color', l: 'Deep water' },
+        { k: 'speed', t: 'select', l: 'Wave speed', opts: [['calm', 'Calm'], ['normal', 'Normal'], ['lively', 'Lively']] },
+        { k: 'bubbles', t: 'checkbox', l: 'Rising bubbles' },
+        { k: 'rays', t: 'checkbox', l: 'Light rays in the water' },
+        { k: 'height', t: 'range', l: 'Banner height', min: 160, max: 360, unit: 'px' },
+      ] },
+      { k: 'signup', t: 'select', l: 'How people sign up', opts: [['link', 'Button to a form you already have'], ['form', 'Custom form on this page']],
+        hint: 'A custom form’s answers show in the portal with your Connect card answers.' },
+      { k: 'btnLabel', t: 'text', l: 'Button text' },
+      { k: 'action', t: 'action', l: 'Button opens', when: (b) => b.signup !== 'form', hint: 'Paste your sign-up form’s link. “Open page in pop-up sheet” keeps people on this page.' },
+      Object.assign({}, formField('items'), { when: (b) => b.signup === 'form' }),
+      Object.assign({}, formField('thanks'), { when: (b) => b.signup === 'form' }),
+      Object.assign({}, formField('notify'), { when: (b) => b.signup === 'form' && TD.FORM_EMAIL }),
+    ],
+    defaults: () => ({
+      eyebrow: 'Baptism Sunday', title: 'Take the ==plunge==', when: '', intro: 'Baptism is a public way to say you’re following Jesus. Sign up and we’ll walk you through every step.',
+      sky: '#bfe8ff', water: '#2aa8e6', deep: '#0b3a78', speed: 'normal', bubbles: true, rays: true, height: 230,
+      signup: 'link',
+      items: [
+        { label: 'Name', kind: 'text', options: '', ph: 'First and last name', required: true },
+        { label: 'Email', kind: 'email', options: '', ph: 'you@example.com', required: true },
+        { label: 'Phone', kind: 'phone', options: '', ph: '', required: false },
+        { label: 'Age', kind: 'choice', options: 'Under 12\n12–17\n18 or older', ph: '', required: false },
+        { label: 'Share a little of your story (optional)', kind: 'long', options: '', ph: '', required: false },
+      ],
+      btnLabel: 'Sign up for baptism', action: TD.newAction('link'),
+      thanks: 'You’re signed up! 🎉 We’ll be in touch soon with next steps.', notify: '',
+    }),
+    summary: (b) => (b.eyebrow ? b.eyebrow + ' · ' : '') + b.title,
+  };
+
   TD.newBlock = (type) => Object.assign({ id: TD.uid('b'), type }, commonDefaults(), TD.BLOCKS[type].defaults());
 
   // BFC's own pop-up worker (worker/popup-proxy.js), used by the Bethany template. It maps
