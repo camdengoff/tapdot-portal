@@ -375,12 +375,14 @@
       { k: 'when', t: 'text', l: 'Date and time (optional)', ph: 'Sunday, Nov 9 · 10:45 AM' },
       { k: 'intro', t: 'textarea', l: 'Text under the water (optional)', rich: true },
       { group: 'Water', open: true, fields: [
-        { k: 'sky', t: 'color', l: 'Above the water' },
+        { k: 'look', t: 'select', l: 'Water style', opts: [['real', 'Realistic baptistry (seen from above)'], ['waves', 'Illustrated waves and bubbles']] },
+        { k: 'tiles', t: 'color', l: 'Tile color', when: (b) => b.look !== 'waves' },
+        { k: 'sky', t: 'color', l: 'Above the water', when: (b) => b.look === 'waves' },
         { k: 'water', t: 'color', l: 'Water at the surface' },
         { k: 'deep', t: 'color', l: 'Deep water' },
         { k: 'speed', t: 'select', l: 'Wave speed', opts: [['calm', 'Calm'], ['normal', 'Normal'], ['lively', 'Lively']] },
-        { k: 'bubbles', t: 'checkbox', l: 'Rising bubbles' },
-        { k: 'rays', t: 'checkbox', l: 'Light rays in the water' },
+        { k: 'bubbles', t: 'checkbox', l: 'Rising bubbles', when: (b) => b.look === 'waves' },
+        { k: 'rays', t: 'checkbox', l: 'Light rays in the water', when: (b) => b.look === 'waves' },
         { k: 'height', t: 'range', l: 'Banner height', min: 160, max: 360, unit: 'px' },
       ] },
       { k: 'signup', t: 'select', l: 'How people sign up', opts: [['link', 'Button to a form you already have'], ['form', 'Custom form on this page']],
@@ -393,7 +395,7 @@
     ],
     defaults: () => ({
       eyebrow: 'Baptism Sunday', title: 'Take the ==plunge==', when: '', intro: 'Baptism is a public way to say you’re following Jesus. Sign up and we’ll walk you through every step.',
-      sky: '#bfe8ff', water: '#2aa8e6', deep: '#0b3a78', speed: 'normal', bubbles: true, rays: true, height: 230,
+      look: 'real', tiles: '#e9f6f8', sky: '#bfe8ff', water: '#2aa8e6', deep: '#0b3a78', speed: 'normal', bubbles: true, rays: true, height: 230,
       signup: 'link',
       items: [
         { label: 'Name', kind: 'text', options: '', ph: 'First and last name', required: true },
