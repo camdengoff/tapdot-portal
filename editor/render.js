@@ -239,7 +239,7 @@
       const dots = b.dots && b.items.length > 1 ? '<div class="td-dots">' + b.items.map((_, i) => '<button type="button" aria-label="Slide ' + (i + 1) + '"' + (i === 0 ? ' class="on"' : '') + '></button>').join('') + '</div>' : '';
       const arrows = b.arrows && b.items.length > 1 ? '<button type="button" class="td-sl-arrow td-sl-prev" aria-label="Previous">‹</button><button type="button" class="td-sl-arrow td-sl-next" aria-label="Next">›</button>' : '';
       const head = b.heading ? '<div class="td-slides-head" style="text-align:' + (b.headAlign === 'center' ? 'center' : 'left') + '"><div class="td-slides-heading td-head">' + md(b.heading) + '</div>' + (b.headSub ? '<div class="td-slides-headsub">' + md(b.headSub) + '</div>' : '') + '</div>' : '';
-      return '<div class="td-slides td-cap-' + cssv(b.captions) + (b.peek ? ' td-peek' : '') + (head ? ' td-slides-boxed td-card' + (b.headPos === 'over' ? ' td-slides-full' : '') : '') + '"' + (b.autoplay && b.items.length > 1 ? ' data-td-auto="' + (+b.interval || 5) * 1000 + '"' : '') + '>' + head + '<div class="td-slides-wrap"><div class="td-slides-track">' + slides + '</div>' + arrows + '</div>' + dots + '</div>';
+      return '<div class="td-slides td-cap-' + cssv(b.captions) + (b.peek ? ' td-peek' : '') + (b.kb ? ' td-kb' : '') + (head ? ' td-slides-boxed td-card' + (b.headPos === 'over' ? ' td-slides-full' : '') : '') + '"' + (b.autoplay && b.items.length > 1 ? ' data-td-auto="' + (+b.interval || 5) * 1000 + '"' : '') + (b.kb ? ' style="--td-kb:' + ((+b.interval || 5) + 2) + 's"' : '') + '>' + head + '<div class="td-slides-wrap"><div class="td-slides-track">' + slides + '</div>' + arrows + '</div>' + dots + '</div>';
     },
     image(b, ctx) {
       const media = '<div class="td-image-media" style="' + aspectCss(b.aspect) + '">' + img(b.image, b.alt) + '</div>';
@@ -524,6 +524,13 @@ ${t.pressFx ? '.td-tap:active{transform:scale(.97)}' : ''}
 .td-slides-headsub{font-size:14px;color:var(--td-muted);margin-top:3px}
 .td-slides-boxed .td-slide{background:var(--td-card2);border-radius:calc(var(--td-radius) * .7)}
 .td-slides-full{padding:0;position:relative}
+.td-kb-on .td-slide.td-on .td-slide-media img{animation:td-kb var(--td-kb,7s) ease-out both}
+@keyframes td-kb{from{transform:scale(1)}to{transform:scale(1.12) translate(-1.5%,-1%)}}
+.td-kb-on .td-slide .td-slide-cap>*{opacity:0}
+.td-kb-on .td-slide.td-on .td-slide-cap>*{animation:td-capin .7s .3s cubic-bezier(.2,.8,.25,1) both}
+.td-kb-on .td-slide.td-on .td-slide-cap>*+*{animation-delay:.45s}
+@keyframes td-capin{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.td-kb-on .td-slide .td-slide-media img,.td-kb-on .td-slide .td-slide-cap>*{animation:none !important;opacity:1}}
 .td-slides-full .td-slides-head{position:absolute;left:0;right:0;top:0;z-index:2;margin:0;padding:16px 16px 48px;color:#fff;background:linear-gradient(to bottom,rgba(0,0,0,.65),rgba(0,0,0,0));pointer-events:none;text-shadow:0 1px 10px rgba(0,0,0,.35)}
 .td-slides-full .td-slides-headsub{color:rgba(255,255,255,.85)}
 .tdp .td-slides-full .td-slides-track{gap:0}
@@ -831,12 +838,14 @@ fieldset.td-bad legend,.td-f-check.td-bad span{color:#ef4444}
     $$('.td-slides').forEach(function (s) {
       var tr = $('.td-slides-track', s), sl = $$('.td-slide', s), dots = $$('.td-dots button', s), cur = 0, hold = 0;
       if (!sl.length) return;
-      function go(i) { cur = (i + sl.length) % sl.length; tr.scrollTo({ left: sl[cur].offsetLeft - sl[0].offsetLeft, behavior: 'smooth' }); }
+      function go(i) { i = (i + sl.length) % sl.length; tr.scrollTo({ left: sl[i].offsetLeft - sl[0].offsetLeft, behavior: 'smooth' }); }
       tr.addEventListener('scroll', function () {
         var best = 0, bd = 1e9;
         sl.forEach(function (x, i) { var d = Math.abs(x.offsetLeft - sl[0].offsetLeft - tr.scrollLeft); if (d < bd) { bd = d; best = i; } });
+        if (best !== cur) { sl[cur].classList.remove('td-on'); sl[best].classList.add('td-on'); }
         cur = best; dots.forEach(function (d, i) { d.classList.toggle('on', i === best); });
       }, { passive: true });
+      sl[0].classList.add('td-on'); if (s.classList.contains('td-kb')) s.classList.add('td-kb-on');
       dots.forEach(function (d, i) { d.addEventListener('click', function () { hold = Date.now(); go(i); }); });
       var p = $('.td-sl-prev', s), n = $('.td-sl-next', s);
       if (p) p.addEventListener('click', function () { hold = Date.now(); go(cur - 1); });

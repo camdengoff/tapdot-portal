@@ -218,7 +218,8 @@
         { k: 'headAlign', t: 'select', l: 'Header alignment', opts: [['left', 'Left'], ['center', 'Center']], when: (b) => !!b.heading },
         { k: 'aspect', t: 'select', l: 'Slide shape', opts: TD.ASPECTS.filter((a) => a[0] !== 'auto') },
         { k: 'captions', t: 'select', l: 'Captions', opts: [['overlay', 'On the image'], ['below', 'Below the image'], ['none', 'Hidden']] },
-        { k: 'peek', t: 'checkbox', l: 'Show edge of next slide' },
+        { k: 'kb', t: 'checkbox', l: 'Slow zoom on photos, names slide in', hint: 'Each photo slowly zooms while it’s showing, and its title and caption glide up.' },
+        { k: 'peek', t: 'checkbox', l: 'Show edge of next slide', when: (b) => !(b.heading && b.headPos === 'over') },
         { k: 'dots', t: 'checkbox', l: 'Show dots' },
         { k: 'arrows', t: 'checkbox', l: 'Show arrows' },
         { k: 'autoplay', t: 'checkbox', l: 'Autoplay' },
@@ -232,7 +233,7 @@
           ],
           newItem: () => ({ image: '', title: 'Slide', caption: '', action: TD.newAction() }) },
       ],
-      defaults: () => ({ heading: '', headSub: '', headPos: 'above', headAlign: 'left', aspect: '16/9', captions: 'overlay', peek: true, dots: true, arrows: false, autoplay: true, interval: 5, items: [] }),
+      defaults: () => ({ heading: '', headSub: '', headPos: 'above', headAlign: 'left', aspect: '16/9', captions: 'overlay', kb: true, peek: true, dots: true, arrows: false, autoplay: true, interval: 5, items: [] }),
       summary: (b) => b.items.length + ' slides',
     },
     image: {
