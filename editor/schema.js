@@ -214,6 +214,7 @@
       fields: [
         { k: 'heading', t: 'text', l: 'Header (optional)', rich: true, ph: 'Welcome our new members', hint: 'Shows at the top, with the slides inside the same card.' },
         { k: 'headSub', t: 'text', l: 'Text under the header (optional)', rich: true, when: (b) => !!b.heading },
+        { k: 'headPos', t: 'select', l: 'Header layout', opts: [['above', 'Above the photos'], ['over', 'On top of the photos (photos fill the card)']], when: (b) => !!b.heading },
         { k: 'headAlign', t: 'select', l: 'Header alignment', opts: [['left', 'Left'], ['center', 'Center']], when: (b) => !!b.heading },
         { k: 'aspect', t: 'select', l: 'Slide shape', opts: TD.ASPECTS.filter((a) => a[0] !== 'auto') },
         { k: 'captions', t: 'select', l: 'Captions', opts: [['overlay', 'On the image'], ['below', 'Below the image'], ['none', 'Hidden']] },
@@ -231,7 +232,7 @@
           ],
           newItem: () => ({ image: '', title: 'Slide', caption: '', action: TD.newAction() }) },
       ],
-      defaults: () => ({ heading: '', headSub: '', headAlign: 'left', aspect: '16/9', captions: 'overlay', peek: true, dots: true, arrows: false, autoplay: true, interval: 5, items: [] }),
+      defaults: () => ({ heading: '', headSub: '', headPos: 'above', headAlign: 'left', aspect: '16/9', captions: 'overlay', peek: true, dots: true, arrows: false, autoplay: true, interval: 5, items: [] }),
       summary: (b) => b.items.length + ' slides',
     },
     image: {
