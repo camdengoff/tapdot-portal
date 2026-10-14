@@ -332,6 +332,15 @@
       return '<div class="td-video td-card" style="' + aspectCss(b.aspect) + '"><iframe src="' + esc(src) + '" title="Video" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowfullscreen></iframe></div>';
     },
     countdown(b, ctx) {
+      // The button, plus an optional second link: an outline button beside it, or a bar along the bottom.
+      const cdLinks = (b, ctx) => {
+        const one = b.btnLabel && b.action && actAttrs(b.action, {}).live ? tap('td-btn td-inline-btn', b.action, esc(b.btnLabel), ctx, '', b.label) : '';
+        const has2 = b.link2Label && b.action2 && actAttrs(b.action2, {}).live;
+        const ic = b.link2Icon ? '<span class="td-cd-l2i">' + esc(b.link2Icon) + '</span>' : '';
+        if (has2 && b.link2Style === 'pair') return '<div class="td-cd-btn td-cd-pair">' + one + tap('td-btn td-inline-btn td-cd-btn2', b.action2, ic + esc(b.link2Label), ctx, '', b.link2Label) + '</div>';
+        return (one ? '<div class="td-cd-btn">' + one + '</div>' : '') +
+          (has2 ? tap('td-cd-strip', b.action2, ic + '<span class="td-cd-l2t">' + esc(b.link2Label) + '</span><span class="td-cd-l2a">›</span>', ctx, '', b.link2Label) : '');
+      };
       const t = zonedToUtc(b.target, b.tz);
       const slot = b.cdStyle === 'slot';
       const unit = (k, l) => '<div class="td-cd-unit"><div class="td-cd-num td-head' + (slot ? ' td-slot' : '') + '" data-td-u="' + k + '">' +
@@ -341,8 +350,7 @@
       const body = (b.label ? '<div class="td-cd-label' + (b.sub ? ' td-cd-title td-head' : '') + '">' + md(b.label) + '</div>' : '') +
         (b.sub ? '<div class="td-cd-sub">' + md(b.sub) + '</div>' : '') +
         '<div class="td-cd-units' + (slot ? ' td-cd-slot' : '') + '">' + unit('d', 'Days') + unit('h', 'Hours') + unit('m', 'Min') + unit('s', 'Sec') + '</div>' +
-        (b.btnLabel && b.action && actAttrs(b.action, {}).live
-          ? '<div class="td-cd-btn">' + tap('td-btn td-inline-btn', b.action, esc(b.btnLabel), ctx, '', b.label) + '</div>' : '');
+        cdLinks(b, ctx);
       if (!safeUrl(b.image, true)) return '<div class="td-countdown td-card td-pad"' + data + '>' + body + '</div>';
       if (b.imgLayout === 'bg') {
         const dim = Math.min(90, Math.max(0, b.dim == null ? 50 : +b.dim)) / 100;
@@ -620,6 +628,17 @@ fieldset.td-bad legend,.td-f-check.td-bad span{color:#ef4444}
 .td-cd-label{text-align:center;color:var(--td-muted);font-size:13px;margin-bottom:10px}
 .td-cd-title{font-size:18px;font-weight:700;color:var(--td-text);margin-bottom:4px}
 .td-cd-btn{text-align:center;margin-top:4px}
+.td-cd-pair{display:flex;justify-content:center;flex-wrap:wrap;gap:10px}
+.td-cd-pair .td-inline-btn{margin-top:12px}
+.tdp .td-cd-btn2{background:transparent;color:var(--td-text);border-color:currentColor}
+.td-cd-bg .td-cd-btn2{color:#fff;background:rgba(255,255,255,.12);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.td-cd-l2i{margin-right:0}
+.td-cd-strip{display:flex;align-items:center;gap:10px;margin:16px -16px -16px;padding:13px 16px;background:var(--td-card2);color:var(--td-text);font-weight:700;font-size:14px;text-decoration:none;position:relative}
+.td-cd-strip .td-cd-l2i{margin:0;font-size:18px}
+.td-cd-l2t{flex:1}
+.td-cd-l2a{font-size:22px;line-height:1;opacity:.7;transition:transform .2s}
+.td-cd-strip:active .td-cd-l2a{transform:translateX(3px)}
+.td-cd-bg .td-cd-strip{margin-bottom:-34px;background:rgba(255,255,255,.14);color:#fff;border-top:1px solid rgba(255,255,255,.18);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
 .td-cd-sub{text-align:center;color:var(--td-muted);font-size:13px;margin-bottom:12px}
 .td-cd-units{display:flex;justify-content:center;gap:10px}
 .td-cd-unit{flex:1;max-width:76px;text-align:center;background:var(--td-card2);border-radius:calc(var(--td-radius) * .7);padding:10px 4px}
