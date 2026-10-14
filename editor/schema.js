@@ -212,6 +212,9 @@
     slides: {
       name: 'Slides', icon: '🎞️', desc: 'Swipeable carousel with dots and autoplay',
       fields: [
+        { k: 'heading', t: 'text', l: 'Header (optional)', rich: true, ph: 'Welcome our new members', hint: 'Shows at the top, with the slides inside the same card.' },
+        { k: 'headSub', t: 'text', l: 'Text under the header (optional)', rich: true, when: (b) => !!b.heading },
+        { k: 'headAlign', t: 'select', l: 'Header alignment', opts: [['left', 'Left'], ['center', 'Center']], when: (b) => !!b.heading },
         { k: 'aspect', t: 'select', l: 'Slide shape', opts: TD.ASPECTS.filter((a) => a[0] !== 'auto') },
         { k: 'captions', t: 'select', l: 'Captions', opts: [['overlay', 'On the image'], ['below', 'Below the image'], ['none', 'Hidden']] },
         { k: 'peek', t: 'checkbox', l: 'Show edge of next slide' },
@@ -228,7 +231,7 @@
           ],
           newItem: () => ({ image: '', title: 'Slide', caption: '', action: TD.newAction() }) },
       ],
-      defaults: () => ({ aspect: '16/9', captions: 'overlay', peek: true, dots: true, arrows: false, autoplay: true, interval: 5, items: [] }),
+      defaults: () => ({ heading: '', headSub: '', headAlign: 'left', aspect: '16/9', captions: 'overlay', peek: true, dots: true, arrows: false, autoplay: true, interval: 5, items: [] }),
       summary: (b) => b.items.length + ' slides',
     },
     image: {

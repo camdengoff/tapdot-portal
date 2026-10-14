@@ -238,7 +238,8 @@
       }).join('');
       const dots = b.dots && b.items.length > 1 ? '<div class="td-dots">' + b.items.map((_, i) => '<button type="button" aria-label="Slide ' + (i + 1) + '"' + (i === 0 ? ' class="on"' : '') + '></button>').join('') + '</div>' : '';
       const arrows = b.arrows && b.items.length > 1 ? '<button type="button" class="td-sl-arrow td-sl-prev" aria-label="Previous">‹</button><button type="button" class="td-sl-arrow td-sl-next" aria-label="Next">›</button>' : '';
-      return '<div class="td-slides td-cap-' + cssv(b.captions) + (b.peek ? ' td-peek' : '') + '"' + (b.autoplay && b.items.length > 1 ? ' data-td-auto="' + (+b.interval || 5) * 1000 + '"' : '') + '><div class="td-slides-wrap"><div class="td-slides-track">' + slides + '</div>' + arrows + '</div>' + dots + '</div>';
+      const head = b.heading ? '<div class="td-slides-head" style="text-align:' + (b.headAlign === 'center' ? 'center' : 'left') + '"><div class="td-slides-heading td-head">' + md(b.heading) + '</div>' + (b.headSub ? '<div class="td-slides-headsub">' + md(b.headSub) + '</div>' : '') + '</div>' : '';
+      return '<div class="td-slides td-cap-' + cssv(b.captions) + (b.peek ? ' td-peek' : '') + (head ? ' td-slides-boxed td-card' : '') + '"' + (b.autoplay && b.items.length > 1 ? ' data-td-auto="' + (+b.interval || 5) * 1000 + '"' : '') + '>' + head + '<div class="td-slides-wrap"><div class="td-slides-track">' + slides + '</div>' + arrows + '</div>' + dots + '</div>';
     },
     image(b, ctx) {
       const media = '<div class="td-image-media" style="' + aspectCss(b.aspect) + '">' + img(b.image, b.alt) + '</div>';
@@ -517,6 +518,11 @@ ${t.pressFx ? '.td-tap:active{transform:scale(.97)}' : ''}
 .td-sl-arrow{position:absolute;top:50%;transform:translateY(-50%);width:34px;height:34px;border-radius:50%;border:0;background:rgba(0,0,0,.45);color:#fff;font-size:22px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center}
 .td-cap-below .td-sl-arrow{top:40%}
 .td-sl-prev{left:8px}.td-sl-next{right:8px}
+.td-slides-boxed{padding:16px 14px 14px}
+.td-slides-head{margin-bottom:12px}
+.td-slides-heading{font-weight:800;font-size:20px;line-height:1.2}
+.td-slides-headsub{font-size:14px;color:var(--td-muted);margin-top:3px}
+.td-slides-boxed .td-slide{background:var(--td-card2);border-radius:calc(var(--td-radius) * .7)}
 /* image & gallery */
 .td-image-media{position:relative;overflow:hidden}
 .td-image-media img{width:100%;height:100%;object-fit:cover}
