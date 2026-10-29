@@ -685,20 +685,26 @@
                 };
                 inp.click();
               } }, '⬆ Upload'),
-              v ? h('button', { type: 'button', class: 'ghost sm', disabled: !!busy, title: 'Look for links and QR codes in the file and add them as buttons', onclick: async () => {
-                try { const r = await fetch(TD.mediaUrl(v)); if (!r.ok) throw new Error(); await scan(await r.blob(), pdf ? 'pdf' : 'image'); }
-                catch (e) { draw('The file could not be read to look for links.'); }
-              } }, '🔍 Find links') : null,
+              v ? h('button', { type: 'button', class: 'ghost sm', disabled: !!busy, title: 'Look for links and QR codes in the file and add them as buttons', onclick: rescan }, '🔍 Find links') : null,
               v ? h('button', { type: 'button', class: 'ghost sm', onclick: () => { setp(o, f.k, ''); o.fileName = ''; o.fileKind = ''; scanNotes.delete(o); draw(); ch(true); } }, 'Remove') : null)));
       };
       // Turn links and QR codes in the file into buttons along the bottom of the viewer.
       const scan = async (blob, kind) => {
         draw('', 'Looking for links and QR codes…');
+        o.scanned = true;
         try { scanNotes.set(o, await addFoundLinks(o, blob, kind)); }
         catch (e) { scanNotes.set(o, 'Couldn’t look for links in this file (' + (e.message || 'unknown error') + '). You can add buttons by hand below.'); }
         draw(); ch(true);
       };
+      const rescan = async () => {
+        const v = getp(o, f.k) || '';
+        const pdf = o.fileKind === 'pdf' || /^data:application\/pdf|\.pdf([?#]|$)/i.test(v);
+        try { const r = await fetch(TD.mediaUrl(v)); if (!r.ok) throw new Error(); await scan(await r.blob(), pdf ? 'pdf' : 'image'); }
+        catch (e) { draw('The file could not be read to look for links.'); }
+      };
       draw();
+      // A file added before link finding existed (or pasted as a link) gets looked at once.
+      if (getp(o, f.k) && !o.scanned && !(o.links || []).length) rescan();
       return wrap;
     },
     images(o, f, ch) {
