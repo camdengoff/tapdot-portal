@@ -371,14 +371,16 @@
     im.src = src;
   });
 
-  const LINK_RE = /\b(?:https?:\/\/|www\.)[^\s<>"')\]]+|\b[\w.+-]+@[\w-]+\.[\w.-]+\b|\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:org|com|church|net|io|co|us|info)(?:\/[^\s<>"')\]]*)?/gi;
+  // Web addresses, emails (text can come split as "name @ site.org") and bare site names. A site
+  // name right after an @ is part of an email, never a link of its own.
+  const LINK_RE = /\b(?:https?:\/\/|www\.)[^\s<>"')\]]+|\b[\w.+-]+ ?@ ?[\w-]+(?:\.[\w-]+)*\.[a-z]{2,}\b|(?<![@\w.-])[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:org|com|church|net|io|co|us|info)\b(?!\s?@)(?:\/[^\s<>"')\]]*)?/gi;
   // PDF text comes in runs; join runs that sit on the same line into one line of text.
   function joinRuns(runs) {
     const lines = [];
     runs.slice().sort((a, b) => a.y1 - b.y1 || a.x0 - b.x0).forEach((r) => {
       const h = r.y1 - r.y0;
       const l = lines.find((x) => Math.abs(x.y1 - r.y1) < h * 0.5 && r.x0 - x.x1 < h * 1.5 && r.x0 >= x.x0 - 1);
-      if (l) { l.str += (r.x0 - l.x1 > h * 0.15 && !/\s$/.test(l.str) ? ' ' : '') + r.str; l.x1 = Math.max(l.x1, r.x1); l.y0 = Math.min(l.y0, r.y0); }
+      if (l) { l.str += (r.x0 - l.x1 > h * 0.15 && !/[\s@.]$/.test(l.str) && !/^[@.]/.test(r.str) ? ' ' : '') + r.str; l.x1 = Math.max(l.x1, r.x1); l.y0 = Math.min(l.y0, r.y0); }
       else lines.push(Object.assign({}, r));
     });
     return lines.filter((l) => l.str.trim());
@@ -388,7 +390,7 @@
   // can be named after the words next to it.
   async function findLinks(blob, kind) {
     const out = [];
-    const fromLines = (lines, page) => lines.forEach((l) => (l.str.match(LINK_RE) || []).forEach((raw) => out.push({ raw, page, box: l, lines })));
+    const fromLines = (lines, page) => lines.forEach((l) => (l.str.match(LINK_RE) || []).forEach((raw) => out.push({ raw: /@/.test(raw) ? raw.replace(/\s+/g, '') : raw, page, box: l, lines })));
     if (kind === 'image') {
       const url = URL.createObjectURL(blob);
       let c;
@@ -430,7 +432,7 @@
   }
 
   // ── Naming a found link after what it does ──
-  const GENERIC = /^(click( here)?|here|tap here|scan( me| here)?|link|qr( code)?|website|web ?site|online|url|more info|info|or|and|at|to)$/i;
+  const GENERIC = /^(click( here)?|here|tap here|scan( me| here)?|link|qr( code)?|website|web ?site|online|url|more info|info|or|and|at|to|visit|go|see|call|e-?mail|text|contact( us)?|questions|or visit|visit us)$/i;
   const titleCase = (s) => s.toLowerCase().replace(/(^|[\s/&-])([a-z])/g, (m, a, b) => a + b.toUpperCase());
   // A short, readable name from a line of text, or '' when the line isn't one.
   function cleanLabel(s) {
@@ -465,8 +467,9 @@
   const TITLE = /^((?:pastor|pr\.?|rev\.?|reverend|dr\.?|mr\.?|mrs\.?|ms\.?|miss|brother|sister)\s+)/i;
   const NAME = /^([A-Z][a-z'’-]+)(?:\s+[A-Z]\.?)?(?:\s+([A-Z][a-z'’-]+))?$/;
   function personIn(s, local) {
-    const t = TITLE.exec(s || '');
-    const m = NAME.exec(t ? s.slice(t[0].length) : s || '');
+    s = String(s || '').replace(/^(?:questions\?\s*)?(?:e-?mail|contact|call|text|message|ask|reach( out to)?)\s+/i, '');
+    const t = TITLE.exec(s);
+    const m = NAME.exec(t ? s.slice(t[0].length) : s);
     if (!m) return '';
     const sameAsEmail = local && local.toLowerCase().indexOf(m[1].toLowerCase()) === 0;
     if (!t && !m[2] && !sameAsEmail) return ''; // one capitalized word ("Questions") isn't a name
@@ -533,6 +536,11 @@
       if (o.links.length >= 30) return;
       o.links.push({ label: b.label, autoLabel: b.label, page: b.page, action: b.action }); added++;
     });
+    // Buttons made automatically before (and not changed since) that aren't in the file any more,
+    // like a site link misread from an email address, are taken away.
+    const before = o.links.length;
+    o.links = o.links.filter((l) => !(l.autoLabel && l.label === l.autoLabel && !byKey.has(keyOf(l.action || {}))));
+    updated += before - o.links.length;
     if (added || updated) {
       return (added ? 'Found ' + added + ' new link' + (added > 1 ? 's' : '') : 'Updated ' + updated + ' button' + (updated > 1 ? 's' : '')) +
         (added && updated ? ' and updated ' + updated : '') + '. Each button is named after the words next to it in the file; check they read well.';
