@@ -111,6 +111,7 @@ h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: v
 .imgf { display: flex; gap: 10px; align-items: flex-start; }
 .thumb { width: 64px; height: 64px; flex-shrink: 0; border-radius: 8px; overflow: hidden; background: var(--bg); border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; font-size: 22px; }
 .thumb img, .thumb video { width: 100%; height: 100%; object-fit: cover; }
+.thumb-pdf { font-size: 13px; font-weight: 800; letter-spacing: .04em; color: #fff; background: #d9363e; padding: 4px 7px; border-radius: 4px; }
 .imgf-r { flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .uploaded { font-size: 12px; color: var(--muted); padding: 8px 0 2px; }
 .imgs { display: flex; flex-direction: column; gap: 8px; }

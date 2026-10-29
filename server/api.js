@@ -11,6 +11,7 @@ import * as auth from './auth.js';
 import * as stats from './stats.js';
 import * as forms from './forms.js';
 import * as templates from './templates.js';
+import * as files from './files.js';
 
 const MAX_BODY = 20 * 1024 * 1024;
 
@@ -142,6 +143,13 @@ export async function handle({ request, env, waitUntil }) {
       return json({ ok: true });
     }
 
+    // Photos and PDFs for the full-screen viewer (see files.js).
+    if (route('POST', 2, 'files')) {
+      if (parts[1] === '_templates') { if (!user.admin) throw new HttpError(403, 'Only an admin can edit templates.'); }
+      else await churchRole(d, user, parts[1]);
+      return json(await files.upload(env, request, parts[1]), 201);
+    }
+
     if (parts[0] === 'templates') return await templates.route({ d, env, request, user, parts, url, json, body });
 
     if (parts[0] !== 'churches') throw new HttpError(404, 'Not found.');
@@ -178,6 +186,7 @@ export async function handle({ request, env, waitUntil }) {
         if (!user.admin) throw new HttpError(403, 'Only an admin can delete a church.');
         const pages = await all(d, 'SELECT id FROM pages WHERE church_id = ?', churchId);
         for (const p of pages) await Promise.all([env.PAGES.delete('draft:' + churchId + '/' + p.id), env.PAGES.delete('live:' + churchId + '/' + p.id)]);
+        await files.removeAll(env, churchId);
         await d.batch([
           d.prepare('DELETE FROM pages WHERE church_id = ?').bind(churchId),
           d.prepare('DELETE FROM stats WHERE church_id = ?').bind(churchId),

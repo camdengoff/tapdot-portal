@@ -50,6 +50,7 @@
     ['link', 'Open a link'],
     ['popup', 'Open page in pop-up sheet'],
     ['sheet', 'Open one of my pop-up menus'],
+    ['file', 'Show a photo or PDF (full screen)'],
     ['copy', 'Copy text to clipboard'],
     ['phone', 'Call a phone number'],
     ['sms', 'Send a text message'],
@@ -66,7 +67,13 @@
     ['choice', 'Pick one'], ['checks', 'Pick any (checkboxes)'], ['check', 'One checkbox (yes/no)'],
   ];
 
-  TD.newAction = (type) => ({ type: type || 'none', url: '', newTab: false, title: '', icon: '', sheet: '', text: '', toast: 'Copied!', phone: '', body: '', email: '', subject: '', target: '', direct: false });
+  TD.newAction = (type) => ({ type: type || 'none', url: '', newTab: false, title: '', icon: '', sheet: '', text: '', toast: 'Copied!', phone: '', body: '', email: '', subject: '', target: '', direct: false, file: '', fileName: '', fileKind: '', links: [] });
+  // The pill buttons along the bottom of the photo / PDF viewer.
+  TD.FILE_LINK_FIELDS = [
+    { k: 'label', t: 'text', l: 'Button text' },
+    { k: 'action', t: 'action', l: 'When tapped', noSheet: true, noFile: true },
+  ];
+  TD.newFileLink = () => ({ label: 'Learn more', action: TD.newAction('link') });
 
   // ── Fields every block gets (style + visibility) ─────────────────────
   TD.COMMON_FIELDS = [
@@ -375,18 +382,18 @@
     },
   };
 
-  // Baptism sign-up: a photo or silent looping video banner with a sign-up button or its own form.
-  // Custom form answers arrive with the Connect card answers in the portal.
+  // Spotlight (was "Baptism sign-up"): a photo or silent looping video banner with the title over
+  // it, then a button, its own form, or nothing. Form answers arrive with the Connect card answers.
   const formField = (k) => TD.BLOCKS.form.fields.find((f) => f.k === k);
-  TD.BLOCKS.baptism = {
-    name: 'Baptism sign-up', icon: '💧', desc: 'Photo or video banner with a sign-up button or form',
+  TD.BLOCKS.spotlight = {
+    name: 'Spotlight', icon: '✨', desc: 'Photo or video banner with a title, plus a button or form',
     fields: [
-      { k: 'eyebrow', t: 'text', l: 'Small text above the title', ph: 'Baptism Sunday' },
+      { k: 'eyebrow', t: 'text', l: 'Small text above the title', ph: 'This Sunday' },
       { k: 'title', t: 'text', l: 'Title', rich: true },
       { k: 'when', t: 'text', l: 'Date and time (optional)', ph: 'Sunday, Nov 9 · 10:45 AM' },
-      { k: 'intro', t: 'textarea', l: 'Text under the water (optional)', rich: true },
+      { k: 'intro', t: 'textarea', l: 'Text under the title (optional)', rich: true },
       { k: 'layout', t: 'select', l: 'Layout', opts: [['below', 'Text and button under the photo'], ['over', 'Text and button on top of the photo']],
-        hint: 'With a custom form, the form itself stays under the photo.' },
+        hint: 'With a form, the form itself stays under the photo.' },
       { k: 'align', t: 'select', l: 'Text alignment', opts: [['left', 'Left'], ['center', 'Center']] },
       { group: 'Photo or video', open: true, fields: [
         { k: 'media', t: 'select', l: 'Show', opts: [['photo', 'A photo'], ['video', 'A video (plays silently on a loop)']] },
@@ -400,30 +407,31 @@
         { k: 'shade', t: 'range', l: 'Darken behind the text', min: 0, max: 90, unit: '%' },
         { k: 'height', t: 'range', l: 'Banner height', min: 160, max: 420, unit: 'px' },
       ] },
-      { k: 'signup', t: 'select', l: 'How people sign up', opts: [['link', 'Button to a form you already have'], ['form', 'Custom form on this page']],
-        hint: 'A custom form’s answers show in the portal with your Connect card answers.' },
-      { k: 'btnLabel', t: 'text', l: 'Button text' },
-      { k: 'action', t: 'action', l: 'Button opens', when: (b) => b.signup !== 'form', hint: 'Paste your sign-up form’s link. “Open page in pop-up sheet” keeps people on this page.' },
+      { k: 'signup', t: 'select', l: 'Under the title', opts: [['link', 'A button'], ['form', 'A form on this page'], ['none', 'Nothing']],
+        hint: 'A form’s answers show in the portal with your Connect card answers.' },
+      { k: 'btnLabel', t: 'text', l: 'Button text', when: (b) => b.signup === 'link' },
+      { k: 'action', t: 'action', l: 'Button opens', when: (b) => b.signup === 'link' },
       Object.assign({}, formField('items'), { when: (b) => b.signup === 'form' }),
       Object.assign({}, formField('thanks'), { when: (b) => b.signup === 'form' }),
       Object.assign({}, formField('notify'), { when: (b) => b.signup === 'form' && TD.FORM_EMAIL }),
     ],
     defaults: () => ({
-      eyebrow: 'Baptism Sunday', title: 'Take the ==plunge==', when: '', intro: 'Baptism is a public way to say you’re following Jesus. Sign up and we’ll walk you through every step.',
+      eyebrow: 'This Sunday', title: 'You’re ==invited==', when: '', intro: 'Add a line or two about what’s happening.',
       layout: 'below', align: 'left', media: 'photo', image: '', video: '', zoom: 100, posX: 50, posY: 50, shade: 45, height: 230,
       signup: 'link',
       items: [
         { label: 'Name', kind: 'text', options: '', ph: 'First and last name', required: true },
         { label: 'Email', kind: 'email', options: '', ph: 'you@example.com', required: true },
         { label: 'Phone', kind: 'phone', options: '', ph: '', required: false },
-        { label: 'Age', kind: 'choice', options: 'Under 12\n12–17\n18 or older', ph: '', required: false },
-        { label: 'Share a little of your story (optional)', kind: 'long', options: '', ph: '', required: false },
+        { label: 'Anything we should know? (optional)', kind: 'long', options: '', ph: '', required: false },
       ],
-      btnLabel: 'Sign up for baptism', action: TD.newAction('link'),
-      thanks: 'You’re signed up! 🎉 We’ll be in touch soon with next steps.', notify: '',
+      btnLabel: 'Learn more', action: TD.newAction('link'),
+      thanks: 'Thanks! 🎉 We’ll be in touch soon.', notify: '',
     }),
     summary: (b) => (b.eyebrow ? b.eyebrow + ' · ' : '') + b.title,
   };
+  // Older pages saved this block as "baptism".
+  TD.RENAMED = { baptism: 'spotlight' };
 
   TD.newBlock = (type) => Object.assign({ id: TD.uid('b'), type }, commonDefaults(), TD.BLOCKS[type].defaults());
 
@@ -439,7 +447,7 @@
     s.exp = Object.assign({}, base.exp, state.exp || {});
     s.exp.proxyHosts = Array.isArray(s.exp.proxyHosts) ? s.exp.proxyHosts.slice() : [];
     s.times = (state.times || []).map((t) => Object.assign(TD.newTime(), t));
-    s.blocks = (state.blocks || []).filter((b) => TD.BLOCKS[b.type]).map((b) => {
+    s.blocks = (state.blocks || []).map((b) => (b && TD.RENAMED[b.type] ? Object.assign({}, b, { type: TD.RENAMED[b.type] }) : b)).filter((b) => b && TD.BLOCKS[b.type]).map((b) => {
       const d = TD.newBlock(b.type);
       const n = Object.assign(d, b);
       n.style = Object.assign(commonDefaults().style, b.style || {});

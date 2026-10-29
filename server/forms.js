@@ -18,7 +18,7 @@ const plain = (s) => String(s || '').replace(/\[\[[^|\]]*\|([^\]]*)\]\]/g, '$1')
 async function formBlock(env, churchId, pageId, blockId) {
   try {
     const draft = JSON.parse((await env.PAGES.get('draft:' + churchId + '/' + pageId)) || 'null');
-    return (draft && Array.isArray(draft.blocks) && draft.blocks.find((b) => b && b.id === blockId && (b.type === 'form' || b.type === 'baptism'))) || null;
+    return (draft && Array.isArray(draft.blocks) && draft.blocks.find((b) => b && b.id === blockId && (b.type === 'form' || b.type === 'spotlight' || b.type === 'baptism'))) || null;
   } catch (e) { return null; }
 }
 
@@ -47,7 +47,7 @@ export async function submit(d, env, request, churchId, pageId, waitUntil) {
 
   const blockId = String(b.block || '').slice(0, 40);
   const block = await formBlock(env, churchId, pageId, blockId);
-  const form = (block && plain(block.title)) || (block && block.type === 'baptism' ? 'Baptism sign-up' : 'Connect card');
+  const form = (block && plain(block.title)) || (block && block.type === 'baptism' ? 'Baptism sign-up' : block && block.type === 'spotlight' ? 'Sign-up' : 'Connect card');
   const id = crypto.randomUUID();
   const at = now();
   await run(d, 'INSERT INTO responses (id, church_id, page_id, block_id, form, answers, created_at, seen) VALUES (?, ?, ?, ?, ?, ?, ?, 0)',

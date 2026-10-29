@@ -78,6 +78,18 @@
       case 'sheet':
         if (!a.sheet) return { attrs: ' role="button"', live: false };
         return { attrs: ' href="#"' + d('act', 'sheet') + d('sheet', a.sheet), live: true };
+      case 'file': {
+        // A photo or PDF shown full screen; each one gets its own viewer in overlays().
+        const src = a.file && /^data:(image\/(png|jpe?g|gif|webp|avif)|application\/pdf)[;,]/i.test(a.file) ? a.file : safeUrl(a.file);
+        if (!src) return { attrs: ' role="button"', live: false };
+        const kind = a.fileKind || (/^data:application\/pdf|\.pdf([?#]|$)/i.test(src) ? 'pdf' : 'image');
+        const links = (a.links || []).filter((l) => l && l.label && l.action && l.action.type !== 'none' && l.action.type !== 'file');
+        const key = JSON.stringify([src, kind, a.title || '', links]);
+        ctx.files = ctx.files || [];
+        let i = ctx.files.findIndex((f) => f.key === key);
+        if (i < 0) { i = ctx.files.length; ctx.files.push({ key, src, kind, title: a.title || '', links }); }
+        return { attrs: ' href="#"' + d('act', 'file') + d('file', i), live: true };
+      }
       case 'copy':
         return { attrs: ' href="#"' + d('act', 'copy') + d('text', a.text || '') + d('toast', a.toast || 'Copied!'), live: true };
       case 'phone':
@@ -118,7 +130,7 @@
   // `<a>` when the action does something, `<div>` otherwise.
   // `label` is what the item says (button label, card title…); a pop-up without its own title uses it.
   function tap(cls, action, inner, ctx, extraAttrs, label) {
-    if (action && action.type === 'popup' && !action.title && label) action = Object.assign({}, action, { title: plain(label) });
+    if (action && (action.type === 'popup' || action.type === 'file') && !action.title && label) action = Object.assign({}, action, { title: plain(label) });
     const r = actAttrs(action, ctx);
     const tag = r.live ? 'a' : 'div';
     return '<' + tag + ' class="' + cls + (r.live ? ' td-tap' : '') + '"' + r.attrs + (extraAttrs || '') + '>' + inner + '</' + tag + '>';
@@ -253,9 +265,9 @@
       }).join('');
       return '<div class="td-gallery" style="grid-template-columns:repeat(' + (+b.cols || 3) + ',1fr);gap:' + (+b.gap || 0) + 'px">' + items + '</div>';
     },
-    // Baptism sign-up: an uploaded photo or silent looping video with the title over it, then a
-    // button to the church's own form or a custom form on the page.
-    baptism(b, ctx) {
+    // Spotlight: an uploaded photo or silent looping video with the title over it, then a button,
+    // a form on the page, or nothing. (Saved as "baptism" before it was renamed.)
+    spotlight(b, ctx) {
       const h = Math.max(160, Math.min(420, +b.height || 230));
       const shade = Math.max(0, Math.min(90, b.shade == null ? 45 : +b.shade)) / 100;
       const pic = mediaUrl(b.image);
@@ -268,7 +280,7 @@
         : pic ? '<img class="td-bap-media"' + frame + ' src="' + esc(pic) + '" alt="" loading="lazy" />' : '';
       const over = b.layout === 'over';
       const intro = b.intro ? '<div class="td-bap-intro">' + md(b.intro, true) + '</div>' : '';
-      const cta = b.signup === 'form' ? '' : '<div class="td-bap-cta">' + tap('td-btn td-inline-btn', b.action, esc(b.btnLabel || 'Sign up'), ctx, '', b.btnLabel) + '</div>';
+      const cta = b.signup === 'form' || b.signup === 'none' ? '' : '<div class="td-bap-cta">' + tap('td-btn td-inline-btn', b.action, esc(b.btnLabel || 'Sign up'), ctx, '', b.btnLabel) + '</div>';
       const form = b.signup === 'form' ? R.form(Object.assign({}, b, { title: '', intro: '' }), ctx) : '';
       const head = '<div class="td-bap-head' + (media ? '' : ' td-bap-empty') + '" style="' + (over ? 'min-' : '') + 'height:' + h + 'px">' + media +
         '<div class="td-bap-text" style="background:linear-gradient(180deg,rgba(0,0,0,' + (shade * (over ? 0.6 : 0.35)).toFixed(2) + '),rgba(0,0,0,' + shade.toFixed(2) + '))">' +
@@ -567,7 +579,7 @@ ${t.pressFx ? '.td-tap:active{transform:scale(.97)}' : ''}
 .td-copy-val{font-size:15px;font-weight:600;word-break:break-word}
 .td-copy-btn{flex-shrink:0;background:var(--td-accent);color:var(--td-accent-text) !important;border-radius:var(--td-btn-radius);padding:8px 14px;font-size:13px;font-weight:700}
 .td-copy-btn.td-tap:active{filter:brightness(.9)}
-/* baptism sign-up */
+/* spotlight */
 .td-bap{overflow:hidden;padding:0}
 .td-bap-head{position:relative;overflow:hidden;background:#0b1620}
 .td-bap-empty{background:linear-gradient(160deg,#1d3a4a,#060e16)}
@@ -696,6 +708,22 @@ fieldset.td-bad legend,.td-f-check.td-bad span{color:#ef4444}
 .td-zoom.open{display:flex}
 .td-zoom img{max-width:100%;max-height:100%;object-fit:contain;border-radius:8px}
 .td-zoom .td-close{position:absolute;top:14px;right:14px;color:#fff;background:rgba(255,255,255,.18)}
+.td-fv{display:none;position:fixed;inset:0;z-index:300;background:#0b0b0d;color:#fff;flex-direction:column;font-family:var(--td-font)}
+.td-fv.open{display:flex}
+.td-fv-top{position:absolute;top:0;left:0;right:0;z-index:2;display:flex;align-items:center;gap:12px;padding:calc(env(safe-area-inset-top,0px) + 12px) 14px 12px 18px;background:linear-gradient(rgba(0,0,0,.65),rgba(0,0,0,0));pointer-events:none}
+.td-fv-title{flex:1;min-width:0;font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 1px 8px rgba(0,0,0,.5)}
+.td-fv .td-close{pointer-events:auto;color:#fff;background:rgba(255,255,255,.18);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.td-fv-scroll{flex:1;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;display:flex;flex-direction:column}
+.td-fv-img{display:block;margin:auto;max-width:100%;height:auto}
+.td-fv-pdf{margin:0 auto;width:100%;max-width:900px;padding:60px 0 16px}
+.td-fv-pdf canvas{display:block;width:100%;height:auto;background:#fff;margin:0 auto 10px}
+.td-fv-msg{text-align:center;padding:40px 20px;color:rgba(255,255,255,.75);font-size:14px}
+.td-fv-msg a{color:#fff;font-weight:700}
+.td-fv-bar{flex-shrink:0;padding:12px 0 calc(env(safe-area-inset-bottom,0px) + 14px);background:rgba(11,11,13,.92);border-top:1px solid rgba(255,255,255,.08)}
+.td-fv-pills{display:flex;gap:8px;overflow-x:auto;padding:0 16px;scrollbar-width:none;justify-content:safe center}
+.td-fv-pills::-webkit-scrollbar{display:none}
+.td-fv-pill{flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;padding:11px 18px;border-radius:999px;background:var(--td-accent);color:var(--td-accent-text);font-size:14px;font-weight:700;text-decoration:none;white-space:nowrap}
+.td-fv-pill:active{opacity:.85}
 .td-toast{position:fixed;left:50%;bottom:28px;transform:translate(-50%,20px);background:rgba(20,20,20,.92);color:#fff;padding:10px 18px;border-radius:99px;font-size:14px;font-weight:600;opacity:0;pointer-events:none;transition:all .25s;z-index:400;font-family:var(--td-font);white-space:nowrap}
 .td-toast.show{opacity:1;transform:translate(-50%,0)}
 .td-sched-off{display:none !important}
@@ -741,7 +769,7 @@ fieldset.td-bad legend,.td-f-check.td-bad span{color:#ef4444}
 
     // sheets
     function closeAll() {
-      $$('.td-sheet.open,.td-bd.open,.td-zoom.open').forEach(function (e) { e.classList.remove('open'); });
+      $$('.td-sheet.open,.td-bd.open,.td-zoom.open,.td-fv.open').forEach(function (e) { e.classList.remove('open'); });
       lock(false);
       var f = $('#td-page-frame'); if (f) setTimeout(function () { if (!$('#td-page.open')) f.src = 'about:blank'; }, 400);
     }
@@ -758,6 +786,59 @@ fieldset.td-bad legend,.td-f-check.td-bad span{color:#ef4444}
       else ic.textContent = icon || '🔗';
       l.style.display = 'block'; f.onload = function () { l.style.display = 'none'; };
       openSheet('td-page'); f.src = url;
+    }
+    // Photo / PDF viewer. PDFs are drawn page by page with PDF.js (loaded the first time one opens),
+    // because phones won't show a PDF inside a page on their own.
+    var PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+    var pdfLib;
+    function loadPdfJs() {
+      if (!pdfLib) pdfLib = new Promise(function (ok, no) {
+        if (W.pdfjsLib) return ok(W.pdfjsLib);
+        var s = D.createElement('script'); s.src = PDFJS + 'pdf.min.js';
+        s.onload = function () { if (!W.pdfjsLib) return no(); W.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS + 'pdf.worker.min.js'; ok(W.pdfjsLib); };
+        s.onerror = no; D.head.appendChild(s);
+      });
+      return pdfLib;
+    }
+    function drawPdf(box) {
+      if (box.getAttribute('data-done')) return;
+      box.setAttribute('data-done', '1');
+      var src = box.getAttribute('data-td-pdf');
+      var fail = function () {
+        box.removeAttribute('data-done');
+        box.innerHTML = '<div class="td-fv-msg">This PDF couldn’t be shown here.<br><br><a href="' + escH(src) + '" target="_blank" rel="noopener">Open the PDF</a></div>';
+      };
+      loadPdfJs().then(function (lib) {
+        var opts = { url: src };
+        if (/^data:/i.test(src)) {
+          var bin = atob(src.slice(src.indexOf(',') + 1)), bytes = new Uint8Array(bin.length);
+          for (var k = 0; k < bin.length; k++) bytes[k] = bin.charCodeAt(k);
+          opts = { data: bytes };
+        }
+        return lib.getDocument(opts).promise.then(function (pdf) {
+          box.innerHTML = '';
+          var scale = Math.min(W.devicePixelRatio || 1, 2) * Math.min(box.clientWidth || 400, 900);
+          var n = 0;
+          (function next() {
+            if (++n > pdf.numPages) return;
+            pdf.getPage(n).then(function (pg) {
+              var v1 = pg.getViewport({ scale: 1 }), vp = pg.getViewport({ scale: scale / v1.width });
+              var c = D.createElement('canvas'); c.width = Math.round(vp.width); c.height = Math.round(vp.height);
+              c.style.aspectRatio = vp.width + '/' + vp.height;
+              box.appendChild(c);
+              return pg.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
+            }).then(next, next);
+          })();
+        });
+      }).catch(fail);
+    }
+    function openFile(i) {
+      var v = D.getElementById('td-fv-' + i); if (!v) return;
+      closeAll();
+      var im = $('.td-fv-img', v); if (im && !im.getAttribute('src')) im.src = im.getAttribute('data-src');
+      var sc = $('.td-fv-scroll', v); if (sc) sc.scrollTop = 0;
+      v.classList.add('open'); lock(true);
+      var pdf = $('.td-fv-pdf', v); if (pdf) drawPdf(pdf);
     }
     function scrollToId(id) {
       var el = D.getElementById(id); if (!el) return;
@@ -783,6 +864,7 @@ fieldset.td-bad legend,.td-f-check.td-bad span{color:#ef4444}
         case 'sheet': openSheet('td-sheet-' + g('sheet')); break;
         case 'copy': copy(g('text'), g('toast')); break;
         case 'scroll': closeAll(); scrollToId(a.getAttribute('href').slice(1)); break;
+        case 'file': openFile(g('file')); break;
         case 'zoom': $('#td-zoom-img').src = g('src'); $('#td-zoom').classList.add('open'); lock(true); break;
         case 'share':
           var u = g('url') || location.href, t = g('title') || D.title;
@@ -1067,6 +1149,18 @@ fieldset.td-bad legend,.td-f-check.td-bad span{color:#ef4444}
         '<div class="td-sheet-title" id="td-ev-title">Event</div><div class="td-sheet-sub" id="td-ev-date" style="color:var(--td-accent)"></div></div></div>' +
         '<button class="td-close" data-td-close aria-label="Close">✕</button></div><div class="td-sheet-body td-ev-body" id="td-ev-body"></div></div>\n';
     }
+    // Photo / PDF viewers. Their pill buttons can add pop-ups, so they come before anything else
+    // that depends on ctx being complete.
+    (ctx.files || []).forEach((f, i) => {
+      const pills = f.links.map((l) => tap('td-fv-pill', l.action, esc(l.label), ctx, '', l.label)).join('');
+      const body = f.kind === 'pdf'
+        ? '<div class="td-fv-pdf" data-td-pdf="' + esc(f.src) + '"><div class="td-fv-msg">Loading…</div></div>'
+        : '<img class="td-fv-img" data-src="' + esc(f.src) + '" alt="' + esc(f.title) + '" />';
+      h += '<div class="td-fv' + (pills ? ' td-fv-has' : '') + '" id="td-fv-' + i + '" role="dialog" aria-modal="true" aria-label="' + esc(f.title || 'Viewer') + '">' +
+        '<div class="td-fv-top"><div class="td-fv-title">' + esc(f.title) + '</div><button class="td-close" data-td-close aria-label="Close">✕</button></div>' +
+        '<div class="td-fv-scroll">' + body + '</div>' +
+        (pills ? '<div class="td-fv-bar"><div class="td-fv-pills">' + pills + '</div></div>' : '') + '</div>\n';
+    });
     if (ctx.usesZoom) h += '<div class="td-zoom" id="td-zoom" data-td-close><img id="td-zoom-img" alt="" /><button class="td-close" data-td-close aria-label="Close">✕</button></div>\n';
     h += '<div class="td-toast" id="td-toast" role="status"></div>\n</div>';
     return h;

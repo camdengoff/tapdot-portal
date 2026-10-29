@@ -293,6 +293,20 @@
     inp.click();
   }
   const dataSize = (u) => (/^data:/.test(u || '') ? Math.round((u.length - u.indexOf(',')) * 0.75) : 0);
+  // Photos and PDFs for the full-screen viewer: uploaded to the portal (see server/files.js), or
+  // kept inside the page when the editor runs on its own.
+  const FILE_MAX = 20 * 1024 * 1024, FILE_IN_PAGE_MAX = 4 * 1024 * 1024;
+  async function uploadFile(file) {
+    if (file.size > FILE_MAX) throw new Error('That file is ' + (file.size / 1048576).toFixed(1) + ' MB. Please keep it under 20 MB.');
+    const r = await fetch('/api/files/' + encodeURIComponent(CLOUD.isTemplate ? '_templates' : CLOUD.church), {
+      method: 'POST', credentials: 'same-origin', body: file,
+      headers: { 'Content-Type': file.type, 'X-TapDot-Name': encodeURIComponent(file.name.slice(0, 120)) },
+    });
+    let data = {};
+    try { data = await r.json(); } catch (e) { /* not JSON */ }
+    if (!r.ok) throw new Error(data.error || 'The upload didn’t work (error ' + r.status + ').');
+    return data.url;
+  }
 
 
   // ── Hex color picker (the browser's own picker shows RGB on some systems) ──
@@ -520,6 +534,48 @@
       draw();
       return wrap;
     },
+    // A photo or PDF for the full-screen viewer. In the portal it is uploaded to the church's
+    // account (so it doesn't make the page itself slower to load); elsewhere it is kept in the page.
+    file(o, f, ch) {
+      const wrap = h('div', { class: 'imgf' });
+      const name = () => o.fileName || 'Uploaded file';
+      const draw = (msg, busy) => {
+        const v = getp(o, f.k) || '';
+        const pdf = o.fileKind === 'pdf' || /^data:application\/pdf|\.pdf([?#]|$)/i.test(v);
+        const stored = /^data:/.test(v) || (o.fileName && v);
+        wrap.replaceChildren(
+          h('div', { class: 'thumb' + (v ? '' : ' empty') }, !v ? '📄' : pdf ? h('span', { class: 'thumb-pdf' }, 'PDF') : h('img', { src: v, alt: '' })),
+          h('div', { class: 'imgf-r' },
+            stored
+              ? h('div', { class: 'uploaded' }, name() + (dataSize(v) ? ' · ' + kb(dataSize(v)) : ''))
+              : h('input', { type: 'url', value: v, placeholder: 'Paste a link to a photo or PDF…', oninput: (e) => { setp(o, f.k, e.target.value.trim()); o.fileKind = /\.pdf([?#]|$)/i.test(e.target.value) ? 'pdf' : 'image'; ch(); }, onchange: () => { ch(true); draw(); } }),
+            busy ? h('div', { class: 'hint' }, busy) : null,
+            msg ? h('div', { class: 'warn' }, msg) : null,
+            h('div', { class: 'row' },
+              h('button', { type: 'button', class: 'ghost sm', disabled: !!busy, onclick: () => {
+                const inp = h('input', { type: 'file', accept: 'image/png,image/jpeg,image/gif,image/webp,application/pdf' });
+                inp.onchange = async () => {
+                  const file = inp.files[0];
+                  if (!file) return;
+                  const kind = file.type === 'application/pdf' ? 'pdf' : /^image\/(png|jpeg|gif|webp)$/.test(file.type) ? 'image' : '';
+                  if (!kind) return draw('Please pick a photo (JPG, PNG, GIF or WebP) or a PDF.');
+                  try {
+                    draw('', 'Uploading ' + file.name + '…');
+                    let url;
+                    if (CLOUD) url = await uploadFile(file);
+                    else if (file.size > FILE_IN_PAGE_MAX) return draw('That file is ' + (file.size / 1048576).toFixed(1) + ' MB. Outside the portal, files are saved inside the page, so keep them under ' + (FILE_IN_PAGE_MAX / 1048576) + ' MB, or paste a link instead.');
+                    else if (kind === 'image') url = await readImage(file, 2400);
+                    else url = await new Promise((ok, no) => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.onerror = no; fr.readAsDataURL(file); });
+                    setp(o, f.k, url); o.fileKind = kind; o.fileName = file.name; draw(); ch(true);
+                  } catch (e) { draw(e.message || 'The upload didn’t work. Please try again.'); }
+                };
+                inp.click();
+              } }, '⬆ Upload'),
+              v ? h('button', { type: 'button', class: 'ghost sm', onclick: () => { setp(o, f.k, ''); o.fileName = ''; o.fileKind = ''; draw(); ch(true); } }, 'Remove') : null)));
+      };
+      draw();
+      return wrap;
+    },
     images(o, f, ch) {
       const wrap = h('div', { class: 'imgs' });
       const draw = () => {
@@ -542,7 +598,8 @@
       const box = h('div', { class: 'action' });
       const a = getp(o, f.k);
       const draw = () => {
-        const opts = TD.ACTIONS.filter(([v]) => !(f.noSheet && v === 'sheet'));
+        const opts = TD.ACTIONS.filter(([v]) => !(f.noSheet && v === 'sheet') && !(f.noFile && v === 'file'));
+        if (a.type === 'file' && !Array.isArray(a.links)) a.links = [];
         const fields = {
           link: [{ k: 'url', t: 'text', l: 'Link', ph: 'https://…' }, { k: 'newTab', t: 'checkbox', l: 'Open in a new tab' }],
           popup: [{ k: 'url', t: 'text', l: 'Page link', ph: 'https://…', hint: state.exp.proxy ? 'Paste the normal link. bethanynaz.org pages go through the pop-up proxy automatically; other sites load as they are, and some may refuse to show in a pop-up.' : 'No pop-up proxy is set in the Export tab, so this link opens in a new tab.' },
@@ -554,6 +611,10 @@
           sms: [{ k: 'phone', t: 'text', l: 'Phone number' }, { k: 'body', t: 'text', l: 'Starting message (optional)' }],
           email: [{ k: 'email', t: 'text', l: 'Email address' }, { k: 'subject', t: 'text', l: 'Subject (optional)' }],
           scroll: [{ k: 'target', t: 'select', l: 'Scroll to', opts: [['', '— choose —']].concat(state.blocks.filter((b) => b.anchor).map((b) => [b.anchor, TD.BLOCKS[b.type].name + ': ' + (TD.BLOCKS[b.type].summary(b) || '').slice(0, 30)])), hint: 'Give a block an Anchor name (in its Style overrides) to list it here.' }],
+          file: [{ k: 'file', t: 'file', l: 'Photo or PDF' },
+            { k: 'title', t: 'text', l: 'Viewer title', ph: 'Same as the label', hint: 'Shown at the top of the viewer. Leave blank to use the label of the button or card.' },
+            { k: 'links', t: 'list', l: 'Buttons along the bottom (optional)', itemName: 'Button', itemLabel: (i) => i.label || 'Button', item: TD.FILE_LINK_FIELDS, newItem: TD.newFileLink,
+              hint: 'Each one shows as a pill button pinned to the bottom of the viewer.' }],
           share: [{ k: 'title', t: 'text', l: 'Share title (optional)' }, { k: 'url', t: 'text', l: 'Link to share (blank = this page)' }],
         }[a.type] || [];
         const shown = fields.filter((ff) => !ff.when || ff.when(a));

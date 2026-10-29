@@ -37,6 +37,11 @@ every Publish updates the live page.
   (D1 table `stats`, about 400 days), with no cookies and nothing about the visitor. The Activity log under
   the stats lists each visit and tap with its time for any day (D1 table `events`, kept 90 days), with taps
   grouped under their visit by a random per-tab id.
+- **Photo and PDF viewer:** any button or link can "Show a photo or PDF (full screen)", with optional pill
+  buttons pinned along the bottom of the viewer. In the portal the file is uploaded to `/api/files/<church>`
+  and kept in KV as `file:<church>/<id>` (up to 20 MB, JPG/PNG/GIF/WebP/PDF), served publicly at
+  `/f/<church>/<id>`, so it doesn't slow down the page itself. PDFs are drawn with PDF.js from cdnjs the
+  first time one opens. Outside the portal the file is saved inside the page (up to 4 MB).
 - **Connect card:** a form block (name, email, phone, pick-one, checkboxes, long answers). On pages published
   from the portal, answers go to `/api/form/<church>/<page>` and show on the page card as "connect card
   answers", with a download for Excel. Spam is slowed by a hidden field, a minimum fill time and 5 sends per
