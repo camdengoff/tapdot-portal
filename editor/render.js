@@ -719,7 +719,10 @@ fieldset.td-bad legend,.td-f-check.td-bad span{color:#ef4444}
 .td-fv-pdf canvas{display:block;width:100%;height:auto;background:#fff;margin:0 auto 10px}
 .td-fv-msg{text-align:center;padding:40px 20px;color:rgba(255,255,255,.75);font-size:14px}
 .td-fv-msg a{color:#fff;font-weight:700}
-.td-fv-bar{flex-shrink:0;padding:12px 0 calc(env(safe-area-inset-bottom,0px) + 14px);background:rgba(11,11,13,.92);border-top:1px solid rgba(255,255,255,.08)}
+.td-fv-bar{position:absolute;left:0;right:0;bottom:0;z-index:2;padding:12px 0 calc(env(safe-area-inset-bottom,0px) + 14px);background:rgba(11,11,13,.9);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border-top:1px solid rgba(255,255,255,.08);transition:transform .25s ease,opacity .25s ease}
+.td-fv-bar.td-fv-none{transform:translateY(100%);opacity:0;pointer-events:none}
+.td-fv-has .td-fv-scroll{padding-bottom:calc(env(safe-area-inset-bottom,0px) + 72px)}
+.td-fv-pill[hidden]{display:none}
 .td-fv-pills{display:flex;gap:8px;overflow-x:auto;padding:0 16px;scrollbar-width:none;justify-content:safe center}
 .td-fv-pills::-webkit-scrollbar{display:none}
 .td-fv-pill{flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;padding:11px 18px;border-radius:999px;background:var(--td-accent);color:var(--td-accent-text);font-size:14px;font-weight:700;text-decoration:none;white-space:nowrap}
@@ -823,22 +826,39 @@ fieldset.td-bad legend,.td-f-check.td-bad span{color:#ef4444}
             if (++n > pdf.numPages) return;
             pdf.getPage(n).then(function (pg) {
               var v1 = pg.getViewport({ scale: 1 }), vp = pg.getViewport({ scale: scale / v1.width });
-              var c = D.createElement('canvas'); c.width = Math.round(vp.width); c.height = Math.round(vp.height);
+              var c = D.createElement('canvas'); c.width = Math.round(vp.width); c.height = Math.round(vp.height); c.setAttribute('data-page', n);
               c.style.aspectRatio = vp.width + '/' + vp.height;
               box.appendChild(c);
+              if (n === 1) pagePills(box.closest('.td-fv'));
               return pg.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
             }).then(next, next);
           })();
         });
       }).catch(fail);
     }
+    // Show only the pills for the PDF page in the middle of the screen (plus the every-page ones).
+    function pagePills(v) {
+      var bar = v && $('.td-fv-bar', v); if (!bar) return;
+      var sc = $('.td-fv-scroll', v), mid = sc.getBoundingClientRect().top + sc.clientHeight / 2, page = 1;
+      $$('.td-fv-pdf canvas', v).forEach(function (c) { if (c.getBoundingClientRect().top <= mid) page = +c.getAttribute('data-page') || page; });
+      var any = false;
+      $$('.td-fv-pill', bar).forEach(function (p) {
+        var on = !p.hasAttribute('data-td-page') || +p.getAttribute('data-td-page') === page;
+        p.hidden = !on; any = any || on;
+      });
+      bar.classList.toggle('td-fv-none', !any);
+    }
+    D.addEventListener('scroll', function (e) {
+      var sc = e.target && e.target.classList && e.target.classList.contains('td-fv-scroll') ? e.target : null;
+      if (sc) pagePills(sc.closest('.td-fv'));
+    }, true);
     function openFile(i) {
       var v = D.getElementById('td-fv-' + i); if (!v) return;
       closeAll();
       var im = $('.td-fv-img', v); if (im && !im.getAttribute('src')) im.src = im.getAttribute('data-src');
       var sc = $('.td-fv-scroll', v); if (sc) sc.scrollTop = 0;
       v.classList.add('open'); lock(true);
-      var pdf = $('.td-fv-pdf', v); if (pdf) drawPdf(pdf);
+      var pdf = $('.td-fv-pdf', v); if (pdf) { pagePills(v); drawPdf(pdf); }
     }
     function scrollToId(id) {
       var el = D.getElementById(id); if (!el) return;
@@ -1152,7 +1172,8 @@ fieldset.td-bad legend,.td-f-check.td-bad span{color:#ef4444}
     // Photo / PDF viewers. Their pill buttons can add pop-ups, so they come before anything else
     // that depends on ctx being complete.
     (ctx.files || []).forEach((f, i) => {
-      const pills = f.links.map((l) => tap('td-fv-pill', l.action, esc(l.label), ctx, '', l.label)).join('');
+      // On a PDF, a pill tied to a page only shows while that page is being read.
+      const pills = f.links.map((l) => tap('td-fv-pill', l.action, esc(l.label), ctx, f.kind === 'pdf' && +l.page > 0 ? ' data-td-page="' + (+l.page | 0) + '"' : '', l.label)).join('');
       const body = f.kind === 'pdf'
         ? '<div class="td-fv-pdf" data-td-pdf="' + esc(f.src) + '"><div class="td-fv-msg">Loading…</div></div>'
         : '<img class="td-fv-img" data-src="' + esc(f.src) + '" alt="' + esc(f.title) + '" />';

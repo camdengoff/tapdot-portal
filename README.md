@@ -42,8 +42,9 @@ every Publish updates the live page.
   and kept in KV as `file:<church>/<id>` (up to 20 MB, JPG/PNG/GIF/WebP/PDF), served publicly at
   `/f/<church>/<id>`, so it doesn't slow down the page itself. PDFs are drawn with PDF.js from cdnjs the
   first time one opens. Outside the portal the file is saved inside the page (up to 4 MB). On upload (or
-  🔍 Find links) the editor reads links, web/email addresses and QR codes in the file (PDF.js + jsQR) and adds
-  them as buttons.
+  🔍 Find links) the editor reads links, web/email addresses and QR codes in the file (PDF.js, jsQR, and
+  Tesseract.js to read text in photos and scanned PDFs) and adds them as buttons named after the words next
+  to them ("Email Pastor Thaddeus", "Serve"). On a PDF each button shows only on its own page.
 - **Connect card:** a form block (name, email, phone, pick-one, checkboxes, long answers). On pages published
   from the portal, answers go to `/api/form/<church>/<page>` and show on the page card as "connect card
   answers", with a download for Excel. Spam is slowed by a hidden field, a minimum fill time and 5 sends per

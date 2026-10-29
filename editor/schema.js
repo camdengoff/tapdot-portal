@@ -72,8 +72,9 @@
   TD.FILE_LINK_FIELDS = [
     { k: 'label', t: 'text', l: 'Button text' },
     { k: 'action', t: 'action', l: 'When tapped', noSheet: true, noFile: true },
+    { k: 'page', t: 'range', l: 'Show on PDF page', min: 0, max: 40, hint: '0 shows it on every page. For a PDF, the bar only shows the buttons for the page being read.' },
   ];
-  TD.newFileLink = () => ({ label: 'Learn more', action: TD.newAction('link') });
+  TD.newFileLink = () => ({ label: 'Learn more', page: 0, action: TD.newAction('link') });
 
   // ── Fields every block gets (style + visibility) ─────────────────────
   TD.COMMON_FIELDS = [

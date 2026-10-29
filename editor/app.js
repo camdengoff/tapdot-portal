@@ -310,13 +310,34 @@
   const pdfjs = () => loadScript(PDFJS + 'pdf.min.js', 'pdfjsLib').then((lib) => { lib.GlobalWorkerOptions.workerSrc = PDFJS + 'pdf.worker.min.js'; return lib; });
   const jsqr = () => loadScript('https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js', 'jsQR');
 
-  // Every QR code on a canvas. jsQR reads one code per pass, so it also looks at overlapping
-  // halves and thirds of the picture to catch flyers with several codes.
+  const TESS = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/';
+  let ocrWorker;
+  const ocr = () => ocrWorker || (ocrWorker = loadScript(TESS + 'tesseract.min.js', 'Tesseract').then((T) => T.createWorker('eng', 1, {
+    workerPath: TESS + 'worker.min.js',
+    corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@5.1.1',
+    langPath: 'https://cdn.jsdelivr.net/npm/@tesseract.js-data/eng@1.0.0/4.0.0_best_int',
+  })).catch((e) => { ocrWorker = null; throw e; }));
+  // The lines of text in a picture (photo flyers, scanned PDFs), with where each one sits.
+  // Words on top of a QR code are noise, so `skip` (the QR codes' boxes) leaves them out.
+  async function ocrLines(canvas, skip) {
+    const { data } = await (await ocr()).recognize(canvas);
+    const inQr = (w) => (skip || []).some((b) => { const cx = (w.bbox.x0 + w.bbox.x1) / 2, cy = (w.bbox.y0 + w.bbox.y1) / 2; return cx > b.x0 - 10 && cx < b.x1 + 10 && cy > b.y0 - 10 && cy < b.y1 + 10; });
+    // Tesseract puts side-by-side headings on one line, so rebuild lines from words, split at wide gaps.
+    return joinRuns((data.words || []).filter((w) => w.confidence > 60 && w.text.trim() && !inQr(w)).map((w) => ({ str: w.text, x0: w.bbox.x0, y0: w.bbox.y0, x1: w.bbox.x1, y1: w.bbox.y1 })));
+  }
+
+  // Every QR code on a canvas, with where it sits. jsQR reads one code per pass, so it also looks
+  // at overlapping halves and thirds of the picture to catch flyers with several codes.
   async function qrCodes(canvas) {
-    const found = new Set();
+    const found = new Map();
     if ('BarcodeDetector' in window) {
-      try { (await new window.BarcodeDetector({ formats: ['qr_code'] }).detect(canvas)).forEach((c) => found.add(c.rawValue)); } catch (e) { /* use jsQR */ }
-      if (found.size) return [...found];
+      try {
+        (await new window.BarcodeDetector({ formats: ['qr_code'] }).detect(canvas)).forEach((c) => {
+          const b = c.boundingBox;
+          if (!found.has(c.rawValue)) found.set(c.rawValue, { x0: b.x, y0: b.y, x1: b.x + b.width, y1: b.y + b.height });
+        });
+      } catch (e) { /* use jsQR */ }
+      if (found.size) return [...found].map(([raw, box]) => ({ raw, box }));
     }
     const read = await jsqr();
     const g = canvas.getContext('2d', { willReadFrequently: true });
@@ -327,11 +348,14 @@
         for (let x = 0; x + w <= W + 1; x += Math.max(1, Math.round(w / 2))) {
           const img = g.getImageData(x, y, Math.min(w, W - x), Math.min(hh, H - y));
           const c = read(img.data, img.width, img.height, { inversionAttempts: 'attemptBoth' });
-          if (c && c.data) found.add(c.data);
+          if (!c || !c.data || found.has(c.data)) continue;
+          const pts = ['topLeftCorner', 'topRightCorner', 'bottomLeftCorner', 'bottomRightCorner'].map((k) => c.location[k]);
+          const xs = pts.map((p) => p.x + x), ys = pts.map((p) => p.y + y);
+          found.set(c.data, { x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys) });
         }
       }
     }
-    return [...found];
+    return [...found].map(([raw, box]) => ({ raw, box }));
   }
   const canvasOf = (src, max) => new Promise((ok, no) => {
     const im = new Image();
@@ -346,21 +370,39 @@
     im.onerror = () => no(new Error('The photo could not be read.'));
     im.src = src;
   });
-  // Links in a photo (QR codes) or a PDF (clickable links, web addresses in the text, QR codes).
+
+  const LINK_RE = /\b(?:https?:\/\/|www\.)[^\s<>"')\]]+|\b[\w.+-]+@[\w-]+\.[\w.-]+\b|\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:org|com|church|net|io|co|us|info)(?:\/[^\s<>"')\]]*)?/gi;
+  // PDF text comes in runs; join runs that sit on the same line into one line of text.
+  function joinRuns(runs) {
+    const lines = [];
+    runs.slice().sort((a, b) => a.y1 - b.y1 || a.x0 - b.x0).forEach((r) => {
+      const h = r.y1 - r.y0;
+      const l = lines.find((x) => Math.abs(x.y1 - r.y1) < h * 0.5 && r.x0 - x.x1 < h * 1.5 && r.x0 >= x.x0 - 1);
+      if (l) { l.str += (r.x0 - l.x1 > h * 0.15 && !/\s$/.test(l.str) ? ' ' : '') + r.str; l.x1 = Math.max(l.x1, r.x1); l.y0 = Math.min(l.y0, r.y0); }
+      else lines.push(Object.assign({}, r));
+    });
+    return lines.filter((l) => l.str.trim());
+  }
+  // Links in a photo or PDF: clickable links, web/email addresses in the text, and QR codes. Each
+  // comes with its page (0 for a photo), where it sits, and the lines of text on that page, so it
+  // can be named after the words next to it.
   async function findLinks(blob, kind) {
     const out = [];
+    const fromLines = (lines, page) => lines.forEach((l) => (l.str.match(LINK_RE) || []).forEach((raw) => out.push({ raw, page, box: l, lines })));
     if (kind === 'image') {
       const url = URL.createObjectURL(blob);
-      try { (await qrCodes(await canvasOf(url, 1600))).forEach((t) => out.push(t)); } finally { URL.revokeObjectURL(url); }
+      let c;
+      try { c = await canvasOf(url, 2000); } finally { URL.revokeObjectURL(url); }
+      const qrs = await qrCodes(c);
+      const lines = await ocrLines(c, qrs.map((q) => q.box)).catch(() => []);
+      qrs.forEach((q) => out.push({ raw: q.raw, page: 0, box: q.box, lines }));
+      fromLines(lines, 0);
       return out;
     }
     const lib = await pdfjs();
     const pdf = await lib.getDocument({ data: new Uint8Array(await blob.arrayBuffer()) }).promise;
-    for (let n = 1; n <= Math.min(pdf.numPages, 20); n++) {
+    for (let n = 1; n <= Math.min(pdf.numPages, 30); n++) {
       const pg = await pdf.getPage(n);
-      (await pg.getAnnotations()).forEach((a) => { if (a.subtype === 'Link' && a.url) out.push(a.url); });
-      const text = (await pg.getTextContent()).items.map((i) => i.str + (i.hasEOL ? '\n' : '')).join(' ');
-      (text.match(/\b(?:https?:\/\/|www\.)[^\s<>"')\]]+|\b[\w.+-]+@[\w-]+\.[\w.-]+\b|\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:org|com|church|net|io|co|us|info)(?:\/[^\s<>"')\]]*)?/gi) || []).forEach((t) => out.push(t));
       const vp0 = pg.getViewport({ scale: 1 });
       const vp = pg.getViewport({ scale: Math.min(3, 1600 / Math.max(vp0.width, vp0.height)) });
       const c = document.createElement('canvas');
@@ -368,43 +410,134 @@
       const g = c.getContext('2d', { willReadFrequently: true });
       g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
       await pg.render({ canvasContext: g, viewport: vp }).promise;
-      (await qrCodes(c)).forEach((t) => out.push(t));
+      const runs = (await pg.getTextContent()).items.filter((i) => i.str && i.str.trim()).map((i) => {
+        const t = lib.Util.transform(vp.transform, i.transform);
+        const fh = Math.hypot(t[2], t[3]) || 10;
+        return { str: i.str, x0: t[4], y0: t[5] - fh, x1: t[4] + i.width * vp.scale, y1: t[5] };
+      });
+      // A scanned PDF has no text of its own, so read the page like a photo.
+      const qrs = await qrCodes(c);
+      const lines = runs.length ? joinRuns(runs) : await ocrLines(c, qrs.map((q) => q.box)).catch(() => []);
+      (await pg.getAnnotations()).forEach((a) => {
+        if (a.subtype !== 'Link' || !a.url) return;
+        const r = vp.convertToViewportRectangle(a.rect);
+        out.push({ raw: a.url, page: n, box: { x0: Math.min(r[0], r[2]), y0: Math.min(r[1], r[3]), x1: Math.max(r[0], r[2]), y1: Math.max(r[1], r[3]) }, lines });
+      });
+      fromLines(lines, n);
+      qrs.forEach((q) => out.push({ raw: q.raw, page: n, box: q.box, lines }));
     }
     return out;
   }
+
+  // ── Naming a found link after what it does ──
+  const GENERIC = /^(click( here)?|here|tap here|scan( me| here)?|link|qr( code)?|website|web ?site|online|url|more info|info|or|and|at|to)$/i;
+  const titleCase = (s) => s.toLowerCase().replace(/(^|[\s/&-])([a-z])/g, (m, a, b) => a + b.toUpperCase());
+  // A short, readable name from a line of text, or '' when the line isn't one.
+  function cleanLabel(s) {
+    let t = String(s || '').replace(LINK_RE, ' ').replace(/\+?\(?\d[\d\s().-]{7,}\d/g, ' ').replace(/\s+/g, ' ').trim();
+    t = t.replace(/^[\s:–—|•·>*-]+|[\s:–—|•·>*,-]+$/g, '');
+    t = t.replace(/^(?:(?:please\s+)?(?:scan|tap|click|visit|go to|head to|check out)(?:\s+(?:here|me|the code|this code|this|below|the qr code|the link))?(?:\s+(?:to|for))?\s+)/i, '');
+    t = t.replace(/[\s:–—|•·>*,(-]+$/g, '').replace(/[?!.]+$/, '').trim();
+    if (!/[a-z]/i.test(t) || t.length < 2 || t.length > 30 || t.split(' ').length > 5 || GENERIC.test(t)) return '';
+    if (t === t.toUpperCase() && t.length > 3) t = titleCase(t);
+    return t.charAt(0).toUpperCase() + t.slice(1);
+  }
+  // The text right next to a link: its own words for a clickable link, or a heading just above
+  // (or beside) a QR code.
+  function nearbyText(f) {
+    if (!f.box || !f.lines) return '';
+    const b = f.box, bh = b.y1 - b.y0;
+    const reach = Math.max(70, bh * 1.2);
+    let best = '', bestD = Infinity;
+    f.lines.forEach((l) => {
+      const name = cleanLabel(l.str);
+      if (!name) return;
+      const dx = Math.max(0, l.x0 - b.x1, b.x0 - l.x1);
+      const above = l.y1 <= b.y0 + 2, below = l.y0 >= b.y1 - 2;
+      const dy = above ? b.y0 - l.y1 : below ? (l.y0 - b.y1) * 1.4 : 0;
+      const d = Math.hypot(dx, dy);
+      if (d <= reach && d < bestD) { best = name; bestD = d; }
+    });
+    return best;
+  }
+  const NOT_NAMES = /^(info|office|contact|hello|hi|admin|mail|email|church|team|support|welcome|connect|noreply|no-reply|web|webmaster|staff|general|questions)$/i;
+  // "Pastor Thaddeus", "Thaddeus Smith", "Dr. Ann Lee": a title, or a first and last name.
+  const TITLE = /^((?:pastor|pr\.?|rev\.?|reverend|dr\.?|mr\.?|mrs\.?|ms\.?|miss|brother|sister)\s+)/i;
+  const NAME = /^([A-Z][a-z'’-]+)(?:\s+[A-Z]\.?)?(?:\s+([A-Z][a-z'’-]+))?$/;
+  function personIn(s, local) {
+    const t = TITLE.exec(s || '');
+    const m = NAME.exec(t ? s.slice(t[0].length) : s || '');
+    if (!m) return '';
+    const sameAsEmail = local && local.toLowerCase().indexOf(m[1].toLowerCase()) === 0;
+    if (!t && !m[2] && !sameAsEmail) return ''; // one capitalized word ("Questions") isn't a name
+    return (t ? titleCase(t[1].trim().replace(/^pr\.?$/i, 'Pastor')) + ' ' : '') + m[1];
+  }
   // Found text → a button (label + action), or null for things that aren't links.
-  function linkButton(raw) {
-    let t = String(raw || '').trim().replace(/[.,;:!?]+$/, '');
-    if (/^mailto:/i.test(t)) t = t.slice(7);
-    if (/^[\w.+-]+@[\w-]+\.[\w.-]+$/.test(t)) return { key: 'mailto:' + t.toLowerCase(), label: 'Email us', action: Object.assign(TD.newAction('email'), { email: t }) };
-    if (/^tel:/i.test(t)) return { key: t.toLowerCase(), label: 'Call', action: Object.assign(TD.newAction('phone'), { phone: t.slice(4) }) };
+  function linkButton(f) {
+    let t = String(f.raw || '').trim().replace(/[.,;:!?)]+$/, '');
+    const near = nearbyText(f);
+    if (/^mailto:/i.test(t)) t = t.slice(7).split('?')[0];
+    if (/^[\w.+-]+@[\w-]+\.[\w.-]+$/.test(t)) {
+      const local = t.split('@')[0], first = local.split(/[._+-]/)[0];
+      const name = personIn(near, local) || (/^[a-z]{3,}$/i.test(first) && !NOT_NAMES.test(first) ? first.charAt(0).toUpperCase() + first.slice(1).toLowerCase() : '');
+      return { key: 'mailto:' + t.toLowerCase(), named: !!name, label: name ? 'Email ' + name : /^office$/i.test(first) ? 'Email the office' : 'Email us', action: Object.assign(TD.newAction('email'), { email: t }) };
+    }
+    const who = personIn(near);
+    if (/^tel:/i.test(t)) return { key: t.toLowerCase(), named: !!who, label: who ? 'Call ' + who : 'Call us', action: Object.assign(TD.newAction('phone'), { phone: t.slice(4) }) };
+    if (/^sms(to)?:/i.test(t)) return { key: t.toLowerCase(), named: !!who, label: who ? 'Text ' + who : 'Text us', action: Object.assign(TD.newAction('sms'), { phone: t.replace(/^sms(to)?:/i, '').split(/[?:]/)[0] }) };
     if (!/^https?:\/\//i.test(t)) { if (/^[\w-]+(\.[\w-]+)+(\/|$)/.test(t)) t = 'https://' + t; else return null; }
     let u;
     try { u = new URL(t); } catch (e) { return null; }
+    const key = u.href.replace(/\/$/, '').toLowerCase();
+    if (near) return { key, named: true, label: near, action: Object.assign(TD.newAction('link'), { url: u.href }) };
+    // Nothing written next to it: guess from the address (…/give → Give).
     const host = u.hostname.replace(/^www\./, '').toLowerCase();
     const all = host + u.pathname.toLowerCase();
     const words = [
-      [/give|giving|donat|tithe|pushpay|tithe\.ly|subsplash.*give/, 'Give'], [/regist|sign-?up|signup|rsvp|forms?\.|form\b|typeform|jotform|planningcenter.*(forms|registrations)/, 'Sign up'],
-      [/youtube|youtu\.be|vimeo|livestream|watch/, 'Watch'], [/maps\.|goo\.gl\/maps|maps\.app/, 'Directions'], [/facebook|fb\.com/, 'Facebook'],
-      [/instagram/, 'Instagram'], [/spotify|podcast/, 'Listen'], [/calendar|events?\b/, 'Events'], [/prayer/, 'Prayer'], [/volunteer|serve/, 'Serve'],
+      [/give|giving|donat|tithe|pushpay|tithe\.ly/, 'Give'], [/regist|sign-?up|rsvp|typeform|jotform|forms?\b|forms\.|\/forms/, 'Sign up'],
+      [/youtube|youtu\.be|vimeo|livestream|\/live\b|watch/, 'Watch live'], [/maps\.|goo\.gl\/maps|maps\.app/, 'Get directions'], [/facebook|fb\.com/, 'Facebook'],
+      [/instagram/, 'Instagram'], [/spotify|podcast/, 'Listen'], [/calendar|\/events?\b/, 'See events'], [/prayer|pray/, 'Prayer requests'],
+      [/volunteer|\/serve/, 'Serve'], [/connect|card/, 'Connect card'], [/groups?\b/, 'Find a group'], [/kids|children|nursery/, 'Kids'], [/youth|students/, 'Youth'],
+      [/bible|sermon|notes/, 'Sermon notes'], [/visit|plan/, 'Plan a visit'], [/contact/, 'Contact us'],
     ];
     const hit = words.find(([re]) => re.test(all));
-    const name = host.split('.').slice(-2, -1)[0] || host;
-    return { key: u.href.replace(/\/$/, '').toLowerCase(), label: hit ? hit[1] : name.charAt(0).toUpperCase() + name.slice(1), action: Object.assign(TD.newAction('link'), { url: u.href }) };
+    // Otherwise the last word of the address path (…/fall-festival → Fall festival), or the site name.
+    const tail = decodeURIComponent(u.pathname.split('/').filter(Boolean).pop() || '').replace(/\.\w+$/, '').replace(/[-_]+/g, ' ').trim();
+    const nice = /^[a-z][a-z ]{2,24}$/i.test(tail) ? tail.charAt(0).toUpperCase() + tail.slice(1).toLowerCase() : '';
+    const site = host.split('.').slice(-2, -1)[0] || host;
+    return { key, named: false, label: hit ? hit[1] : nice || site.charAt(0).toUpperCase() + site.slice(1), action: Object.assign(TD.newAction('link'), { url: u.href }) };
   }
+  const LEGACY_AUTO = /^(Give|Sign up|Watch|Directions|Facebook|Instagram|Listen|Events|Prayer|Serve|Email us|Call|Gmail|Google|Qr|[A-Z][a-z0-9-]+)$/;
   const keyOf = (a) => (a.type === 'email' ? 'mailto:' + String(a.email).toLowerCase() : a.type === 'phone' ? 'tel:' + a.phone : String(a.url || '').replace(/\/$/, '').toLowerCase());
-  // Adds new buttons to a viewer action for what's in the file; returns a sentence about it.
+  // Adds buttons to a viewer action for what's in the file; returns a sentence about it. Each
+  // button shows on the PDF page its link is on (or every page, if it's on several). Buttons it
+  // made before and nobody has renamed are refreshed.
   async function addFoundLinks(o, blob, kind) {
     const found = await findLinks(blob, kind);
     if (!Array.isArray(o.links)) o.links = [];
-    const have = new Set(o.links.map((l) => keyOf(l.action || {})));
-    let added = 0;
-    found.map(linkButton).filter(Boolean).forEach((b) => {
-      if (have.has(b.key) || o.links.length >= 8) return;
-      have.add(b.key); o.links.push({ label: b.label, action: b.action }); added++;
+    const byKey = new Map();
+    found.map((f) => { const b = linkButton(f); return b && Object.assign(b, { page: f.page }); }).filter(Boolean).forEach((b) => {
+      const had = byKey.get(b.key);
+      if (!had) return byKey.set(b.key, b);
+      if (had.page !== b.page) had.page = 0;
+      if (!had.named && b.named) { had.label = b.label; had.named = true; }
     });
-    if (added) return 'Found ' + added + ' link' + (added > 1 ? 's' : '') + ' and added ' + (added > 1 ? 'them' : 'it') + ' as buttons below. Check the button text.';
-    return found.length ? 'The links in this file are already buttons below.' : 'No links or QR codes found in this file.';
+    let added = 0, updated = 0;
+    byKey.forEach((b) => {
+      const mine = o.links.find((l) => keyOf(l.action || {}) === b.key);
+      if (mine) {
+        if (!mine.autoLabel && LEGACY_AUTO.test(mine.label)) mine.autoLabel = mine.label; // made by the first version of this
+        if (mine.autoLabel && mine.label === mine.autoLabel && (mine.label !== b.label || (mine.page || 0) !== b.page)) { mine.label = mine.autoLabel = b.label; mine.page = b.page; updated++; }
+        return;
+      }
+      if (o.links.length >= 30) return;
+      o.links.push({ label: b.label, autoLabel: b.label, page: b.page, action: b.action }); added++;
+    });
+    if (added || updated) {
+      return (added ? 'Found ' + added + ' new link' + (added > 1 ? 's' : '') : 'Updated ' + updated + ' button' + (updated > 1 ? 's' : '')) +
+        (added && updated ? ' and updated ' + updated : '') + '. Each button is named after the words next to it in the file; check they read well.';
+    }
+    return byKey.size ? 'The links in this file are already buttons below.' : 'No links or QR codes found in this file.';
   }
   const scanNotes = new WeakMap();
   async function uploadFile(file) {
