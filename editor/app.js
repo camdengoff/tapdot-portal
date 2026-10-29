@@ -942,7 +942,11 @@
       if (!c) return;
       sp.removeAttribute('class'); sp.dataset.c = c; sp.style.color = shownColor(c);
     });
-    wrap.querySelectorAll('a').forEach((a) => { a.removeAttribute('target'); a.removeAttribute('rel'); });
+    wrap.querySelectorAll('a').forEach((a) => {
+      a.removeAttribute('target'); a.removeAttribute('rel');
+      // Email links are written encoded in the page (see mailAttrs in render.js); edit the real address.
+      if (a.dataset.tdMail) { try { a.setAttribute('href', decodeURIComponent(a.dataset.tdMail)); } catch (e) { /* keep # */ } a.removeAttribute('data-td-mail'); a.removeAttribute('data-td-act'); }
+    });
     return wrap.innerHTML;
   }
 
