@@ -727,6 +727,12 @@ fieldset.td-bad legend,.td-f-check.td-bad span{color:#ef4444}
 .td-fv-pills::-webkit-scrollbar{display:none}
 .td-fv-pill{flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;padding:11px 18px;border-radius:999px;background:var(--td-accent);color:var(--td-accent-text);font-size:14px;font-weight:700;text-decoration:none;white-space:nowrap}
 .td-fv-pill:active{opacity:.85}
+.td-mail{display:none;position:fixed;inset:0;z-index:350;background:rgba(0,0,0,.55);align-items:flex-end;justify-content:center;padding:16px;font-family:var(--td-font)}
+.td-mail.open{display:flex}
+.td-mail-card{width:100%;max-width:420px;background:var(--td-sheet);color:var(--td-text);border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:8px;margin-bottom:env(safe-area-inset-bottom,0px)}
+.td-mail-to{text-align:center;font-size:14px;color:var(--td-muted);padding:2px 0 6px;word-break:break-all}
+.td-mail-btn{display:block;width:100%;text-align:center;padding:13px;border-radius:12px;border:0;background:var(--td-card);color:var(--td-text);font:inherit;font-size:15px;font-weight:700;text-decoration:none;cursor:pointer}
+.td-mail-x{background:none;border:0;color:var(--td-muted);font:inherit;font-size:14px;padding:8px;cursor:pointer}
 .td-toast{position:fixed;left:50%;bottom:28px;transform:translate(-50%,20px);background:rgba(20,20,20,.92);color:#fff;padding:10px 18px;border-radius:99px;font-size:14px;font-weight:600;opacity:0;pointer-events:none;transition:all .25s;z-index:400;font-family:var(--td-font);white-space:nowrap}
 .td-toast.show{opacity:1;transform:translate(-50%,0)}
 .td-sched-off{display:none !important}
@@ -867,8 +873,47 @@ fieldset.td-bad legend,.td-f-check.td-bad span{color:#ef4444}
       sc.scrollTo({ top: top, behavior: 'smooth' });
     }
 
+    // Email buttons: let the device open its mail app, but if nothing happens (a computer with no
+    // mail app set up, or a browser that blocks it) offer Gmail, Outlook or copying the address.
+    function mailChooser(href) {
+      var q = href.replace(/^mailto:/i, '').split('?'), to = decodeURIComponent(q[0] || ''), su = '';
+      (q[1] || '').split('&').forEach(function (kv) { var p = kv.split('='); if (/^subject$/i.test(p[0])) su = decodeURIComponent((p[1] || '').replace(/\+/g, ' ')); });
+      var m = $('#td-mail');
+      if (!m) {
+        m = D.createElement('div'); m.id = 'td-mail'; m.className = 'td-mail'; m.setAttribute('role', 'dialog');
+        ($('.td-overlay') || D.body).appendChild(m);
+      }
+      var enc = encodeURIComponent;
+      m.innerHTML = '<div class="td-mail-card"><div class="td-mail-to"></div>' +
+        '<a class="td-mail-btn" target="_blank" rel="noopener" href="https://mail.google.com/mail/?view=cm&fs=1&to=' + enc(to) + (su ? '&su=' + enc(su) : '') + '">Open in Gmail</a>' +
+        '<a class="td-mail-btn" target="_blank" rel="noopener" href="https://outlook.live.com/mail/0/deeplink/compose?to=' + enc(to) + (su ? '&subject=' + enc(su) : '') + '">Open in Outlook</a>' +
+        '<button class="td-mail-btn" type="button" data-td-mailcopy>Copy email address</button>' +
+        '<button class="td-mail-x" type="button" data-td-mailx>Cancel</button></div>';
+      $('.td-mail-to', m).textContent = to;
+      m.setAttribute('data-to', to);
+      m.classList.add('open');
+    }
+    function mailWatch(href) {
+      var left = false;
+      function gone() { left = true; }
+      W.addEventListener('blur', gone); D.addEventListener('visibilitychange', gone);
+      setTimeout(function () {
+        W.removeEventListener('blur', gone); D.removeEventListener('visibilitychange', gone);
+        if (!left && D.visibilityState === 'visible') mailChooser(href);
+      }, 1200);
+    }
+
     D.addEventListener('click', function (e) {
       if (e.target.closest('[data-td-close]')) { e.preventDefault(); closeAll(); return; }
+      var mc = $('#td-mail.open');
+      if (mc) {
+        if (e.target.closest('[data-td-mailcopy]')) copy(mc.getAttribute('data-to'), 'Email address copied');
+        if (e.target.closest('[data-td-mailx]') || e.target.closest('[data-td-mailcopy]') || e.target.closest('.td-mail-btn') || !e.target.closest('.td-mail-card')) mc.classList.remove('open');
+        if (!e.target.closest('a.td-mail-btn')) { e.preventDefault(); return; }
+        return;
+      }
+      var ml = e.target.closest('a[href^="mailto:"],a[href^="MAILTO:"]');
+      if (ml) { mailWatch(ml.getAttribute('href')); return; }
       var a = e.target.closest('[data-td-act]');
       if (!a) {
         if (PREVIEW) {
