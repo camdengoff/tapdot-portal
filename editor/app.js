@@ -296,6 +296,117 @@
   // Photos and PDFs for the full-screen viewer: uploaded to the portal (see server/files.js), or
   // kept inside the page when the editor runs on its own.
   const FILE_MAX = 20 * 1024 * 1024, FILE_IN_PAGE_MAX = 4 * 1024 * 1024;
+  // ── Find links and QR codes in an uploaded photo or PDF, to offer them as viewer buttons ──
+  const scripts = {};
+  const loadScript = (src, global) => scripts[src] || (scripts[src] = new Promise((ok, no) => {
+    if (window[global]) return ok(window[global]);
+    const el = document.createElement('script');
+    el.src = src;
+    el.onload = () => (window[global] ? ok(window[global]) : no(new Error('Could not load ' + src)));
+    el.onerror = () => { delete scripts[src]; no(new Error('Could not load ' + src)); };
+    document.head.appendChild(el);
+  }));
+  const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+  const pdfjs = () => loadScript(PDFJS + 'pdf.min.js', 'pdfjsLib').then((lib) => { lib.GlobalWorkerOptions.workerSrc = PDFJS + 'pdf.worker.min.js'; return lib; });
+  const jsqr = () => loadScript('https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js', 'jsQR');
+
+  // Every QR code on a canvas. jsQR reads one code per pass, so it also looks at overlapping
+  // halves and thirds of the picture to catch flyers with several codes.
+  async function qrCodes(canvas) {
+    const found = new Set();
+    if ('BarcodeDetector' in window) {
+      try { (await new window.BarcodeDetector({ formats: ['qr_code'] }).detect(canvas)).forEach((c) => found.add(c.rawValue)); } catch (e) { /* use jsQR */ }
+      if (found.size) return [...found];
+    }
+    const read = await jsqr();
+    const g = canvas.getContext('2d', { willReadFrequently: true });
+    const W = canvas.width, H = canvas.height;
+    for (const part of [1, 1 / 2, 1 / 3]) {
+      const w = Math.round(W * part), hh = Math.round(H * part);
+      for (let y = 0; y + hh <= H + 1; y += Math.max(1, Math.round(hh / 2))) {
+        for (let x = 0; x + w <= W + 1; x += Math.max(1, Math.round(w / 2))) {
+          const img = g.getImageData(x, y, Math.min(w, W - x), Math.min(hh, H - y));
+          const c = read(img.data, img.width, img.height, { inversionAttempts: 'attemptBoth' });
+          if (c && c.data) found.add(c.data);
+        }
+      }
+    }
+    return [...found];
+  }
+  const canvasOf = (src, max) => new Promise((ok, no) => {
+    const im = new Image();
+    im.onload = () => {
+      const k = Math.min(1, max / Math.max(im.naturalWidth, im.naturalHeight));
+      const c = document.createElement('canvas');
+      c.width = Math.round(im.naturalWidth * k); c.height = Math.round(im.naturalHeight * k);
+      const g = c.getContext('2d', { willReadFrequently: true });
+      g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(im, 0, 0, c.width, c.height);
+      ok(c);
+    };
+    im.onerror = () => no(new Error('The photo could not be read.'));
+    im.src = src;
+  });
+  // Links in a photo (QR codes) or a PDF (clickable links, web addresses in the text, QR codes).
+  async function findLinks(blob, kind) {
+    const out = [];
+    if (kind === 'image') {
+      const url = URL.createObjectURL(blob);
+      try { (await qrCodes(await canvasOf(url, 1600))).forEach((t) => out.push(t)); } finally { URL.revokeObjectURL(url); }
+      return out;
+    }
+    const lib = await pdfjs();
+    const pdf = await lib.getDocument({ data: new Uint8Array(await blob.arrayBuffer()) }).promise;
+    for (let n = 1; n <= Math.min(pdf.numPages, 20); n++) {
+      const pg = await pdf.getPage(n);
+      (await pg.getAnnotations()).forEach((a) => { if (a.subtype === 'Link' && a.url) out.push(a.url); });
+      const text = (await pg.getTextContent()).items.map((i) => i.str + (i.hasEOL ? '\n' : '')).join(' ');
+      (text.match(/\b(?:https?:\/\/|www\.)[^\s<>"')\]]+|\b[\w.+-]+@[\w-]+\.[\w.-]+\b|\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:org|com|church|net|io|co|us|info)(?:\/[^\s<>"')\]]*)?/gi) || []).forEach((t) => out.push(t));
+      const vp0 = pg.getViewport({ scale: 1 });
+      const vp = pg.getViewport({ scale: Math.min(3, 1600 / Math.max(vp0.width, vp0.height)) });
+      const c = document.createElement('canvas');
+      c.width = Math.round(vp.width); c.height = Math.round(vp.height);
+      const g = c.getContext('2d', { willReadFrequently: true });
+      g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
+      await pg.render({ canvasContext: g, viewport: vp }).promise;
+      (await qrCodes(c)).forEach((t) => out.push(t));
+    }
+    return out;
+  }
+  // Found text → a button (label + action), or null for things that aren't links.
+  function linkButton(raw) {
+    let t = String(raw || '').trim().replace(/[.,;:!?]+$/, '');
+    if (/^mailto:/i.test(t)) t = t.slice(7);
+    if (/^[\w.+-]+@[\w-]+\.[\w.-]+$/.test(t)) return { key: 'mailto:' + t.toLowerCase(), label: 'Email us', action: Object.assign(TD.newAction('email'), { email: t }) };
+    if (/^tel:/i.test(t)) return { key: t.toLowerCase(), label: 'Call', action: Object.assign(TD.newAction('phone'), { phone: t.slice(4) }) };
+    if (!/^https?:\/\//i.test(t)) { if (/^[\w-]+(\.[\w-]+)+(\/|$)/.test(t)) t = 'https://' + t; else return null; }
+    let u;
+    try { u = new URL(t); } catch (e) { return null; }
+    const host = u.hostname.replace(/^www\./, '').toLowerCase();
+    const all = host + u.pathname.toLowerCase();
+    const words = [
+      [/give|giving|donat|tithe|pushpay|tithe\.ly|subsplash.*give/, 'Give'], [/regist|sign-?up|signup|rsvp|forms?\.|form\b|typeform|jotform|planningcenter.*(forms|registrations)/, 'Sign up'],
+      [/youtube|youtu\.be|vimeo|livestream|watch/, 'Watch'], [/maps\.|goo\.gl\/maps|maps\.app/, 'Directions'], [/facebook|fb\.com/, 'Facebook'],
+      [/instagram/, 'Instagram'], [/spotify|podcast/, 'Listen'], [/calendar|events?\b/, 'Events'], [/prayer/, 'Prayer'], [/volunteer|serve/, 'Serve'],
+    ];
+    const hit = words.find(([re]) => re.test(all));
+    const name = host.split('.').slice(-2, -1)[0] || host;
+    return { key: u.href.replace(/\/$/, '').toLowerCase(), label: hit ? hit[1] : name.charAt(0).toUpperCase() + name.slice(1), action: Object.assign(TD.newAction('link'), { url: u.href }) };
+  }
+  const keyOf = (a) => (a.type === 'email' ? 'mailto:' + String(a.email).toLowerCase() : a.type === 'phone' ? 'tel:' + a.phone : String(a.url || '').replace(/\/$/, '').toLowerCase());
+  // Adds new buttons to a viewer action for what's in the file; returns a sentence about it.
+  async function addFoundLinks(o, blob, kind) {
+    const found = await findLinks(blob, kind);
+    if (!Array.isArray(o.links)) o.links = [];
+    const have = new Set(o.links.map((l) => keyOf(l.action || {})));
+    let added = 0;
+    found.map(linkButton).filter(Boolean).forEach((b) => {
+      if (have.has(b.key) || o.links.length >= 8) return;
+      have.add(b.key); o.links.push({ label: b.label, action: b.action }); added++;
+    });
+    if (added) return 'Found ' + added + ' link' + (added > 1 ? 's' : '') + ' and added ' + (added > 1 ? 'them' : 'it') + ' as buttons below. Check the button text.';
+    return found.length ? 'The links in this file are already buttons below.' : 'No links or QR codes found in this file.';
+  }
+  const scanNotes = new WeakMap();
   async function uploadFile(file) {
     if (file.size > FILE_MAX) throw new Error('That file is ' + (file.size / 1048576).toFixed(1) + ' MB. Please keep it under 20 MB.');
     const r = await fetch('/api/files/' + encodeURIComponent(CLOUD.isTemplate ? '_templates' : CLOUD.church), {
@@ -543,6 +654,7 @@
         const v = getp(o, f.k) || '';
         const pdf = o.fileKind === 'pdf' || /^data:application\/pdf|\.pdf([?#]|$)/i.test(v);
         const stored = /^data:/.test(v) || (o.fileName && v);
+        const note = scanNotes.get(o);
         wrap.replaceChildren(
           h('div', { class: 'thumb' + (v ? '' : ' empty') }, !v ? '📄' : pdf ? h('span', { class: 'thumb-pdf' }, 'PDF') : h('img', { src: v, alt: '' })),
           h('div', { class: 'imgf-r' },
@@ -551,6 +663,7 @@
               : h('input', { type: 'url', value: v, placeholder: 'Paste a link to a photo or PDF…', oninput: (e) => { setp(o, f.k, e.target.value.trim()); o.fileKind = /\.pdf([?#]|$)/i.test(e.target.value) ? 'pdf' : 'image'; ch(); }, onchange: () => { ch(true); draw(); } }),
             busy ? h('div', { class: 'hint' }, busy) : null,
             msg ? h('div', { class: 'warn' }, msg) : null,
+            !busy && !msg && note ? h('div', { class: 'hint' }, note) : null,
             h('div', { class: 'row' },
               h('button', { type: 'button', class: 'ghost sm', disabled: !!busy, onclick: () => {
                 const inp = h('input', { type: 'file', accept: 'image/png,image/jpeg,image/gif,image/webp,application/pdf' });
@@ -566,12 +679,24 @@
                     else if (file.size > FILE_IN_PAGE_MAX) return draw('That file is ' + (file.size / 1048576).toFixed(1) + ' MB. Outside the portal, files are saved inside the page, so keep them under ' + (FILE_IN_PAGE_MAX / 1048576) + ' MB, or paste a link instead.');
                     else if (kind === 'image') url = await readImage(file, 2400);
                     else url = await new Promise((ok, no) => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.onerror = no; fr.readAsDataURL(file); });
-                    setp(o, f.k, url); o.fileKind = kind; o.fileName = file.name; draw(); ch(true);
+                    setp(o, f.k, url); o.fileKind = kind; o.fileName = file.name;
+                    await scan(file, kind);
                   } catch (e) { draw(e.message || 'The upload didn’t work. Please try again.'); }
                 };
                 inp.click();
               } }, '⬆ Upload'),
-              v ? h('button', { type: 'button', class: 'ghost sm', onclick: () => { setp(o, f.k, ''); o.fileName = ''; o.fileKind = ''; draw(); ch(true); } }, 'Remove') : null)));
+              v ? h('button', { type: 'button', class: 'ghost sm', disabled: !!busy, title: 'Look for links and QR codes in the file and add them as buttons', onclick: async () => {
+                try { const r = await fetch(TD.mediaUrl(v)); if (!r.ok) throw new Error(); await scan(await r.blob(), pdf ? 'pdf' : 'image'); }
+                catch (e) { draw('The file could not be read to look for links.'); }
+              } }, '🔍 Find links') : null,
+              v ? h('button', { type: 'button', class: 'ghost sm', onclick: () => { setp(o, f.k, ''); o.fileName = ''; o.fileKind = ''; scanNotes.delete(o); draw(); ch(true); } }, 'Remove') : null)));
+      };
+      // Turn links and QR codes in the file into buttons along the bottom of the viewer.
+      const scan = async (blob, kind) => {
+        draw('', 'Looking for links and QR codes…');
+        try { scanNotes.set(o, await addFoundLinks(o, blob, kind)); }
+        catch (e) { scanNotes.set(o, 'Couldn’t look for links in this file (' + (e.message || 'unknown error') + '). You can add buttons by hand below.'); }
+        draw(); ch(true);
       };
       draw();
       return wrap;
