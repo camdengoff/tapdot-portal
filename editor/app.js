@@ -579,6 +579,11 @@
   function closePicker() { if (pickerEl) { pickerEl.remove(); pickerEl = null; } }
   document.addEventListener('mousedown', (e) => { if (pickerEl && !pickerEl.contains(e.target) && !e.target.closest('.opens-picker')) closePicker(); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePicker(); });
+  // Close the rich-text color pop-out when clicking anywhere else.
+  document.addEventListener('mousedown', (e) => {
+    if (e.target.closest && e.target.closest('.rb-colors, .cpick')) return;
+    document.querySelectorAll('.rb-pop.open').forEach((x) => x.classList.remove('open'));
+  });
   const RECENT = 'tapdot-recent-colors';
   const recent = () => { try { return JSON.parse(localStorage.getItem(RECENT)) || []; } catch (e) { return []; } };
   const addRecent = (c) => { try { localStorage.setItem(RECENT, JSON.stringify([c].concat(recent().filter((x) => x !== c)).slice(0, 10))); } catch (e) { /* ignore */ } };
@@ -1090,11 +1095,15 @@
       const r = restore(); if (!r || r.collapsed) return needSel();
       openPicker(pick, lastPick, (hex) => { lastPick = hex; paint(hex); });
     } }, '🎨');
+    // The color swatches live in a small pop-out so the toolbar stays on one line.
+    const pop = h('div', { class: 'rb-pop' },
+      btn('Accent', 'Theme accent color', () => { paint('accent'); pop.classList.remove('open'); }, 'rb-accent'),
+      SWATCHES.map((c) => { const b = btn('', c, () => { paint(c); pop.classList.remove('open'); }, 'rb-sw'); b.style.background = c; return b; }),
+      pick);
+    const colors = h('span', { class: 'rb-colors' },
+      btn(h('span', { class: 'rb-a' }, 'A'), 'Color the highlighted words', () => pop.classList.toggle('open')), pop);
     const bar = h('div', { class: 'richbar' },
-      btn('Accent', 'Theme accent color', () => paint('accent'), 'rb-accent'),
-      SWATCHES.map((c) => { const b = btn('', c, () => paint(c), 'rb-sw'); b.style.background = c; return b; }),
-      pick,
-      h('span', { class: 'rb-sep' }),
+      colors,
       btn(h('b', null, 'B'), 'Bold', () => cmd('bold')),
       btn(h('i', null, 'I'), 'Italic', () => cmd('italic')),
       btn('🔗', 'Link', link),
@@ -1105,9 +1114,15 @@
 
   function field(o, f, ch) {
     const c = f.rich ? richEditor(o, f, ch) : CTRL[f.t](o, f, ch);
-    if (f.t === 'checkbox') return h('div', { class: 'field' }, c, f.hint ? h('div', { class: 'hint' }, f.hint) : null);
-    return h('div', { class: 'field' }, h('label', { class: 'fl' }, f.l), c, f.hint ? h('div', { class: 'hint' }, f.hint) : null);
+    // Descriptions sit behind an ⓘ next to the label instead of a line of small print.
+    if (f.t === 'checkbox') return h('div', { class: 'field row' }, c, f.hint ? info(f.hint) : null);
+    const label = h('div', { class: 'fl row' }, h('label', null, f.l), f.hint ? info(f.hint) : null);
+    // Short controls sit on the same line as their label.
+    return h('div', { class: 'field' + (INLINE.has(f.t) && !f.rich ? ' inline' : '') }, label, c);
   }
+  const INLINE = new Set(['select', 'range', 'color', 'number', 'time', 'date', 'datetime']);
+  // Which collapsible groups the user opened or closed, so a redraw keeps them that way.
+  const groupState = new WeakMap();
 
   // Build a form for `obj`. Fields with `when` re-draw the form when a
   // structural control (select/checkbox) changes, so conditional fields appear.
@@ -1116,7 +1131,10 @@
     const draw = () => {
       wrap.replaceChildren(...fields.map((f) => {
         if (f.group) {
-          const d = h('details', { class: 'group', open: !!f.open }, h('summary', null, f.group));
+          if (!groupState.has(obj)) groupState.set(obj, {});
+          const gs = groupState.get(obj);
+          const isOpen = f.group in gs ? gs[f.group] : typeof f.open === 'function' ? !!f.open(obj) : !!f.open;
+          const d = h('details', { class: 'group', open: isOpen, ontoggle: () => { gs[f.group] = d.open; } }, h('summary', null, f.group));
           const inner = form(obj, f.fields, onLight, onStructural);
           d.append(inner);
           return d;
@@ -1207,7 +1225,7 @@
         h('b', null, '🏠 Normal'), h('small', null, 'Any other time')),
       state.times.map((x) => h('button', { class: 'ttab' + (timeTab === x.id ? ' on' : ''), onclick: () => { timeTab = x.id; drawPanel(); refresh(); } },
         h('b', null, TD.iconLabel(x.icon) + (x.name || 'Special time')), h('small', null, TD.describeTime(x)))),
-      h('button', { class: 'ttab add', title: 'Make a different version of the page for certain days or times', onclick: () => {
+      h('button', { class: 'ttab add', title: 'Make a different version of the page for certain days or times (like Chapel on Tue/Thu mornings)', onclick: () => {
         const n = TD.newTime();
         n.name = 'Special time ' + (state.times.length + 1);
         state.times.push(n);
@@ -1216,9 +1234,7 @@
         timeTab = n.id; changed(true); refresh();
       } }, h('b', null, '+ Time'), h('small', null, 'Add a version')));
     const info = timeTab === 'normal'
-      ? h('p', { class: 'tinfo' }, state.times.length
-        ? 'This is what people see when none of your special times are happening. Use 👁 on a block to show or hide it here.'
-        : 'Want a different page at certain times (like Chapel on Tue/Thu mornings)? Add a time tab with “+ Time”.')
+      ? (state.times.length ? h('p', { class: 'tinfo' }, 'Shown when none of your special times are on. 👁 shows or hides a block here.') : null)
       : h('div', { class: 'tinfo special' },
         h('p', null, 'This is what people see during ', h('b', null, t.name || 'this time'), ' (' + TD.describeTime(t) + '). Blocks marked 🚫 are hidden during this time. New blocks you add here only show during this time.'),
         h('details', { class: 'group', open: !t.days.length && !t.start && !t.from },
@@ -1251,7 +1267,7 @@
 
   function themeTab() {
     const t = state.theme;
-    return h('div', null,
+    return h('div', { class: 'form', style: { paddingTop: 0 } },
       h('div', { class: 'field' }, h('label', { class: 'fl' }, 'Page title (browser tab)'),
         h('input', { type: 'text', value: state.title, oninput: (e) => { state.title = e.target.value; changed(); } })),
       h('div', { class: 'field' }, h('label', { class: 'fl' }, 'Color presets'),
@@ -1351,7 +1367,7 @@
       catch (x) { download('tapdot-popup-worker.js', code, 'text/javascript'); }
       workerCheck.url = ''; // check again next time
     };
-    return h('details', { class: 'setup', open: !String(state.exp.proxy || '').trim() },
+    return h('details', { class: 'setup' },
       h('summary', null, 'Set up your own worker'),
       h('ol', null,
         h('li', null, 'Make a free account at ', h('a', { href: 'https://dash.cloudflare.com/sign-up', target: '_blank', rel: 'noopener' }, 'cloudflare.com'), ' and sign in.'),
@@ -1372,7 +1388,7 @@
         h('button', { class: 'ghost', onclick: downloadExport }, '⬇ Download .html'),
         h('button', { class: 'ghost', onclick: () => { const u = URL.createObjectURL(new Blob([exportHtml()], { type: 'text/html' })); window.open(u, '_blank'); } }, '↗ Open')),
       h('div', { id: 'exportSize', class: 'size' }),
-      h('textarea', { id: 'exportCode', class: 'mono code', readOnly: true, rows: 14, onfocus: (ev) => ev.target.select() }),
+      h('textarea', { id: 'exportCode', class: 'mono code', readOnly: true, rows: 6, onfocus: (ev) => ev.target.select() }),
       h('h3', null, 'Pop-up proxy'),
       h('div', { class: 'field' }, h('div', { class: 'fl row' }, 'Worker address',
           info('Your Cloudflare worker, so sites that block framing still load in pop-ups. Until you add one, pop-up links open in a new tab instead.')),
@@ -1383,20 +1399,24 @@
       SHOW_PUBLISH || CLOUD ? publishSection() : null,
       h('h3', null, 'Export options'),
       opt('squarespace', 'Squarespace code block fixes', 'Forces the page background onto Squarespace wrappers, removes their padding and hides the site search bar, like base html does.'),
-      h('div', { class: 'field' }, h('label', { class: 'fl' }, 'Layout'),
+      h('div', { class: 'field inline' }, h('label', { class: 'fl' }, 'Layout'),
         h('select', { onchange: (ev) => { e.layout = ev.target.value; changed(); } },
-          h('option', { value: 'app', selected: e.layout === 'app' }, 'Full-screen app (covers the whole Squarespace page)'),
-          h('option', { value: 'inline', selected: e.layout === 'inline' }, 'Inline (sits inside the normal page flow)'))),
+          h('option', { value: 'app', selected: e.layout === 'app' }, 'Full-screen app'),
+          h('option', { value: 'inline', selected: e.layout === 'inline' }, 'Inline (in the page flow)'))),
       opt('fullDoc', 'Full HTML document (<html>, <head>, <body>)', 'Turn off to get just the styles and markup, for pasting into a block on an existing page.'),
       opt('embed', 'Keep editable copy inside the HTML', 'Lets you reopen this exact export later with Open → .html. Roughly doubles the size of uploaded images.'),
-      h('h3', null, 'Uploaded image quality'),
-      h('div', { class: 'field' }, h('label', { class: 'fl' }, 'Longest side for new uploads'),
-        CTRL.range(e, { k: 'imgMax', min: 400, max: 2400, step: 100, unit: 'px' }, () => save())),
-      h('div', { class: 'field' }, h('label', { class: 'fl' }, 'JPEG quality for new uploads'),
-        CTRL.range(e, { k: 'imgQ', min: 0.4, max: 0.95, step: 0.05 }, () => save())),
-      h('h3', { class: 'row' }, 'Restore from pasted HTML', info('Paste HTML that was exported with “Keep editable copy” on.')),
-      h('textarea', { id: 'pasteIn', rows: 3, class: 'mono', placeholder: '<!DOCTYPE html>…' }),
-      h('button', { class: 'ghost', onclick: () => importText($('#pasteIn').value) }, 'Restore'));
+      h('details', { class: 'group more' }, h('summary', null, 'Uploaded image quality'),
+        h('div', { class: 'form' },
+          h('div', { class: 'field inline' }, h('label', { class: 'fl' }, 'Longest side'),
+            CTRL.range(e, { k: 'imgMax', min: 400, max: 2400, step: 100, unit: 'px' }, () => save())),
+          h('div', { class: 'field inline' }, h('label', { class: 'fl' }, 'JPEG quality'),
+            CTRL.range(e, { k: 'imgQ', min: 0.4, max: 0.95, step: 0.05 }, () => save())),
+          h('div', { class: 'hint' }, 'Applies to photos you upload from now on.'))),
+      h('details', { class: 'group more' }, h('summary', null, 'Restore from pasted HTML'),
+        h('div', { class: 'form' },
+          h('div', { class: 'hint' }, 'Paste HTML that was exported with “Keep editable copy” on.'),
+          h('textarea', { id: 'pasteIn', rows: 3, class: 'mono', placeholder: '<!DOCTYPE html>…' }),
+          h('button', { class: 'ghost', onclick: () => importText($('#pasteIn').value) }, 'Restore'))));
     setTimeout(drawExportCode, 0);
     setTimeout(checkWorker, 0);
     return wrap;

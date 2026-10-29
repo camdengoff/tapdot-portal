@@ -72,18 +72,18 @@
   TD.FILE_LINK_FIELDS = [
     { k: 'label', t: 'text', l: 'Button text' },
     { k: 'action', t: 'action', l: 'When tapped', noSheet: true, noFile: true },
-    { k: 'page', t: 'range', l: 'Show on PDF page', min: 0, max: 40, hint: '0 shows it on every page. For a PDF, the bar only shows the buttons for the page being read.' },
+    { k: 'page', t: 'range', l: 'PDF page', min: 0, max: 40, hint: 'Which PDF page this button shows on. 0 shows it on every page; the bar only shows the buttons for the page being read.' },
   ];
   TD.newFileLink = () => ({ label: 'Learn more', page: 0, action: TD.newAction('link') });
 
   // ── Fields every block gets (style + visibility) ─────────────────────
   TD.COMMON_FIELDS = [
-    { group: 'Style overrides', fields: [
-      { k: 'style.card', t: 'color', l: 'Card color', hint: 'Blank uses the theme.' },
-      { k: 'style.card2', t: 'color', l: 'Card pressed color' },
-      { k: 'style.text', t: 'color', l: 'Text color' },
-      { k: 'style.muted', t: 'color', l: 'Secondary text color' },
-      { k: 'style.accent', t: 'color', l: 'Accent color' },
+    { group: 'Style overrides (colors, corners, spacing)', fields: [
+      { k: 'style.card', t: 'color', l: 'Card', hint: 'Blank uses the theme.' },
+      { k: 'style.card2', t: 'color', l: 'Card pressed' },
+      { k: 'style.text', t: 'color', l: 'Text' },
+      { k: 'style.muted', t: 'color', l: 'Secondary text' },
+      { k: 'style.accent', t: 'color', l: 'Accent' },
       { k: 'style.radius', t: 'range', l: 'Corner radius', min: -1, max: 40, unit: 'px', hint: 'Far left (−1) uses the theme.' },
       { k: 'style.mt', t: 'range', l: 'Space above', min: -1, max: 80, unit: 'px', hint: 'Far left (−1) uses the theme spacing.' },
       { k: 'style.side', t: 'range', l: 'Side margin', min: -1, max: 40, unit: 'px', hint: 'Far left (−1) uses the theme. 0 = edge to edge.' },
@@ -107,8 +107,8 @@
         { k: 'images', t: 'images', l: 'Images', hint: 'Add more than one to make a fading slideshow.' },
         { k: 'interval', t: 'range', l: 'Seconds per image', min: 2, max: 20, unit: 's', when: (b) => b.images.length > 1 },
         { k: 'aspect', t: 'select', l: 'Image shape', opts: TD.ASPECTS },
-        { k: 'fit', t: 'select', l: 'Image fit', opts: [['cover', 'Fill (crop edges)'], ['contain', 'Fit (show whole image)']] },
-        { k: 'textPos', t: 'select', l: 'Title position', opts: [['below', 'Below the image'], ['overlay', 'On top of the image'], ['none', 'No title']] },
+        { k: 'fit', t: 'select', l: 'Image fit', opts: [['cover', 'Fill (crop edges)'], ['contain', 'Show whole image']] },
+        { k: 'textPos', t: 'select', l: 'Title position', opts: [['below', 'Below the image'], ['overlay', 'On the image'], ['none', 'No title']] },
         { k: 'title', t: 'text', l: 'Title', rich: true, when: (b) => b.textPos !== 'none' },
         { k: 'subtitle', t: 'text', l: 'Subtitle', when: (b) => b.textPos !== 'none', rich: true },
         { k: 'titleSize', t: 'range', l: 'Title size', min: 14, max: 44, unit: 'px', when: (b) => b.textPos !== 'none' },
@@ -152,11 +152,13 @@
         { k: 'items', t: 'list', l: 'Buttons', itemName: 'Button', itemLabel: (i) => TD.iconLabel(i.icon) + (i.label || 'Button'),
           item: [
             { k: 'label', t: 'text', l: 'Label', rich: true },
-            { k: 'icon', t: 'emoji', l: 'Icon (emoji)' },
-            { k: 'iconBg', t: 'color', l: 'Icon circle color' },
-            { k: 'bg', t: 'color', l: 'Button color' },
-            { k: 'color', t: 'color', l: 'Label color' },
+            { k: 'icon', t: 'emoji', l: 'Icon' },
             { k: 'action', t: 'action', l: 'When tapped' },
+            { group: 'Colors', fields: [
+              { k: 'iconBg', t: 'color', l: 'Icon circle' },
+              { k: 'bg', t: 'color', l: 'Button' },
+              { k: 'color', t: 'color', l: 'Label' },
+            ] },
           ],
           newItem: () => ({ label: 'Button', icon: '', iconBg: '', bg: '', color: '', action: TD.newAction('link') }) },
       ],
@@ -166,7 +168,7 @@
     banner: {
       name: 'Banner card', icon: '🪧', desc: 'Tappable card with icon, eyebrow, title and arrow',
       fields: [
-        { k: 'icon', t: 'emoji', l: 'Icon (emoji)' },
+        { k: 'icon', t: 'emoji', l: 'Icon' },
         { k: 'iconBg', t: 'color', l: 'Icon background' },
         { k: 'image', t: 'image', l: 'Image instead of icon' },
         { k: 'eyebrow', t: 'text', l: 'Small label above title', ph: 'New here?', rich: true },
@@ -183,7 +185,7 @@
       fields: [
         { k: 'layout', t: 'select', l: 'Layout', opts: [['scroll', 'Side-scrolling row'], ['grid', 'Grid, 2 across'], ['list', 'Full-width list']] },
         { k: 'variant', t: 'select', l: 'Card style', opts: [['pill', 'Small image on the left'], ['tile', 'Image on top']] },
-        { k: 'width', t: 'range', l: 'Card width (side-scroller)', min: 120, max: 320, unit: 'px', when: (b) => b.layout === 'scroll' },
+        { k: 'width', t: 'range', l: 'Card width', min: 120, max: 320, unit: 'px', when: (b) => b.layout === 'scroll' },
         { k: 'imgSize', t: 'range', l: 'Image size', min: 40, max: 120, unit: 'px', when: (b) => b.variant === 'pill' },
         { k: 'aspect', t: 'select', l: 'Image shape', opts: TD.ASPECTS.filter((a) => a[0] !== 'auto'), when: (b) => b.variant === 'tile' },
         { k: 'items', t: 'list', l: 'Cards', itemName: 'Card', itemLabel: (i) => i.name || 'Card',
@@ -204,7 +206,7 @@
         { k: 'single', t: 'checkbox', l: 'Only one open at a time' },
         { k: 'items', t: 'list', l: 'Dropdowns', itemName: 'Dropdown', itemLabel: (i) => TD.iconLabel(i.icon) + (i.title || 'Dropdown'),
           item: [
-            { k: 'icon', t: 'emoji', l: 'Icon (emoji)' },
+            { k: 'icon', t: 'emoji', l: 'Icon' },
             { k: 'title', t: 'text', l: 'Title', rich: true },
             { k: 'body', t: 'textarea', l: 'Content', rich: true },
             { k: 'image', t: 'image', l: 'Image inside (optional)' },
@@ -220,18 +222,22 @@
     slides: {
       name: 'Slides', icon: '🎞️', desc: 'Swipeable carousel with dots and autoplay',
       fields: [
-        { k: 'heading', t: 'text', l: 'Header (optional)', rich: true, ph: 'Welcome our new members', hint: 'Shows at the top, with the slides inside the same card.' },
+        { group: 'Header (optional)', open: (b) => !!b.heading, fields: [
+        { k: 'heading', t: 'text', l: 'Header', rich: true, ph: 'Welcome our new members', hint: 'Shows at the top, with the slides inside the same card.' },
         { k: 'headSub', t: 'text', l: 'Text under the header (optional)', rich: true, when: (b) => !!b.heading },
-        { k: 'headPos', t: 'select', l: 'Header layout', opts: [['above', 'Above the photos'], ['over', 'On top of the photos (photos fill the card)']], when: (b) => !!b.heading },
+        { k: 'headPos', t: 'select', l: 'Header layout', opts: [['above', 'Above the photos'], ['over', 'On top of the photos']], hint: 'On top: the photos fill the whole card.', when: (b) => !!b.heading },
         { k: 'headAlign', t: 'select', l: 'Header alignment', opts: [['left', 'Left'], ['center', 'Center']], when: (b) => !!b.heading },
+        ] },
         { k: 'aspect', t: 'select', l: 'Slide shape', opts: TD.ASPECTS.filter((a) => a[0] !== 'auto') },
         { k: 'captions', t: 'select', l: 'Captions', opts: [['overlay', 'On the image'], ['below', 'Below the image'], ['none', 'Hidden']] },
+        { group: 'Motion and controls', fields: [
         { k: 'kb', t: 'checkbox', l: 'Slow zoom on photos, names slide in', hint: 'Each photo slowly zooms while it’s showing, and its title and caption glide up.' },
         { k: 'peek', t: 'checkbox', l: 'Show edge of next slide', when: (b) => !(b.heading && b.headPos === 'over') },
         { k: 'dots', t: 'checkbox', l: 'Show dots' },
         { k: 'arrows', t: 'checkbox', l: 'Show arrows' },
         { k: 'autoplay', t: 'checkbox', l: 'Autoplay' },
         { k: 'interval', t: 'range', l: 'Seconds per slide', min: 2, max: 20, unit: 's', when: (b) => b.autoplay },
+        ] },
         { k: 'items', t: 'list', l: 'Slides', itemName: 'Slide', itemLabel: (i) => i.title || 'Slide',
           item: [
             { k: 'image', t: 'image', l: 'Image' },
@@ -291,9 +297,11 @@
         { k: 'max', t: 'range', l: 'How many events', min: 1, max: 10 },
         { k: 'tz', t: 'select', l: 'Time zone', opts: TD.TIMEZONES },
         { k: 'detail', t: 'checkbox', l: 'Tap opens event details sheet' },
-        { k: 'proxies', t: 'checkbox', l: 'Retry through public proxies if blocked', hint: 'Needed when the page is not on the same Squarespace site.' },
-        { k: 'loading', t: 'text', l: 'Loading message' },
-        { k: 'error', t: 'text', l: 'Error message' },
+        { group: 'More options', fields: [
+          { k: 'proxies', t: 'checkbox', l: 'Retry through public proxies if blocked', hint: 'Needed when the page is not on the same Squarespace site.' },
+          { k: 'loading', t: 'text', l: 'Loading message' },
+          { k: 'error', t: 'text', l: 'Error message' },
+        ] },
       ],
       defaults: () => ({ url: 'https://www.example.com/events?format=json', max: 3, tz: 'America/Chicago', detail: true, proxies: true, loading: 'Loading events…', error: 'Could not load upcoming events.' }),
       summary: (b) => b.url,
@@ -313,22 +321,24 @@
         { k: 'label', t: 'text', l: 'Label', rich: true },
         { k: 'sub', t: 'text', l: 'Subheading (optional)', rich: true, hint: 'With a subheading, the label shows as a bold heading above it.' },
         { k: 'target', t: 'datetime', l: 'Counts down to' },
-        { k: 'cdStyle', t: 'select', l: 'Number style', opts: [['boxes', 'Boxes'], ['slot', 'Slot machine (numbers roll up, no boxes)']] },
+        { k: 'cdStyle', t: 'select', l: 'Number style', opts: [['boxes', 'Boxes'], ['slot', 'Slot machine']], hint: 'Slot machine: the numbers roll up, with no boxes.' },
         { k: 'tz', t: 'select', l: 'Time zone', opts: TD.TIMEZONES },
         { k: 'done', t: 'text', l: 'Text when finished' },
         { k: 'hideDone', t: 'checkbox', l: 'Hide the block when finished' },
         { k: 'btnLabel', t: 'text', l: 'Button text', ph: 'Learn more' },
         { k: 'action', t: 'action', l: 'Button action', hint: 'The button shows once this does something.' },
-        { group: 'Second link (optional)', fields: [
+        { group: 'Second link (optional)', open: (b) => !!b.link2Label, fields: [
           { k: 'link2Label', t: 'text', l: 'Text', ph: 'Serve at Block Party' },
           { k: 'link2Icon', t: 'text', l: 'Emoji before the text (optional)', ph: '🙌' },
           { k: 'link2Style', t: 'select', l: 'Style', opts: [['strip', 'Bar along the bottom of the card'], ['pair', 'Outline button next to the first one']] },
           { k: 'action2', t: 'action', l: 'Opens', hint: 'Shows once this does something, e.g. your serving sign-up form.' },
         ] },
-        { k: 'image', t: 'image', l: 'Photo (optional)' },
+        { group: 'Photo (optional)', open: (b) => !!b.image, fields: [
+        { k: 'image', t: 'image', l: 'Photo' },
         { k: 'imgLayout', t: 'select', l: 'Photo placement', opts: [['top', 'Above the countdown'], ['bg', 'Behind the countdown']], when: (b) => !!b.image },
         { k: 'aspect', t: 'select', l: 'Photo shape', opts: TD.ASPECTS.filter((a) => a[0] !== 'auto'), when: (b) => !!b.image && b.imgLayout !== 'bg' },
         { k: 'dim', t: 'range', l: 'Darken photo', min: 0, max: 90, unit: '%', when: (b) => !!b.image && b.imgLayout === 'bg', hint: 'Keeps the numbers readable on top of the photo.' },
+        ] },
       ],
       defaults: () => ({ label: 'Christmas Eve service starts in', target: '', tz: 'America/Chicago', done: 'Happening now!', hideDone: false, cdStyle: 'boxes', sub: '', btnLabel: 'Learn more', action: TD.newAction('link'), link2Label: '', link2Icon: '', link2Style: 'strip', action2: TD.newAction('link'), image: '', imgLayout: 'top', aspect: '16/9', dim: 50 }),
       summary: (b) => b.label,
@@ -393,7 +403,7 @@
       { k: 'title', t: 'text', l: 'Title', rich: true },
       { k: 'when', t: 'text', l: 'Date and time (optional)', ph: 'Sunday, Nov 9 · 10:45 AM' },
       { k: 'intro', t: 'textarea', l: 'Text under the title (optional)', rich: true },
-      { k: 'layout', t: 'select', l: 'Layout', opts: [['below', 'Text and button under the photo'], ['over', 'Text and button on top of the photo']],
+      { k: 'layout', t: 'select', l: 'Text placement', opts: [['below', 'Under the photo'], ['over', 'On top of the photo']],
         hint: 'With a form, the form itself stays under the photo.' },
       { k: 'align', t: 'select', l: 'Text alignment', opts: [['left', 'Left'], ['center', 'Center']] },
       { group: 'Photo or video', open: true, fields: [
@@ -402,13 +412,15 @@
         { k: 'video', t: 'video', l: 'Video', when: (b) => b.media === 'video',
           hint: 'Upload a short clip (under 6 MB) or paste a link to an .mp4 file (Dropbox share links work). It plays muted, like a moving photo.' },
         { k: 'image', t: 'image', l: 'Cover photo while the video loads (optional)', when: (b) => b.media === 'video' },
-        { k: 'zoom', t: 'range', l: 'Zoom', min: 100, max: 300, unit: '%' },
-        { k: 'posX', t: 'range', l: 'Move left / right', min: 0, max: 100, unit: '%', hint: '0 shows the left edge, 100 the right edge.' },
-        { k: 'posY', t: 'range', l: 'Move up / down', min: 0, max: 100, unit: '%', hint: '0 shows the top, 100 the bottom.' },
         { k: 'shade', t: 'range', l: 'Darken behind the text', min: 0, max: 90, unit: '%' },
-        { k: 'height', t: 'range', l: 'Banner height', min: 160, max: 420, unit: 'px' },
+        { group: 'Zoom, position and height', fields: [
+        { k: 'zoom', t: 'range', l: 'Zoom', min: 100, max: 300, unit: '%' },
+        { k: 'posX', t: 'range', l: 'Left / right', min: 0, max: 100, unit: '%', hint: '0 shows the left edge, 100 the right edge.' },
+        { k: 'posY', t: 'range', l: 'Up / down', min: 0, max: 100, unit: '%', hint: '0 shows the top, 100 the bottom.' },
+                { k: 'height', t: 'range', l: 'Banner height', min: 160, max: 420, unit: 'px' },
+        ] },
       ] },
-      { k: 'signup', t: 'select', l: 'Under the title', opts: [['link', 'A button'], ['form', 'A form on this page'], ['none', 'Nothing']],
+      { k: 'signup', t: 'select', l: 'Under the title', opts: [['link', 'A button'], ['form', 'A form'], ['none', 'Nothing']],
         hint: 'A form’s answers show in the portal with your Connect card answers.' },
       { k: 'btnLabel', t: 'text', l: 'Button text', when: (b) => b.signup === 'link' },
       { k: 'action', t: 'action', l: 'Button opens', when: (b) => b.signup === 'link' },
@@ -494,12 +506,12 @@
   // ── Pop-up menus (bottom sheets, like “Next Steps”) ──────────────────
   TD.newSheet = () => ({ id: TD.uid('s'), title: 'Menu', subtitle: '', icon: '✚', items: [] });
   TD.SHEET_FIELDS = [
-    { k: 'icon', t: 'emoji', l: 'Icon (emoji)' },
+    { k: 'icon', t: 'emoji', l: 'Icon' },
     { k: 'title', t: 'text', l: 'Title', rich: true },
     { k: 'subtitle', t: 'text', l: 'Subtitle', rich: true },
     { k: 'items', t: 'list', l: 'Menu items', itemName: 'Item', itemLabel: (i) => TD.iconLabel(i.icon) + (i.title || 'Item'),
       item: [
-        { k: 'icon', t: 'emoji', l: 'Icon (emoji)' },
+        { k: 'icon', t: 'emoji', l: 'Icon' },
         { k: 'iconBg', t: 'color', l: 'Icon background' },
         { k: 'title', t: 'text', l: 'Title', rich: true },
         { k: 'desc', t: 'text', l: 'Description', rich: true },
@@ -512,13 +524,13 @@
   TD.THEME_FIELDS = [
     { group: 'Colors', open: true, fields: [
       { k: 'bg', t: 'color', l: 'Page background' },
-      { k: 'card', t: 'color', l: 'Card color' },
-      { k: 'card2', t: 'color', l: 'Card pressed color' },
+      { k: 'card', t: 'color', l: 'Cards' },
+      { k: 'card2', t: 'color', l: 'Cards when pressed' },
       { k: 'text', t: 'color', l: 'Text' },
       { k: 'muted', t: 'color', l: 'Secondary text' },
       { k: 'accent', t: 'color', l: 'Accent' },
       { k: 'accentText', t: 'color', l: 'Text on accent buttons' },
-      { k: 'sheetBg', t: 'color', l: 'Pop-up sheet background' },
+      { k: 'sheetBg', t: 'color', l: 'Pop-up background' },
     ] },
     { group: 'Shape & spacing', open: true, fields: [
       { k: 'radius', t: 'range', l: 'Card corner radius', min: 0, max: 40, unit: 'px' },
