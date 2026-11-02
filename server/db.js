@@ -99,6 +99,15 @@ const SCHEMA = [
     label TEXT NOT NULL DEFAULT '',
     visit TEXT NOT NULL DEFAULT ''
   )`,
+  // Stats links: a read-only page of a church's tap stats (and, if allowed, connect card answers)
+  // for churches whose pages someone else edits. One link per church. See shares.js.
+  `CREATE TABLE IF NOT EXISTS shares (
+    church_id TEXT PRIMARY KEY,
+    token TEXT NOT NULL UNIQUE,
+    answers INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    created_by TEXT
+  )`,
   'CREATE INDEX IF NOT EXISTS events_page ON events (church_id, page_id, at)',
   'CREATE INDEX IF NOT EXISTS members_email ON members (email)',
   'CREATE INDEX IF NOT EXISTS sessions_email ON sessions (email)',

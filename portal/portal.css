@@ -180,3 +180,14 @@ dialog:has(.newpage) { width: min(1080px, calc(100vw - 24px)); }
   #tplBtn .lbl { display: none; }
   .card { padding: 16px; }
 }
+
+/* stats link page and the Share stats dialog */
+.check { flex-direction: row; align-items: flex-start; gap: 10px; font-weight: 500; cursor: pointer; }
+.check input { width: auto; margin: 3px 0 0; accent-color: var(--btn); }
+.check > span { display: flex; flex-direction: column; gap: 2px; }
+.topname { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.topname:not(:empty)::before { content: '·'; margin-right: 10px; }
+.head .sub { margin: 4px 0 0; }
+.overview { display: flex; flex-direction: column; gap: 16px; }
+.page .taplist { max-height: none; }
+.foot { margin-top: 32px; text-align: center; }

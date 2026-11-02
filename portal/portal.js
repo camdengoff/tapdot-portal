@@ -65,12 +65,16 @@
     return svg;
   }
 
+  // On the stats link page (stats.html), everything is read-only and comes from /api/shared/<token>.
+  const SHARE = document.body.dataset.mode === 'shared' ? location.hash.slice(1) : null;
+  const cbase = (church) => SHARE ? '/shared/' + enc(SHARE) : '/churches/' + enc(church.id);
+
   async function api(path, opts) {
     opts = opts || {};
     const init = { method: opts.method || 'GET', credentials: 'same-origin', headers: {} };
     if (opts.body !== undefined) { init.headers['Content-Type'] = 'application/json'; init.body = JSON.stringify(opts.body); }
     const r = await fetch('/api' + path, init);
-    if (r.status === 401) { location.replace('/app/login.html'); throw new Error('Please sign in.'); }
+    if (r.status === 401 && !SHARE) { location.replace('/app/login.html'); throw new Error('Please sign in.'); }
     const data = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(data.error || 'Something went wrong. Please try again.');
     return data;
@@ -128,9 +132,10 @@
   // ── State and routing ────────────────────────────────────────────────
   let me = null;
   const route = () => decodeURIComponent(location.hash.slice(1));
-  window.addEventListener('hashchange', () => { if (me) draw(); });
+  window.addEventListener('hashchange', () => { if (SHARE) location.reload(); else if (me) draw(); });
 
   async function start() {
+    if (SHARE !== null) return drawShared('30');
     try { me = await api('/me'); } catch (e) { return; }
     const acct = $('#acctBtn');
     acct.hidden = false;
@@ -292,6 +297,7 @@
           await api('/churches/' + enc(church.id), { method: 'PATCH', body: { name: v.name } }); me = await api('/me'); draw();
         }) }, 'Rename') : null,
         h('div', { class: 'grow' }),
+        manage ? h('button', { class: 'ghost', title: 'A read-only page of this church’s tap stats, for people who don’t edit', onclick: () => shareDialog(church) }, '📊 Share stats') : null,
         h('button', { class: 'primary', onclick: () => newPage(church) }, '+ New page')),
       pages.length ? h('div', { class: 'grid' }, pages.map(pageCard))
         : h('div', { class: 'card center muted' }, 'No pages yet. Create one to start editing.'),
@@ -449,7 +455,7 @@
     dlg.onclose = null;
     if (!dlg.open) dlg.showModal();
     let data;
-    try { data = await api('/churches/' + enc(church.id) + '/stats?days=' + n); }
+    try { data = await api(cbase(church) + '/stats?days=' + n); }
     catch (e) { fill(body, h('p', null, e.message)); return; }
     const days = lastDays(n);
     const t = sumStats(data.pages[p.id], days);
@@ -495,9 +501,9 @@
     dlg.onclose = reload;
     dlg.showModal();
     let list;
-    try { list = (await api('/churches/' + enc(church.id) + '/responses?page=' + enc(p.id))).responses; }
+    try { list = (await api(cbase(church) + '/responses?page=' + enc(p.id))).responses; }
     catch (e) { fill(body, h('p', null, e.message)); return; }
-    api('/churches/' + enc(church.id) + '/responses/seen', { method: 'POST', body: { page: p.id } }).catch(() => { /* stays "new" */ });
+    if (!SHARE) api('/churches/' + enc(church.id) + '/responses/seen', { method: 'POST', body: { page: p.id } }).catch(() => { /* stays "new" */ });
     const draw = () => fill(body,
       h('div', { class: 'row' }, h('h2', { class: 'grow' }, 'Connect card answers'),
         list.length ? h('button', { class: 'ghost sm', onclick: () => {
@@ -510,7 +516,7 @@
           h('b', { class: 'grow' }, r.form),
           r.seen ? null : h('span', { class: 'pill ok' }, 'New'),
           h('span', { class: 'muted small' }, when(r.createdAt)),
-          h('button', { class: 'ghost sm danger', title: 'Delete this answer', onclick: act(async () => {
+          SHARE ? null : h('button', { class: 'ghost sm danger', title: 'Delete this answer', onclick: act(async () => {
             if (!confirm('Delete this answer for good?')) return;
             await api('/churches/' + enc(church.id) + '/responses/' + enc(r.id), { method: 'DELETE' });
             list = list.filter((x) => x !== r); draw();
@@ -539,7 +545,7 @@
         h('button', { class: 'ghost sm', title: 'Day after', disabled: isToday, onclick: () => { day.setDate(day.getDate() + 1); load(); } }, '›'));
       fill(wrap, head, h('p', { class: 'muted small' }, 'Loading…'));
       let r;
-      try { r = await api('/churches/' + enc(church.id) + '/activity?page=' + enc(p.id) + '&from=' + from + '&to=' + next.getTime()); }
+      try { r = await api(cbase(church) + '/activity?page=' + enc(p.id) + '&from=' + from + '&to=' + next.getTime()); }
       catch (e) { fill(wrap, head, h('p', { class: 'muted' }, e.message)); return; }
       const ev = r.events;
       if (!ev.length) {
@@ -576,6 +582,112 @@
     }
     load();
     return wrap;
+  }
+
+  // ── Stats link: owners make a read-only stats page to send a church ──
+  async function shareDialog(church) {
+    const dlg = $('#dlg');
+    const body = h('div', { class: 'dlgform' }, h('p', { class: 'muted' }, 'Loading…'));
+    fill($('#dlgBody'), body);
+    dlg.onclose = null;
+    if (!dlg.open) dlg.showModal();
+    const url = '/churches/' + enc(church.id) + '/share';
+    let share;
+    try { share = (await api(url)).share; } catch (e) { fill(body, h('p', null, e.message)); return; }
+    const answersBox = h('input', { type: 'checkbox', checked: share ? share.answers : false, onchange: act(async (e) => {
+      if (!share) return;
+      share = (await api(url, { method: 'PATCH', body: { answers: e.target.checked } })).share;
+      toast(share.answers ? 'The link now shows connect card answers' : 'The link no longer shows connect card answers');
+    }) });
+    const intro = h('p', { class: 'muted' }, 'A link to a page with only ' + church.name + '’s tap stats: visits, button taps and the activity log for each page. Nobody needs to sign in, and nothing on it can be changed. Anyone with the link can see it.');
+    const check = h('label', { class: 'check' }, answersBox,
+      h('span', null, 'Also show connect card answers', h('span', { class: 'muted small' }, 'Names, emails and anything else people sent through forms on the pages.')));
+    const close = h('button', { class: 'ghost', onclick: () => dlg.close() }, 'Close');
+    if (!share) {
+      fill(body, h('h2', null, 'Share stats'), intro, check,
+        h('div', { class: 'row end' }, close, h('button', { class: 'primary', onclick: act(async () => {
+          await api(url, { method: 'POST', body: { answers: answersBox.checked } });
+          shareDialog(church);
+        }) }, 'Make link')));
+      return;
+    }
+    fill(body, h('h2', null, 'Share stats'), intro,
+      h('input', { type: 'text', value: share.link, readOnly: true, onfocus: (e) => e.target.select(), class: 'mono' }),
+      h('div', { class: 'row wrap' },
+        h('button', { class: 'primary', onclick: () => copy(share.link, 'Stats link copied') }, 'Copy link'),
+        h('a', { class: 'ghost btn', href: share.link, target: '_blank', rel: 'noopener' }, '↗ Open')),
+      check,
+      h('p', { class: 'muted small' }, 'Made ' + when(share.createdAt) + (share.createdBy ? ' by ' + share.createdBy : '') + '.'),
+      h('div', { class: 'row end wrap' },
+        h('button', { class: 'ghost danger', onclick: act(async () => {
+          if (!confirm('Turn off this stats link? Anyone who has it will see “turned off”.')) return;
+          await api(url, { method: 'DELETE' }); toast('Stats link turned off'); shareDialog(church);
+        }) }, 'Turn off'),
+        h('button', { class: 'ghost', onclick: act(async () => {
+          if (!confirm('Make a new link? The old one stops working.')) return;
+          await api(url, { method: 'POST', body: {} }); toast('New link made'); shareDialog(church);
+        }) }, 'New link'),
+        close));
+  }
+
+  // ── The stats link page: one church's numbers, read-only ─────────────
+  async function drawShared(n) {
+    n = +n || 30;
+    const main = $('#main');
+    if (!SHARE) { fill(main, h('div', { class: 'card center' }, h('h1', null, 'Link not complete'), h('p', { class: 'muted' }, 'This stats link is missing its code. Copy the whole link and try again.'))); return; }
+    let info, data;
+    try { [info, data] = await Promise.all([api(cbase()), api(cbase() + '/stats?days=' + n)]); }
+    catch (e) { fill(main, h('div', { class: 'card center' }, h('h1', null, 'Stats not available'), h('p', { class: 'muted' }, e.message))); return; }
+    const church = info.church;
+    document.title = church.name + ' · Tap stats';
+    $('#topName').textContent = church.name;
+    const days = lastDays(n);
+    const pages = info.pages.filter((p) => p.publishedAt || data.pages[p.id]);
+    const per = pages.map((p) => ({ p, t: sumStats(data.pages[p.id], days) }));
+    const sum = (k) => per.reduce((a, x) => a + x.t[k], 0);
+    const views = days.map((_, i) => per.reduce((a, x) => a + x.t.views[i], 0));
+    const totalViews = sum('totalViews');
+    const totalTaps = sum('totalTaps');
+    const rangeSel = h('select', { class: 'sm', 'aria-label': 'Time range', onchange: (e) => drawShared(e.target.value) },
+      [[7, 'Last 7 days'], [30, 'Last 30 days'], [90, 'Last 90 days'], [365, 'Last year']].map(([v, l]) => h('option', { value: v, selected: v === n }, l)));
+    const answers = info.responses || {};
+
+    const card = ({ p, t }) => {
+      const top = t.buttons.slice(0, 3);
+      const maxB = top.length ? top[0][1] : 1;
+      return h('div', { class: 'card page' },
+        h('div', { class: 'pagehead' }, h('b', null, p.name),
+          p.publishedAt ? h('span', { class: 'pill ok' }, 'Live') : h('span', { class: 'pill' }, 'Not live')),
+        h('button', { class: 'stats', title: 'See details and the activity log', onclick: () => showStats(church, p, n) },
+          h('div', { class: 'statnums' },
+            h('span', null, h('b', null, t.totalViews.toLocaleString()), ' ', t.totalViews === 1 ? 'visit' : 'visits'),
+            h('span', { class: 'muted small' }, t.totalTaps ? plural(t.totalTaps, 'button tap', 'button taps') : 'No taps yet')),
+          bars(days, t.views)),
+        top.length ? h('div', { class: 'taplist' }, top.map(([label, c]) => h('div', { class: 'tapRow' },
+          h('span', { class: 'tapLabel', title: label }, label),
+          h('span', { class: 'tapBar' }, h('i', { style: 'width:' + Math.max(3, (c / maxB) * 100) + '%' })),
+          h('b', null, c.toLocaleString())))) : null,
+        info.answers && answers[p.id] ? h('button', { class: 'answers', onclick: () => showResponses(church, p, () => {}) },
+          '📥 ', plural(answers[p.id].total, 'connect card answer', 'connect card answers')) : null,
+        h('div', { class: 'row wrap' },
+          h('button', { class: 'ghost', onclick: () => showStats(church, p, n) }, '📊 Details'),
+          p.publishedAt ? h('a', { class: 'ghost btn', href: location.origin + '/view/' + church.id + '/' + p.id, target: '_blank', rel: 'noopener' }, '↗ See the page') : null));
+    };
+
+    fill(main,
+      h('div', { class: 'head' },
+        h('div', { class: 'grow' }, h('h1', null, church.name), h('p', { class: 'muted sub' }, 'How people are using your tap pages')),
+        rangeSel),
+      h('div', { class: 'card overview' },
+        h('div', { class: 'statbig' },
+          h('div', null, h('b', null, totalViews.toLocaleString()), h('span', { class: 'muted small' }, totalViews === 1 ? 'visit' : 'visits')),
+          h('div', null, h('b', null, totalTaps.toLocaleString()), h('span', { class: 'muted small' }, totalTaps === 1 ? 'button tap' : 'button taps')),
+          h('div', null, h('b', null, totalViews ? Math.round((totalTaps / totalViews) * 10) / 10 : 0), h('span', { class: 'muted small' }, 'taps per visit'))),
+        h('div', { class: 'chart' }, bars(days, views, true),
+          h('div', { class: 'row muted small' }, h('span', { class: 'grow' }, shortDay(days[0])), h('span', null, 'Today')))),
+      h('div', { class: 'head' }, h('h2', null, pages.length === 1 ? 'Your page' : 'Your pages')),
+      per.length ? h('div', { class: 'grid' }, per.map(card)) : h('div', { class: 'card center muted' }, 'No pages are live yet.'),
+      h('p', { class: 'muted small foot' }, 'A visit counts once per person every 30 minutes. No cookies are used and nothing about visitors is stored. Bookmark this page to come back to it.'));
   }
 
   // ── Account: name, password, sign out ────────────────────────────────

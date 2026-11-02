@@ -37,6 +37,10 @@ every Publish updates the live page.
   (D1 table `stats`, about 400 days), with no cookies and nothing about the visitor. The Activity log under
   the stats lists each visit and tap with its time for any day (D1 table `events`, kept 90 days), with taps
   grouped under their visit by a random per-tab id.
+- **Stats link (for churches you edit for):** owners and admins click 📊 Share stats on a church to make a
+  link to a read-only page (`/app/stats#<code>`) with only that church's tap stats: totals, a chart, each
+  page's visits and top buttons, and the details/activity log. No sign-in, nothing can be edited. A
+  checkbox also shows connect card answers. New link replaces the old one; Turn off stops it (D1 `shares`).
 - **Photo and PDF viewer:** any button or link can "Show a photo or PDF (full screen)", with optional pill
   buttons pinned along the bottom of the viewer. In the portal the file is uploaded to `/api/files/<church>`
   and kept in KV as `file:<church>/<id>` (up to 20 MB, JPG/PNG/GIF/WebP/PDF), served publicly at
@@ -127,7 +131,7 @@ Run `node tools/build.js` after changing `portal/`, `public/` or the editor.
 - `portal/`: the client portal pages (copied to `dist/app/` by the build)
 - `public/embed.js`: the loader that the live-page code block uses
 - `functions/` and `server/`: the portal API on Cloudflare Pages Functions (`server/api.js` routes,
-  `server/auth.js` sign-in, `server/db.js` tables, `server/stats.js` tap stats, `server/forms.js` connect card answers, `server/templates.js` templates)
+  `server/auth.js` sign-in, `server/db.js` tables, `server/stats.js` tap stats, `server/forms.js` connect card answers, `server/templates.js` templates, `server/shares.js` stats links)
 
 ## Pop-up proxy (for sites that won't open in a pop-up)
 

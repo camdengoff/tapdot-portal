@@ -12,6 +12,7 @@ import * as stats from './stats.js';
 import * as forms from './forms.js';
 import * as templates from './templates.js';
 import * as files from './files.js';
+import * as shares from './shares.js';
 
 const MAX_BODY = 20 * 1024 * 1024;
 
@@ -122,6 +123,9 @@ export async function handle({ request, env, waitUntil }) {
       throw new HttpError(404, 'Not found.');
     }
 
+    // A church's stats link: read-only stats for whoever has it (see shares.js).
+    if (parts[0] === 'shared') return json(await shares.route({ d, parts, url, method: M }), 200, { 'X-Robots-Tag': 'noindex' });
+
     // ── Everything else needs a signed-in person ─────────────────────
     const user = await auth.currentUser(d, env, request);
     if (!user) throw new HttpError(401, 'Please sign in.');
@@ -193,6 +197,7 @@ export async function handle({ request, env, waitUntil }) {
           d.prepare('DELETE FROM events WHERE church_id = ?').bind(churchId),
           d.prepare('DELETE FROM responses WHERE church_id = ?').bind(churchId),
           d.prepare('DELETE FROM members WHERE church_id = ?').bind(churchId),
+          d.prepare('DELETE FROM shares WHERE church_id = ?').bind(churchId),
           d.prepare('DELETE FROM churches WHERE id = ?').bind(churchId),
         ]);
         return json({ ok: true });
@@ -217,6 +222,11 @@ export async function handle({ request, env, waitUntil }) {
     if (route('GET', 3) && parts[2] === 'activity') {
       const p = await pageRow(d, churchId, url.searchParams.get('page'));
       return json(await stats.activity(d, churchId, p.id, url.searchParams.get('from'), url.searchParams.get('to')));
+    }
+    if (parts[2] === 'share' && parts.length === 3) {
+      if (!canManage(role)) throw new HttpError(403, 'Only a church owner can share stats.');
+      const b = M === 'POST' || M === 'PATCH' ? await body(request) : null;
+      return json(await shares.manage({ d, request, user, churchId, method: M, b }));
     }
     if (route('GET', 3) && parts[2] === 'stats') return json(await stats.churchStats(d, churchId, url.searchParams.get('days')));
 
