@@ -464,20 +464,23 @@
       h('div', { class: 'row' }, h('h2', { class: 'grow' }, p.name),
         h('select', { class: 'sm', onchange: (e) => showStats(church, p, +e.target.value) },
           [[7, 'Last 7 days'], [30, 'Last 30 days'], [90, 'Last 90 days'], [365, 'Last year']].map(([v, l]) => h('option', { value: v, selected: v === n }, l)))),
-      h('div', { class: 'statbig' },
-        h('div', null, h('b', null, t.totalViews.toLocaleString()), h('span', { class: 'muted small' }, t.totalViews === 1 ? 'visit' : 'visits')),
-        h('div', null, h('b', null, t.totalTaps.toLocaleString()), h('span', { class: 'muted small' }, t.totalTaps === 1 ? 'button tap' : 'button taps')),
-        h('div', null, h('b', null, t.totalViews ? Math.round((t.totalTaps / t.totalViews) * 10) / 10 : 0), h('span', { class: 'muted small' }, 'taps per visit'))),
-      h('div', { class: 'chart' }, bars(days, t.views, true),
-        h('div', { class: 'row muted small' }, h('span', { class: 'grow' }, shortDay(days[0])), h('span', null, 'Today'))),
-      h('h3', null, 'Buttons tapped'),
-      t.buttons.length
-        ? h('div', { class: 'taplist' }, t.buttons.map(([label, c]) => h('div', { class: 'tapRow' },
-          h('span', { class: 'tapLabel', title: label }, label),
-          h('span', { class: 'tapBar' }, h('i', { style: 'width:' + Math.max(3, (c / maxB) * 100) + '%' })),
-          h('b', null, c.toLocaleString()))))
-        : h('p', { class: 'muted' }, 'No taps in this time yet.'),
-      activityLog(church, p),
+      // Wide screens: totals, chart and buttons on the left, the activity log on the right.
+      h('div', { class: 'statcols' },
+        h('div', { class: 'statcol' },
+          h('div', { class: 'statbig' },
+            h('div', null, h('b', null, t.totalViews.toLocaleString()), h('span', { class: 'muted small' }, t.totalViews === 1 ? 'visit' : 'visits')),
+            h('div', null, h('b', null, t.totalTaps.toLocaleString()), h('span', { class: 'muted small' }, t.totalTaps === 1 ? 'button tap' : 'button taps')),
+            h('div', null, h('b', null, t.totalViews ? Math.round((t.totalTaps / t.totalViews) * 10) / 10 : 0), h('span', { class: 'muted small' }, 'taps per visit'))),
+          h('div', { class: 'chart' }, bars(days, t.views, true),
+            h('div', { class: 'row muted small' }, h('span', { class: 'grow' }, shortDay(days[0])), h('span', null, 'Today'))),
+          h('h3', null, 'Buttons tapped'),
+          t.buttons.length
+            ? h('div', { class: 'taplist' }, t.buttons.map(([label, c]) => h('div', { class: 'tapRow' },
+              h('span', { class: 'tapLabel', title: label }, label),
+              h('span', { class: 'tapBar' }, h('i', { style: 'width:' + Math.max(3, (c / maxB) * 100) + '%' })),
+              h('b', null, c.toLocaleString()))))
+            : h('p', { class: 'muted' }, 'No taps in this time yet.')),
+        h('div', { class: 'statcol' }, activityLog(church, p))),
       h('p', { class: 'muted small' }, 'A visit counts once per person every 30 minutes. Visits are counted on the site’s code block and the live link. No cookies are used and nothing about visitors is stored.'),
       h('div', { class: 'row end' }, h('button', { class: 'ghost', onclick: () => dlg.close() }, 'Close')));
   }
@@ -653,7 +656,7 @@
     const answers = info.responses || {};
 
     const card = ({ p, t }) => {
-      const top = t.buttons.slice(0, 3);
+      const top = t.buttons.slice(0, 5);
       const maxB = top.length ? top[0][1] : 1;
       return h('div', { class: 'card page' },
         h('div', { class: 'pagehead' }, h('b', null, p.name),
@@ -678,7 +681,7 @@
       h('div', { class: 'head' },
         h('div', { class: 'grow' }, h('h1', null, church.name), h('p', { class: 'muted sub' }, 'How people are using your tap pages')),
         rangeSel),
-      h('div', { class: 'card overview' },
+      h('div', { class: 'card overview wideov' },
         h('div', { class: 'statbig' },
           h('div', null, h('b', null, totalViews.toLocaleString()), h('span', { class: 'muted small' }, totalViews === 1 ? 'visit' : 'visits')),
           h('div', null, h('b', null, totalTaps.toLocaleString()), h('span', { class: 'muted small' }, totalTaps === 1 ? 'button tap' : 'button taps')),
