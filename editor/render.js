@@ -1297,8 +1297,8 @@ fieldset.td-bad legend,.td-f-check.td-bad span{color:#ef4444}
     if (opts.preview) {
       script += '\n<script>document.addEventListener("click",function(e){if(!e.altKey&&!window.TD_PICK)return;var b=e.target.closest("[data-td-id]");if(!b)return;e.preventDefault();e.stopPropagation();parent.postMessage({tdSelect:b.getAttribute("data-td-id")},"*")},true);' +
         '(function(){var t;function sc(){return document.getElementById("td-root")||document.scrollingElement}addEventListener("scroll",function(){clearTimeout(t);t=setTimeout(function(){var r=sc();if(r)parent.postMessage({tdScrollY:r.scrollTop},"*")},80)},true);addEventListener("message",function(e){if(e.data&&typeof e.data.tdScrollTo==="number"){var r=sc();if(r)r.scrollTop=e.data.tdScrollTo}})})();' +
-        'window.addEventListener("message",function(e){if(e.data&&"tdPick" in e.data){window.TD_PICK=e.data.tdPick;document.documentElement.classList.toggle("td-picking",!!e.data.tdPick)}if(e.data&&e.data.tdFlash){var el=document.querySelector("[data-td-id=\\""+e.data.tdFlash+"\\"]");if(el){el.scrollIntoView({block:"center",behavior:"smooth"});el.animate([{outline:"3px solid #7c9cff",outlineOffset:"3px"},{outline:"3px solid transparent",outlineOffset:"3px"}],{duration:1200})}}});</' + 'script>' +
-        '<style>.td-picking [data-td-id]{cursor:crosshair}.td-picking [data-td-id]:hover{outline:2px dashed #7c9cff;outline-offset:2px}</style>';
+        'window.addEventListener("message",function(e){if(e.data&&"tdPick" in e.data){window.TD_PICK=e.data.tdPick;document.documentElement.classList.toggle("td-picking",!!e.data.tdPick)}if(e.data&&e.data.tdFlash){var el=document.querySelector("[data-td-id=\\""+e.data.tdFlash+"\\"]");if(el){el.scrollIntoView({block:"center",behavior:"smooth"});el.animate([{outline:"3px solid #ff5e1f",outlineOffset:"3px"},{outline:"3px solid transparent",outlineOffset:"3px"}],{duration:1200})}}});</' + 'script>' +
+        '<style>.td-picking [data-td-id]{cursor:crosshair}.td-picking [data-td-id]:hover{outline:2px dashed #ff5e1f;outline-offset:2px}</style>';
     }
     let embed = '';
     if (opts.embed) {
