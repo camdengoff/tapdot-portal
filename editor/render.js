@@ -344,6 +344,15 @@
       return '<div class="td-events" data-td-events="' + esc(safeUrl(b.url)) + '" data-td-max="' + (+b.max || 3) + '" data-td-tz="' + esc(b.tz) + '" data-td-detail="' + (b.detail ? 1 : 0) + '" data-td-proxies="' + (b.proxies ? 1 : 0) + '" data-td-error="' + esc(b.error) + '">' +
         '<div class="td-events-msg td-card">' + esc(b.loading) + '</div></div>';
     },
+    feed(b, ctx) {
+      ctx.usesFeed = true;
+      const d = (k, v) => ' data-td-' + k + '="' + esc(v) + '"';
+      const url = safeUrl(b.url);
+      return '<div class="td-feed td-feed-' + esc(b.layout || 'list') + '"' + d('feed', url) + d('via', url ? TD.FEED_VIA || '' : '') + d('max', +b.max || 10) +
+        d('opts', [b.image ? 'img' : '', b.summary ? 'sum' : '', b.date ? 'date' : '', b.filter ? 'filter' : '', b.proxies ? 'proxies' : ''].filter(Boolean).join(' ')) +
+        d('tap', b.tap || 'sheet') + d('btn', b.btnLabel || 'Learn more') + d('error', b.error) + d('empty', b.empty) + '>' +
+        '<div class="td-events-msg td-card">' + esc(url ? b.loading : 'Add a feed address') + '</div></div>';
+    },
     video(b) {
       const src = videoEmbed(b.url);
       if (!src) return '<div class="td-card td-pad td-muted" style="text-align:center">Add a YouTube or Vimeo link</div>';
@@ -640,6 +649,30 @@ fieldset.td-bad legend,.td-f-check.td-bad span{color:#ef4444}
 .td-ev-detail{flex:1;min-width:0}
 .td-ev-name{font-size:14px;font-weight:600;line-height:1.3;margin-bottom:2px}
 .td-ev-meta{font-size:12px;color:var(--td-muted)}
+/* rss feed */
+.td-feed-chips{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin:0 calc(var(--td-side,16px)*-1) 10px;padding:0 var(--td-side,16px)}
+.td-feed-chips::-webkit-scrollbar{display:none}
+.td-feed-chip{flex:none;font:inherit;font-size:13px;font-weight:600;padding:7px 14px;border-radius:99px;border:1.5px solid rgba(128,128,128,.3);background:transparent;color:var(--td-text);cursor:pointer;-webkit-appearance:none}
+.td-feed-chip.on{background:var(--td-accent);border-color:var(--td-accent);color:var(--td-accent-text)}
+.td-feed-items{display:flex;flex-direction:column;gap:10px}
+.td-fd{display:block;background:var(--td-card);color:var(--td-text);border-radius:var(--td-radius);overflow:hidden;text-decoration:none}
+.td-fd:active{background:var(--td-card2)}
+.td-feed .td-fd[hidden]{display:none!important}
+.td-fd-img{display:block;width:100%;object-fit:cover;background:var(--td-card2)}
+.td-fd-text{padding:12px 14px;min-width:0}
+.td-fd-name{font-size:15px;font-weight:700;line-height:1.3}
+.td-fd-date{font-size:12px;color:var(--td-accent);font-weight:600;margin-top:2px}
+.td-fd-sum{font-size:13px;color:var(--td-muted);line-height:1.45;margin-top:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.td-feed-list .td-fd{display:flex;align-items:center;gap:0}
+.td-feed-list .td-fd-img{width:84px;height:84px;flex:none;margin:10px 0 10px 10px;border-radius:calc(var(--td-radius)*.6)}
+.td-feed-list .td-fd-text{flex:1}
+.td-feed-list .td-arrow{padding-right:14px}
+.td-feed-cards .td-fd-img{aspect-ratio:16/9}
+.td-feed-scroll .td-feed-items{flex-direction:row;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;margin:0 calc(var(--td-side,16px)*-1);padding:0 var(--td-side,16px)}
+.td-feed-scroll .td-feed-items::-webkit-scrollbar{display:none}
+.td-feed-scroll .td-fd{flex:none;width:72%;max-width:280px;scroll-snap-align:start}
+.td-feed-scroll .td-fd-img{aspect-ratio:4/3}
+.td-fd-body .td-fd-more{display:block;background:transparent;color:var(--td-accent);border:1.5px solid var(--td-accent);text-align:center;padding:12px;border-radius:10px;font-weight:700;font-size:14px;text-decoration:none;margin-top:8px}
 /* video, countdown, spacer */
 .td-video{position:relative}
 .td-video iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
@@ -1201,6 +1234,139 @@ fieldset.td-bad legend,.td-f-check.td-bad span{color:#ef4444}
         box.innerHTML = ''; box.appendChild(list);
       }).catch(fail);
     });
+
+    // RSS / Atom feed. The TapDot feed reader (data-td-via) fetches it for us, because most sites
+    // don't let other sites read their feed; a feed on this same site is read directly.
+    function fetchText(url) {
+      var c = W.AbortController ? new AbortController() : null, t = setTimeout(function () { if (c) c.abort(); }, 8000);
+      return fetch(url, c ? { signal: c.signal } : {}).then(function (r) { clearTimeout(t); if (!r.ok) throw 0; return r.text(); });
+    }
+    function getXml(url, via, proxies) {
+      var list = [], same = false;
+      try { same = new URL(url, location.href).origin === location.origin; } catch (e) {}
+      var direct = function () { return fetchText(url); };
+      if (same) list.push(direct);
+      if (via) list.push(function () { return fetchText(via + (via.indexOf('?') < 0 ? '?' : '&') + 'url=' + encodeURIComponent(url)); });
+      if (!same) list.push(direct);
+      if (proxies) {
+        list.push(function () { return fetchText('https://api.allorigins.win/get?url=' + encodeURIComponent(url)).then(function (t) { return JSON.parse(t).contents; }); });
+        list.push(function () { return fetchText('https://corsproxy.io/?' + encodeURIComponent(url)); });
+      }
+      var i = 0;
+      function next() {
+        if (i >= list.length) return Promise.reject(new Error('feed failed'));
+        return list[i++]().then(function (x) { var f = parseFeed(x); if (!f) throw 0; return f; }).catch(next);
+      }
+      return next();
+    }
+    function kids(el, names) {
+      var out = [], c = el.children || [];
+      for (var i = 0; i < c.length; i++) if (names.indexOf(c[i].nodeName.toLowerCase()) >= 0) out.push(c[i]);
+      return out;
+    }
+    function kidText(el, names) { var k = kids(el, names); return k.length ? (k[0].textContent || '').trim() : ''; }
+    function parseFeed(xml) {
+      if (!xml || typeof xml !== 'string') return null;
+      var doc = new DOMParser().parseFromString(xml, 'text/xml');
+      if (doc.getElementsByTagName('parsererror').length) return null;
+      var root = doc.documentElement && doc.documentElement.nodeName.toLowerCase();
+      if (!/^(rss|feed|rdf:rdf)$/.test(root || '')) return null;
+      var nodes = doc.getElementsByTagName('item');
+      if (!nodes.length) nodes = doc.getElementsByTagName('entry');
+      var items = [];
+      for (var i = 0; i < nodes.length; i++) {
+        var n = nodes[i], link = kidText(n, ['link']);
+        kids(n, ['link']).forEach(function (l) { var r = l.getAttribute('rel'); if (l.getAttribute('href') && (!r || r === 'alternate')) link = l.getAttribute('href'); });
+        var html = kidText(n, ['content:encoded']) || kidText(n, ['content']) || kidText(n, ['description']) || kidText(n, ['summary']);
+        var img = '';
+        kids(n, ['media:thumbnail', 'media:content', 'enclosure', 'itunes:image']).forEach(function (m) {
+          var u = m.getAttribute('url') || m.getAttribute('href'), ty = m.getAttribute('type') || '', med = m.getAttribute('medium') || '';
+          if (!img && u && (m.nodeName.toLowerCase() !== 'enclosure' && !/^(video|audio)/.test(ty) && med !== 'video' || /^image\//.test(ty))) img = u;
+        });
+        kids(n, ['media:group']).forEach(function (g) { kids(g, ['media:thumbnail', 'media:content']).forEach(function (m) { if (!img && m.getAttribute('url')) img = m.getAttribute('url'); }); });
+        var hdoc = html ? new DOMParser().parseFromString(html, 'text/html') : null;
+        if (!img && hdoc) { var im = hdoc.querySelector('img[src], img[data-src]'); if (im) img = im.getAttribute('data-src') || im.getAttribute('src'); }
+        var cats = kids(n, ['category']).map(function (c) { return (c.getAttribute('term') || c.textContent || '').trim(); }).filter(Boolean);
+        var ds = kidText(n, ['pubdate', 'published', 'updated', 'dc:date']), date = ds ? new Date(ds) : null;
+        items.push({ title: kidText(n, ['title']) || 'Untitled', link: /^https?:/i.test(link) ? link : '', html: html, doc: hdoc,
+          text: hdoc ? feedText(hdoc) : '', img: /^https?:/i.test(img || '') ? img : '',
+          cats: cats, date: date && !isNaN(date) ? date : null });
+      }
+      return items;
+    }
+    // Plain text with a space between paragraphs, so "together." and "Email" don't run together.
+    function feedText(doc) {
+      var parts = [];
+      doc.body.querySelectorAll('p, li, h1, h2, h3, h4, blockquote, div, br').forEach(function (n) { n.insertAdjacentText(n.nodeName === 'BR' ? 'afterend' : 'beforeend', ' '); });
+      parts.push(doc.body.textContent || '');
+      return parts.join(' ').replace(/\s+/g, ' ').trim();
+    }
+    function fdDate(d) { return d ? d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: d.getFullYear() === new Date().getFullYear() ? undefined : 'numeric' }) : ''; }
+    function openFeedItem(it, btn) {
+      $('#td-fd-title').textContent = it.title;
+      $('#td-fd-date').textContent = it.date ? fdDate(it.date) : it.cats.join(' · ');
+      var b = $('#td-fd-body'); b.innerHTML = '';
+      if (it.img) { var im = D.createElement('img'); im.src = it.img; im.alt = ''; b.appendChild(im); }
+      var seen = {};
+      if (it.doc) {
+        var blocks = it.doc.querySelectorAll('p, li, h1, h2, h3, h4, blockquote');
+        if (!blocks.length && it.text) { var p0 = D.createElement('p'); p0.textContent = it.text; b.appendChild(p0); }
+        var links = [];
+        it.doc.querySelectorAll('a[href]').forEach(function (x) {
+          var h = x.getAttribute('href'), t = (x.textContent || '').trim();
+          if (!/^(https?:|mailto:|tel:|sms:)/i.test(h) || !t || t.length > 40 || seen[h] || h === it.link) return;
+          seen[h] = 1; seen[t] = 1; links.push([h, t]);
+        });
+        blocks.forEach(function (n) { if (n.querySelector('p, li')) return; var p = D.createElement('p'); p.textContent = n.textContent.trim(); if (p.textContent && !seen[p.textContent]) b.appendChild(p); });
+        links.forEach(function (l) {
+          var h = l[0], t = l[1];
+          var a = D.createElement('a'); a.className = 'td-fd-more'; a.href = h; a.textContent = t;
+          if (/^https?:/i.test(h)) { a.target = '_blank'; a.rel = 'noopener'; }
+          b.appendChild(a);
+        });
+      }
+      if (it.link) { var a = D.createElement('a'); a.className = 'td-ev-btn'; a.href = it.link; a.target = '_blank'; a.rel = 'noopener'; a.textContent = btn; b.appendChild(a); }
+      openSheet('td-fdsheet');
+    }
+    $$('[data-td-feed]').forEach(function (box) {
+      var g = function (k) { return box.getAttribute('data-td-' + k) || ''; };
+      var url = g('feed'), opts = ' ' + g('opts') + ' ', has = function (o) { return opts.indexOf(' ' + o + ' ') >= 0; };
+      var msg = function (t) { box.innerHTML = '<div class="td-events-msg td-card">' + escH(t) + '</div>'; };
+      if (!url) return;
+      getXml(url, g('via'), has('proxies')).then(function (items) {
+        items = items.slice(0, +g('max') || 10);
+        if (!items.length) return msg(g('empty'));
+        var tap = g('tap'), wrap = D.createElement('div'), list = D.createElement('div'); list.className = 'td-feed-items';
+        var rows = items.map(function (it) {
+          var r = D.createElement(tap === 'none' ? 'div' : 'a'); r.className = 'td-fd' + (tap === 'none' ? '' : ' td-tap');
+          if (tap === 'link' && it.link) { r.href = it.link; r.target = '_blank'; r.rel = 'noopener'; }
+          else if (tap === 'sheet') { r.href = '#'; r.addEventListener('click', function (e) { e.preventDefault(); openFeedItem(it, g('btn')); }); }
+          r.innerHTML = (has('img') && it.img ? '<img class="td-fd-img" loading="lazy" alt="" src="' + escH(it.img) + '">' : '') +
+            '<div class="td-fd-text"><div class="td-fd-name">' + escH(it.title) + '</div>' +
+            (has('date') && it.date ? '<div class="td-fd-date">' + escH(fdDate(it.date)) + '</div>' : '') +
+            (has('sum') && it.text ? '<div class="td-fd-sum">' + escH(it.text.slice(0, 220)) + '</div>' : '') + '</div>' +
+            (box.className.indexOf('td-feed-list') >= 0 && tap !== 'none' ? '<div class="td-arrow">›</div>' : '');
+          var im = r.querySelector('img'); if (im) im.onerror = function () { im.remove(); };
+          list.appendChild(r); return { el: r, cats: it.cats };
+        });
+        var all = [];
+        rows.forEach(function (x) { x.cats.forEach(function (c) { if (all.indexOf(c) < 0) all.push(c); }); });
+        if (has('filter') && all.length > 1) {
+          var chips = D.createElement('div'); chips.className = 'td-feed-chips';
+          ['All'].concat(all).forEach(function (c, i) {
+            var ch = D.createElement('button'); ch.type = 'button'; ch.className = 'td-feed-chip' + (i ? '' : ' on'); ch.textContent = c;
+            ch.addEventListener('click', function () {
+              chips.querySelectorAll('.on').forEach(function (o) { o.classList.remove('on'); }); ch.classList.add('on');
+              rows.forEach(function (x) { x.el.hidden = !!i && x.cats.indexOf(c) < 0; });
+            });
+            chips.appendChild(ch);
+          });
+          wrap.appendChild(chips);
+        }
+        wrap.appendChild(list);
+        box.innerHTML = ''; box.appendChild(wrap);
+      }).catch(function () { msg(g('error')); });
+    });
   }
   /* eslint-enable */
 
@@ -1223,6 +1389,11 @@ fieldset.td-bad legend,.td-f-check.td-bad span{color:#ef4444}
       h += '<div class="td-sheet" id="td-evsheet"><div class="td-handle"><span></span></div><div class="td-sheet-head"><div class="td-sheet-head-l"><div class="td-sheet-icon">📅</div><div>' +
         '<div class="td-sheet-title" id="td-ev-title">Event</div><div class="td-sheet-sub" id="td-ev-date" style="color:var(--td-accent)"></div></div></div>' +
         '<button class="td-close" data-td-close aria-label="Close">✕</button></div><div class="td-sheet-body td-ev-body" id="td-ev-body"></div></div>\n';
+    }
+    if (ctx.usesFeed) {
+      h += '<div class="td-sheet" id="td-fdsheet"><div class="td-handle"><span></span></div><div class="td-sheet-head"><div class="td-sheet-head-l"><div>' +
+        '<div class="td-sheet-title" id="td-fd-title"></div><div class="td-sheet-sub" id="td-fd-date" style="color:var(--td-accent)"></div></div></div>' +
+        '<button class="td-close" data-td-close aria-label="Close">✕</button></div><div class="td-sheet-body td-ev-body td-fd-body" id="td-fd-body"></div></div>\n';
     }
     // Photo / PDF viewers. Their pill buttons can add pop-ups, so they come before anything else
     // that depends on ctx being complete.

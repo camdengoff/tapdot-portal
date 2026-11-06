@@ -306,6 +306,28 @@
       defaults: () => ({ url: 'https://www.example.com/events?format=json', max: 3, tz: 'America/Chicago', detail: true, proxies: true, loading: 'Loading events…', error: 'Could not load upcoming events.' }),
       summary: (b) => b.url,
     },
+    feed: {
+      name: 'RSS feed', icon: '📰', desc: 'Live list from any RSS feed, like a small groups or blog page',
+      fields: [
+        { k: 'url', t: 'text', l: 'Feed address', ph: 'https://www.yourchurch.org/small-groups?format=rss', hint: 'On Squarespace, open the page (a blog or other collection) and add ?format=rss to its address. Any RSS or Atom feed works.' },
+        { k: 'layout', t: 'select', l: 'Layout', opts: [['list', 'List'], ['cards', 'Big cards'], ['scroll', 'Side-scrolling cards']] },
+        { k: 'max', t: 'range', l: 'How many items', min: 1, max: 30 },
+        { k: 'image', t: 'checkbox', l: 'Show photos' },
+        { k: 'summary', t: 'checkbox', l: 'Show a short description' },
+        { k: 'date', t: 'checkbox', l: 'Show the date posted' },
+        { k: 'filter', t: 'checkbox', l: 'Filter buttons from the feed’s categories', hint: 'Shows a row of buttons (like Women, Tuesday, Downtown) when the items have categories or tags.' },
+        { k: 'tap', t: 'select', l: 'Tapping an item', opts: [['sheet', 'Shows the details'], ['link', 'Opens its page in a new tab'], ['none', 'Does nothing']] },
+        { k: 'btnLabel', t: 'text', l: 'Details button', ph: 'Learn more', when: (b) => b.tap === 'sheet', hint: 'The button at the bottom of the details that opens the item’s page.' },
+        { group: 'More options', fields: [
+          { k: 'proxies', t: 'checkbox', l: 'Retry through public proxies if blocked', hint: 'Only used if the TapDot feed reader can’t reach the feed.' },
+          { k: 'loading', t: 'text', l: 'Loading message' },
+          { k: 'error', t: 'text', l: 'Error message' },
+          { k: 'empty', t: 'text', l: 'Message when the feed is empty' },
+        ] },
+      ],
+      defaults: () => ({ url: '', layout: 'list', max: 10, image: true, summary: true, date: false, filter: true, tap: 'sheet', btnLabel: 'Learn more', proxies: true, loading: 'Loading…', error: 'Could not load this list right now.', empty: 'Nothing here yet. Check back soon!' }),
+      summary: (b) => b.url,
+    },
     video: {
       name: 'Video', icon: '▶️', desc: 'YouTube or Vimeo embed',
       fields: [

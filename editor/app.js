@@ -19,6 +19,10 @@
     } catch (e) { return null; }
   })();
 
+  // RSS feed blocks read feeds through the portal's feed reader (server/feed.js). Pages made in the
+  // portal use this site's address; anywhere else (like the Squarespace copy) uses the main portal.
+  TD.FEED_VIA = (/\.pages\.dev$|camdengoff\.com$/.test(location.hostname) ? location.origin : 'https://tapdot-portal.pages.dev') + '/api/feed';
+
   // ── Tiny DOM helper ──────────────────────────────────────────────────
   function h(tag, attrs, ...kids) {
     const el = document.createElement(tag);

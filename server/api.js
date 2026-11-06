@@ -13,6 +13,7 @@ import * as forms from './forms.js';
 import * as templates from './templates.js';
 import * as files from './files.js';
 import * as shares from './shares.js';
+import { feedProxy } from './feed.js';
 
 const MAX_BODY = 20 * 1024 * 1024;
 
@@ -83,6 +84,7 @@ export async function handle({ request, env, waitUntil }) {
     const path = new URL(request.url).pathname;
     if (path === '/api/track') return await trackBeacon(request, env);
     if (path.startsWith('/api/form/')) return await formPost(request, env, path, waitUntil);
+    if (path === '/api/feed') return await feedProxy(request, waitUntil || (() => {}));
     checkOrigin(request);
     const d = await db(env);
     const url = new URL(request.url);
