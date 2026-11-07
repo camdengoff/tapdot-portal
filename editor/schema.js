@@ -319,8 +319,9 @@
         { k: 'summary', t: 'checkbox', l: 'Show a short description' },
         { k: 'date', t: 'checkbox', l: 'Show the date posted' },
         { k: 'filter', t: 'checkbox', l: 'Filter buttons from the feed’s categories', hint: 'Shows a row of buttons (like Women, Tuesday, Downtown) when the items have categories or tags.' },
-        { k: 'tap', t: 'select', l: 'Tapping an item', opts: [['sheet', 'Shows the details'], ['link', 'Opens its page in a new tab'], ['none', 'Does nothing']] },
+        { k: 'tap', t: 'select', l: 'Tapping an item', opts: [['sheet', 'Shows the details'], ['popup', 'Opens its page in a pop-up'], ['link', 'Opens its page in a new tab'], ['none', 'Does nothing']], hint: 'Pop-ups need your pop-up worker for sites that won’t open inside another page (Export → Pop-up proxy). With no worker set, pages open in a new tab.' },
         { k: 'btnLabel', t: 'text', l: 'Details button', ph: 'Learn more', when: (b) => b.tap === 'sheet', hint: 'The button at the bottom of the details that opens the item’s page.' },
+        { k: 'btnPopup', t: 'checkbox', l: 'Details button opens the page in a pop-up', when: (b) => b.tap === 'sheet' },
         { group: 'More options', fields: [
           { k: 'proxies', t: 'checkbox', l: 'Retry through public proxies if blocked', hint: 'Only used if the TapDot feed reader can’t reach the feed.' },
           { k: 'loading', t: 'text', l: 'Loading message' },
@@ -328,7 +329,7 @@
           { k: 'empty', t: 'text', l: 'Message when the feed is empty' },
         ] },
       ],
-      defaults: () => ({ url: '', layout: 'list', max: 10, titles: true, image: true, summary: true, date: false, filter: true, more: true, moreLabel: 'Show more', tap: 'sheet', btnLabel: 'Learn more', proxies: true, loading: 'Loading…', error: 'Could not load this list right now.', empty: 'Nothing here yet. Check back soon!' }),
+      defaults: () => ({ url: '', layout: 'list', max: 10, titles: true, image: true, summary: true, date: false, filter: true, more: true, moreLabel: 'Show more', tap: 'sheet', btnLabel: 'Learn more', btnPopup: false, proxies: true, loading: 'Loading…', error: 'Could not load this list right now.', empty: 'Nothing here yet. Check back soon!' }),
       summary: (b) => b.url,
     },
     video: {

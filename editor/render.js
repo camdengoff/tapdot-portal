@@ -348,9 +348,16 @@
       ctx.usesFeed = true;
       const d = (k, v) => ' data-td-' + k + '="' + esc(v) + '"';
       const url = safeUrl(b.url);
+      // Pop-ups: the page's script works out each item's address the same way proxied() does.
+      let pop = '';
+      const px = String(ctx.proxy || '').trim().replace(/\/+$/, '');
+      if ((b.tap === 'popup' || (b.tap === 'sheet' && b.btnPopup)) && px) {
+        ctx.usesPage = true;
+        pop = d('px', px) + d('pxhosts', px === TD.BFC_PROXY.replace(/\/+$/, '') ? '@bfc' : (ctx.proxyHosts || []).join(' '));
+      }
       return '<div class="td-feed td-feed-' + esc(b.layout || 'list') + '"' + d('feed', url) + d('via', url ? TD.FEED_VIA || '' : '') + d('max', +b.max || 10) +
         d('opts', [b.titles === false ? 'notitle' : '', b.image ? 'img' : '', b.summary ? 'sum' : '', b.date ? 'date' : '', b.filter ? 'filter' : '', b.more ? 'more' : '', b.proxies ? 'proxies' : ''].filter(Boolean).join(' ')) +
-        d('tap', b.tap || 'sheet') + d('btn', b.btnLabel || 'Learn more') + d('more', b.moreLabel || 'Show more') + d('error', b.error) + d('empty', b.empty) + '>' +
+        pop + d('tap', b.tap || 'sheet') + d('pop', b.btnPopup ? 1 : '') + d('btn', b.btnLabel || 'Learn more') + d('more', b.moreLabel || 'Show more') + d('error', b.error) + d('empty', b.empty) + '>' +
         '<div class="td-events-msg td-card">' + esc(url ? b.loading : 'Add a feed address') + '</div></div>';
     },
     video(b) {
@@ -1306,7 +1313,22 @@ fieldset.td-bad legend,.td-f-check.td-bad span{color:#ef4444}
       return parts.join(' ').replace(/\s+/g, ' ').trim();
     }
     function fdDate(d) { return d ? d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: d.getFullYear() === new Date().getFullYear() ? undefined : 'numeric' }) : ''; }
-    function openFeedItem(it, btn) {
+    // Opens an item's page in the pop-up sheet (through the pop-up worker when its site needs it),
+    // or in a new tab when the page has no worker.
+    function feedPopup(box, link, title) {
+      var px = box.getAttribute('data-td-px'), u = link, host = '';
+      if (!px || !$('#td-page')) { W.open(link, '_blank', 'noopener'); return; }
+      try {
+        var url = new URL(link), list = (box.getAttribute('data-td-pxhosts') || '').split(' ').filter(Boolean);
+        host = url.hostname.replace(/^www\./, '');
+        if (url.host !== new URL(px).host) {
+          if (list[0] === '@bfc') { if (host === 'bethanynaz.org') u = px + url.pathname + url.search + url.hash; }
+          else if (list.some(function (h) { return host === h || host.slice(-h.length - 1) === '.' + h; })) u = px + '/?url=' + encodeURIComponent(link);
+        }
+      } catch (e) {}
+      openPage(u, title, '🔗', host);
+    }
+    function openFeedItem(it, btn, box) {
       $('#td-fd-title').textContent = it.title;
       $('#td-fd-date').textContent = it.date ? fdDate(it.date) : it.cats.join(' · ');
       var b = $('#td-fd-body'); b.innerHTML = '';
@@ -1329,7 +1351,11 @@ fieldset.td-bad legend,.td-f-check.td-bad span{color:#ef4444}
           b.appendChild(a);
         });
       }
-      if (it.link) { var a = D.createElement('a'); a.className = 'td-ev-btn'; a.href = it.link; a.target = '_blank'; a.rel = 'noopener'; a.textContent = btn; b.appendChild(a); }
+      if (it.link) {
+        var a = D.createElement('a'); a.className = 'td-ev-btn'; a.href = it.link; a.target = '_blank'; a.rel = 'noopener'; a.textContent = btn;
+        if (box.getAttribute('data-td-pop')) a.addEventListener('click', function (e) { e.preventDefault(); feedPopup(box, it.link, it.title); });
+        b.appendChild(a);
+      }
       openSheet('td-fdsheet');
     }
     $$('[data-td-feed]').forEach(function (box) {
@@ -1345,7 +1371,8 @@ fieldset.td-bad legend,.td-f-check.td-bad span{color:#ef4444}
         var rows = items.map(function (it) {
           var r = D.createElement(tap === 'none' ? 'div' : 'a'); r.className = 'td-fd' + (tap === 'none' ? '' : ' td-tap');
           if (tap === 'link' && it.link) { r.href = it.link; r.target = '_blank'; r.rel = 'noopener'; }
-          else if (tap === 'sheet') { r.href = '#'; r.addEventListener('click', function (e) { e.preventDefault(); openFeedItem(it, g('btn')); }); }
+          else if (tap === 'popup' && it.link) { r.href = it.link; r.addEventListener('click', function (e) { e.preventDefault(); feedPopup(box, it.link, it.title); }); }
+          else if (tap === 'sheet') { r.href = '#'; r.addEventListener('click', function (e) { e.preventDefault(); openFeedItem(it, g('btn'), box); }); }
           var pic = has('img') && it.img, name = !has('notitle') || !pic;
           var text = (name ? '<div class="td-fd-name">' + escH(it.title) + '</div>' : '') +
             (has('date') && it.date ? '<div class="td-fd-date">' + escH(fdDate(it.date)) + '</div>' : '') +
