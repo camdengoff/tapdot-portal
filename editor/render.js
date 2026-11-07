@@ -355,10 +355,16 @@
         ctx.usesPage = true;
         pop = d('px', px) + d('pxhosts', px === TD.BFC_PROXY.replace(/\/+$/, '') ? '@bfc' : (ctx.proxyHosts || []).join(' '));
       }
-      return '<div class="td-feed td-feed-' + esc(b.layout || 'list') + '"' + d('feed', url) + d('via', url ? TD.FEED_VIA || '' : '') + d('max', +b.max || 10) +
+      const html = '<div class="td-feed td-feed-' + esc(b.layout || 'list') + '"' + d('feed', url) + d('via', url ? TD.FEED_VIA || '' : '') + d('max', +b.max || 10) +
         d('opts', [b.titles === false ? 'notitle' : '', b.image ? 'img' : '', b.summary ? 'sum' : '', b.date ? 'date' : '', b.filter ? 'filter' : '', b.more ? 'more' : '', b.proxies ? 'proxies' : ''].filter(Boolean).join(' ')) +
         pop + d('tap', b.tap || 'sheet') + d('pop', b.btnPopup ? 1 : '') + d('btn', b.btnLabel || 'Learn more') + d('more', b.moreLabel || 'Show more') + d('error', b.error) + d('empty', b.empty) + '>' +
         '<div class="td-events-msg td-card">' + esc(url ? b.loading : 'Add a feed address') + '</div></div>';
+      if (b.show !== 'button') return html;
+      // Behind a button: the list lives in its own pop-up sheet (drawn in overlays()).
+      const label = b.openLabel || 'See all';
+      (ctx.feedSheets = ctx.feedSheets || []).push({ id: 'feed-' + b.id, title: b.sheetTitle || label, icon: b.openIcon || '', html });
+      return '<a href="#" class="td-btn td-feed-open td-tap" data-td-act="sheet" data-td-sheet="feed-' + esc(b.id) + '">' +
+        (b.openIcon ? '<span class="td-feed-open-ico">' + ico(b.openIcon) + '</span>' : '') + '<span>' + esc(label) + '</span></a>';
     },
     video(b) {
       const src = videoEmbed(b.url);
@@ -676,6 +682,10 @@ fieldset.td-bad legend,.td-f-check.td-bad span{color:#ef4444}
 .td-feed-list .td-arrow{padding-right:14px}
 .td-feed-cards .td-fd-img{aspect-ratio:16/9}
 .td-feed .td-fd-imgonly{display:block}
+.td-feed-open{justify-content:center;width:100%;box-sizing:border-box;background:var(--td-accent);border-color:var(--td-accent);color:var(--td-accent-text);font-size:15px;padding:13px 16px}
+.td-feed-open-ico{font-size:17px;line-height:1}
+.td-feed-sheet{height:92vh}
+.td-feed-sheet .td-sheet-body{padding:16px 16px 40px;--td-side:16px}
 .td-feed-more{display:block;width:100%;margin-top:10px;font:inherit;font-weight:700;font-size:14px;padding:12px;border-radius:var(--td-btn-radius);border:1.5px solid rgba(128,128,128,.3);background:transparent;color:var(--td-text);cursor:pointer;-webkit-appearance:none}
 .td-feed-more[hidden]{display:none}
 .td-feed .td-fd-imgonly .td-fd-img{width:100%;height:auto;aspect-ratio:auto;margin:0;border-radius:0}
@@ -827,6 +837,12 @@ fieldset.td-bad legend,.td-f-check.td-bad span{color:#ef4444}
     }
 
     // sheets
+    // A feed's own pop-up: closing an item's details (or its page) goes back to the list.
+    var fdBack = null;
+    function closeTop() {
+      var back = fdBack; fdBack = null;
+      if (back && !D.getElementById(back).classList.contains('open')) openSheet(back); else closeAll();
+    }
     function closeAll() {
       $$('.td-sheet.open,.td-bd.open,.td-zoom.open,.td-fv.open').forEach(function (e) { e.classList.remove('open'); });
       lock(false);
@@ -834,6 +850,7 @@ fieldset.td-bad legend,.td-f-check.td-bad span{color:#ef4444}
     }
     function openSheet(id) {
       var s = D.getElementById(id); if (!s) return;
+      if (id !== 'td-fdsheet' && id !== 'td-page') fdBack = null;
       closeAll(); s.classList.add('open'); $('#td-bd').classList.add('open'); lock(true);
     }
     function openPage(url, title, icon, site) {
@@ -954,7 +971,7 @@ fieldset.td-bad legend,.td-f-check.td-bad span{color:#ef4444}
     }
 
     D.addEventListener('click', function (e) {
-      if (e.target.closest('[data-td-close]')) { e.preventDefault(); closeAll(); return; }
+      if (e.target.closest('[data-td-close]')) { e.preventDefault(); closeTop(); return; }
       var mc = $('#td-mail.open');
       if (mc) {
         if (e.target.closest('[data-td-mailcopy]')) copy(mc.getAttribute('data-to'), 'Email address copied');
@@ -992,7 +1009,7 @@ fieldset.td-bad legend,.td-f-check.td-bad span{color:#ef4444}
           break;
       }
     });
-    D.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeAll(); });
+    D.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeTop(); });
 
     // connect card forms: check the answers, then send them to the portal
     $$('[data-td-form]').forEach(function (f) {
@@ -1316,6 +1333,7 @@ fieldset.td-bad legend,.td-f-check.td-bad span{color:#ef4444}
     // Opens an item's page in the pop-up sheet (through the pop-up worker when its site needs it),
     // or in a new tab when the page has no worker.
     function feedPopup(box, link, title) {
+      var hs = box.closest('.td-feed-sheet'); fdBack = hs ? hs.id : null;
       var px = box.getAttribute('data-td-px'), u = link, host = '';
       if (!px || !$('#td-page')) { W.open(link, '_blank', 'noopener'); return; }
       try {
@@ -1329,6 +1347,7 @@ fieldset.td-bad legend,.td-f-check.td-bad span{color:#ef4444}
       openPage(u, title, '🔗', host);
     }
     function openFeedItem(it, btn, box) {
+      var hs = box.closest('.td-feed-sheet'); fdBack = hs ? hs.id : null;
       $('#td-fd-title').textContent = it.title;
       $('#td-fd-date').textContent = it.date ? fdDate(it.date) : it.cats.join(' · ');
       var b = $('#td-fd-body'); b.innerHTML = '';
@@ -1437,6 +1456,11 @@ fieldset.td-bad legend,.td-f-check.td-bad span{color:#ef4444}
         '<div class="td-sheet-title" id="td-ev-title">Event</div><div class="td-sheet-sub" id="td-ev-date" style="color:var(--td-accent)"></div></div></div>' +
         '<button class="td-close" data-td-close aria-label="Close">✕</button></div><div class="td-sheet-body td-ev-body" id="td-ev-body"></div></div>\n';
     }
+    (ctx.feedSheets || []).forEach((f) => {
+      h += '<div class="td-sheet td-feed-sheet" id="td-sheet-' + esc(f.id) + '"><div class="td-handle"><span></span></div><div class="td-sheet-head"><div class="td-sheet-head-l">' +
+        (f.icon ? '<div class="td-sheet-icon">' + ico(f.icon) + '</div>' : '') + '<div class="td-sheet-title td-head">' + esc(f.title) + '</div></div>' +
+        '<button class="td-close" data-td-close aria-label="Close">✕</button></div><div class="td-sheet-body">' + f.html + '</div></div>\n';
+    });
     if (ctx.usesFeed) {
       h += '<div class="td-sheet" id="td-fdsheet"><div class="td-handle"><span></span></div><div class="td-sheet-head"><div class="td-sheet-head-l"><div>' +
         '<div class="td-sheet-title" id="td-fd-title"></div><div class="td-sheet-sub" id="td-fd-date" style="color:var(--td-accent)"></div></div></div>' +

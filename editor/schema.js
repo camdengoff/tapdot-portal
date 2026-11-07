@@ -310,6 +310,10 @@
       name: 'RSS feed', icon: '📰', desc: 'Live list from any RSS feed, like a small groups or blog page',
       fields: [
         { k: 'url', t: 'text', l: 'Feed address', ph: 'https://www.yourchurch.org/small-groups?format=rss', hint: 'On Squarespace, open the page (a blog or other collection) and add ?format=rss to its address. Any RSS or Atom feed works.' },
+        { k: 'show', t: 'select', l: 'Show it', opts: [['page', 'On the page'], ['button', 'Behind a button (opens a pop-up)']] },
+        { k: 'openLabel', t: 'text', l: 'Button', ph: 'See all groups', when: (b) => b.show === 'button' },
+        { k: 'openIcon', t: 'text', l: 'Button icon', ph: 'e.g. 👥', when: (b) => b.show === 'button' },
+        { k: 'sheetTitle', t: 'text', l: 'Pop-up title', ph: 'Same as the button', when: (b) => b.show === 'button' },
         { k: 'layout', t: 'select', l: 'Layout', opts: [['list', 'List'], ['cards', 'Big cards'], ['scroll', 'Side-scrolling cards']] },
         { k: 'max', t: 'range', l: 'How many items', min: 1, max: 30, hint: 'How many show at first. With Show more on, the rest of the feed is a tap away.' },
         { k: 'more', t: 'checkbox', l: 'Show more button when there are more' },
@@ -329,7 +333,7 @@
           { k: 'empty', t: 'text', l: 'Message when the feed is empty' },
         ] },
       ],
-      defaults: () => ({ url: '', layout: 'list', max: 10, titles: true, image: true, summary: true, date: false, filter: true, more: true, moreLabel: 'Show more', tap: 'sheet', btnLabel: 'Learn more', btnPopup: false, proxies: true, loading: 'Loading…', error: 'Could not load this list right now.', empty: 'Nothing here yet. Check back soon!' }),
+      defaults: () => ({ url: '', show: 'page', openLabel: 'See all groups', openIcon: '👥', sheetTitle: '', layout: 'list', max: 10, titles: true, image: true, summary: true, date: false, filter: true, more: true, moreLabel: 'Show more', tap: 'sheet', btnLabel: 'Learn more', btnPopup: false, proxies: true, loading: 'Loading…', error: 'Could not load this list right now.', empty: 'Nothing here yet. Check back soon!' }),
       summary: (b) => b.url,
     },
     video: {
