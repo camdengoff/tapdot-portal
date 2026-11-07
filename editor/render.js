@@ -349,7 +349,7 @@
       const d = (k, v) => ' data-td-' + k + '="' + esc(v) + '"';
       const url = safeUrl(b.url);
       return '<div class="td-feed td-feed-' + esc(b.layout || 'list') + '"' + d('feed', url) + d('via', url ? TD.FEED_VIA || '' : '') + d('max', +b.max || 10) +
-        d('opts', [b.image ? 'img' : '', b.summary ? 'sum' : '', b.date ? 'date' : '', b.filter ? 'filter' : '', b.proxies ? 'proxies' : ''].filter(Boolean).join(' ')) +
+        d('opts', [b.titles === false ? 'notitle' : '', b.image ? 'img' : '', b.summary ? 'sum' : '', b.date ? 'date' : '', b.filter ? 'filter' : '', b.proxies ? 'proxies' : ''].filter(Boolean).join(' ')) +
         d('tap', b.tap || 'sheet') + d('btn', b.btnLabel || 'Learn more') + d('error', b.error) + d('empty', b.empty) + '>' +
         '<div class="td-events-msg td-card">' + esc(url ? b.loading : 'Add a feed address') + '</div></div>';
     },
@@ -668,6 +668,8 @@ fieldset.td-bad legend,.td-f-check.td-bad span{color:#ef4444}
 .td-feed-list .td-fd-text{flex:1}
 .td-feed-list .td-arrow{padding-right:14px}
 .td-feed-cards .td-fd-img{aspect-ratio:16/9}
+.td-feed .td-fd-imgonly{display:block}
+.td-feed .td-fd-imgonly .td-fd-img{width:100%;height:auto;aspect-ratio:auto;margin:0;border-radius:0}
 .td-feed-scroll .td-feed-items{flex-direction:row;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;margin:0 calc(var(--td-side,16px)*-1);padding:0 var(--td-side,16px)}
 .td-feed-scroll .td-feed-items::-webkit-scrollbar{display:none}
 .td-feed-scroll .td-fd{flex:none;width:72%;max-width:280px;scroll-snap-align:start}
@@ -1341,11 +1343,16 @@ fieldset.td-bad legend,.td-f-check.td-bad span{color:#ef4444}
           var r = D.createElement(tap === 'none' ? 'div' : 'a'); r.className = 'td-fd' + (tap === 'none' ? '' : ' td-tap');
           if (tap === 'link' && it.link) { r.href = it.link; r.target = '_blank'; r.rel = 'noopener'; }
           else if (tap === 'sheet') { r.href = '#'; r.addEventListener('click', function (e) { e.preventDefault(); openFeedItem(it, g('btn')); }); }
-          r.innerHTML = (has('img') && it.img ? '<img class="td-fd-img" loading="lazy" alt="" src="' + escH(it.img) + '">' : '') +
-            '<div class="td-fd-text"><div class="td-fd-name">' + escH(it.title) + '</div>' +
+          var pic = has('img') && it.img, name = !has('notitle') || !pic;
+          var text = (name ? '<div class="td-fd-name">' + escH(it.title) + '</div>' : '') +
             (has('date') && it.date ? '<div class="td-fd-date">' + escH(fdDate(it.date)) + '</div>' : '') +
-            (has('sum') && it.text ? '<div class="td-fd-sum">' + escH(it.text.slice(0, 220)) + '</div>' : '') + '</div>' +
-            (box.className.indexOf('td-feed-list') >= 0 && tap !== 'none' ? '<div class="td-arrow">›</div>' : '');
+            (has('sum') && it.text ? '<div class="td-fd-sum">' + escH(it.text.slice(0, 220)) + '</div>' : '');
+          // No title, date or description: just the photo, shown whole (like a flyer).
+          if (!text) r.className += ' td-fd-imgonly';
+          if (!name) r.setAttribute('aria-label', it.title);
+          r.innerHTML = (pic ? '<img class="td-fd-img" loading="lazy" alt="' + (name ? '' : escH(it.title)) + '" src="' + escH(it.img) + '">' : '') +
+            (text ? '<div class="td-fd-text">' + text + '</div>' : '') +
+            (text && box.className.indexOf('td-feed-list') >= 0 && tap !== 'none' ? '<div class="td-arrow">›</div>' : '');
           var im = r.querySelector('img'); if (im) im.onerror = function () { im.remove(); };
           list.appendChild(r); return { el: r, cats: it.cats };
         });

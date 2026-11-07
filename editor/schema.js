@@ -312,6 +312,7 @@
         { k: 'url', t: 'text', l: 'Feed address', ph: 'https://www.yourchurch.org/small-groups?format=rss', hint: 'On Squarespace, open the page (a blog or other collection) and add ?format=rss to its address. Any RSS or Atom feed works.' },
         { k: 'layout', t: 'select', l: 'Layout', opts: [['list', 'List'], ['cards', 'Big cards'], ['scroll', 'Side-scrolling cards']] },
         { k: 'max', t: 'range', l: 'How many items', min: 1, max: 30 },
+        { k: 'titles', t: 'checkbox', l: 'Show titles', hint: 'Turn off to show just each item’s photo, like a flyer. Items without a photo still show their title.' },
         { k: 'image', t: 'checkbox', l: 'Show photos' },
         { k: 'summary', t: 'checkbox', l: 'Show a short description' },
         { k: 'date', t: 'checkbox', l: 'Show the date posted' },
@@ -325,7 +326,7 @@
           { k: 'empty', t: 'text', l: 'Message when the feed is empty' },
         ] },
       ],
-      defaults: () => ({ url: '', layout: 'list', max: 10, image: true, summary: true, date: false, filter: true, tap: 'sheet', btnLabel: 'Learn more', proxies: true, loading: 'Loading…', error: 'Could not load this list right now.', empty: 'Nothing here yet. Check back soon!' }),
+      defaults: () => ({ url: '', layout: 'list', max: 10, titles: true, image: true, summary: true, date: false, filter: true, tap: 'sheet', btnLabel: 'Learn more', proxies: true, loading: 'Loading…', error: 'Could not load this list right now.', empty: 'Nothing here yet. Check back soon!' }),
       summary: (b) => b.url,
     },
     video: {
