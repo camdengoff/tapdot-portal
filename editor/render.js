@@ -349,8 +349,8 @@
       const d = (k, v) => ' data-td-' + k + '="' + esc(v) + '"';
       const url = safeUrl(b.url);
       return '<div class="td-feed td-feed-' + esc(b.layout || 'list') + '"' + d('feed', url) + d('via', url ? TD.FEED_VIA || '' : '') + d('max', +b.max || 10) +
-        d('opts', [b.titles === false ? 'notitle' : '', b.image ? 'img' : '', b.summary ? 'sum' : '', b.date ? 'date' : '', b.filter ? 'filter' : '', b.proxies ? 'proxies' : ''].filter(Boolean).join(' ')) +
-        d('tap', b.tap || 'sheet') + d('btn', b.btnLabel || 'Learn more') + d('error', b.error) + d('empty', b.empty) + '>' +
+        d('opts', [b.titles === false ? 'notitle' : '', b.image ? 'img' : '', b.summary ? 'sum' : '', b.date ? 'date' : '', b.filter ? 'filter' : '', b.more ? 'more' : '', b.proxies ? 'proxies' : ''].filter(Boolean).join(' ')) +
+        d('tap', b.tap || 'sheet') + d('btn', b.btnLabel || 'Learn more') + d('more', b.moreLabel || 'Show more') + d('error', b.error) + d('empty', b.empty) + '>' +
         '<div class="td-events-msg td-card">' + esc(url ? b.loading : 'Add a feed address') + '</div></div>';
     },
     video(b) {
@@ -669,6 +669,8 @@ fieldset.td-bad legend,.td-f-check.td-bad span{color:#ef4444}
 .td-feed-list .td-arrow{padding-right:14px}
 .td-feed-cards .td-fd-img{aspect-ratio:16/9}
 .td-feed .td-fd-imgonly{display:block}
+.td-feed-more{display:block;width:100%;margin-top:10px;font:inherit;font-weight:700;font-size:14px;padding:12px;border-radius:var(--td-btn-radius);border:1.5px solid rgba(128,128,128,.3);background:transparent;color:var(--td-text);cursor:pointer;-webkit-appearance:none}
+.td-feed-more[hidden]{display:none}
 .td-feed .td-fd-imgonly .td-fd-img{width:100%;height:auto;aspect-ratio:auto;margin:0;border-radius:0}
 .td-feed-scroll .td-feed-items{flex-direction:row;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;margin:0 calc(var(--td-side,16px)*-1);padding:0 var(--td-side,16px)}
 .td-feed-scroll .td-feed-items::-webkit-scrollbar{display:none}
@@ -1336,7 +1338,8 @@ fieldset.td-bad legend,.td-f-check.td-bad span{color:#ef4444}
       var msg = function (t) { box.innerHTML = '<div class="td-events-msg td-card">' + escH(t) + '</div>'; };
       if (!url) return;
       getXml(url, g('via'), has('proxies')).then(function (items) {
-        items = items.slice(0, +g('max') || 10);
+        var step = +g('max') || 10, shown = step, cat = '';
+        if (!has('more')) items = items.slice(0, step);
         if (!items.length) return msg(g('empty'));
         var tap = g('tap'), wrap = D.createElement('div'), list = D.createElement('div'); list.className = 'td-feed-items';
         var rows = items.map(function (it) {
@@ -1364,13 +1367,23 @@ fieldset.td-bad legend,.td-f-check.td-bad span{color:#ef4444}
             var ch = D.createElement('button'); ch.type = 'button'; ch.className = 'td-feed-chip' + (i ? '' : ' on'); ch.textContent = c;
             ch.addEventListener('click', function () {
               chips.querySelectorAll('.on').forEach(function (o) { o.classList.remove('on'); }); ch.classList.add('on');
-              rows.forEach(function (x) { x.el.hidden = !!i && x.cats.indexOf(c) < 0; });
+              cat = i ? c : ''; shown = step; apply();
             });
             chips.appendChild(ch);
           });
           wrap.appendChild(chips);
         }
         wrap.appendChild(list);
+        // Show the first few (of the chosen category); "Show more" reveals the next set.
+        var more = D.createElement('button'); more.type = 'button'; more.className = 'td-feed-more'; more.textContent = g('more');
+        more.addEventListener('click', function () { shown += step; apply(); });
+        wrap.appendChild(more);
+        function apply() {
+          var n = 0;
+          rows.forEach(function (x) { var ok = !cat || x.cats.indexOf(cat) >= 0; x.el.hidden = !ok || n >= shown; if (ok) n++; });
+          more.hidden = n <= shown;
+        }
+        apply();
         box.innerHTML = ''; box.appendChild(wrap);
       }).catch(function () { msg(g('error')); });
     });
