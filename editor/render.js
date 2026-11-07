@@ -359,10 +359,11 @@
         d('opts', [b.titles === false ? 'notitle' : '', b.image ? 'img' : '', b.summary ? 'sum' : '', b.date ? 'date' : '', b.filter ? 'filter' : '', b.more ? 'more' : '', b.proxies ? 'proxies' : ''].filter(Boolean).join(' ')) +
         pop + d('tap', b.tap || 'sheet') + d('pop', b.btnPopup ? 1 : '') + d('btn', b.btnLabel || 'Learn more') + d('more', b.moreLabel || 'Show more') + d('error', b.error) + d('empty', b.empty) + '>' +
         '<div class="td-events-msg td-card">' + esc(url ? b.loading : 'Add a feed address') + '</div></div>';
-      if (b.show !== 'button') return html;
+      if (b.show !== 'button' && b.show !== 'popup') return html;
       // Behind a button: the list lives in its own pop-up sheet (drawn in overlays()).
       const label = b.openLabel || 'See all';
-      (ctx.feedSheets = ctx.feedSheets || []).push({ id: 'feed-' + b.id, title: b.sheetTitle || label, icon: b.openIcon || '', html });
+      (ctx.feedSheets = ctx.feedSheets || []).push({ id: 'feed-' + b.id, title: (b.show === 'button' && b.sheetTitle) || label, icon: b.openIcon || '', html });
+      if (b.show === 'popup') return ''; // opened from another button's "pop-up menus or lists" action
       return '<a href="#" class="td-btn td-feed-open td-tap" data-td-act="sheet" data-td-sheet="feed-' + esc(b.id) + '">' +
         (b.openIcon ? '<span class="td-feed-open-ico">' + ico(b.openIcon) + '</span>' : '') + '<span>' + esc(label) + '</span></a>';
     },
@@ -1517,6 +1518,7 @@ fieldset.td-bad legend,.td-f-check.td-bad span{color:#ef4444}
     const tabIds = ['normal'].concat(times.map((x) => x.id));
     const body = p.blocks.filter((b) => !b.hidden).map((b) => {
       const inner = R[b.type](b, ctx);
+      if (inner === '') return '';
       const st = blockStyle(b);
       const hide = (b.hideIn || []).filter((id) => tabIds.includes(id));
       if (hide.length >= tabIds.length) return '';

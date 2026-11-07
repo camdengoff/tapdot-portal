@@ -886,7 +886,9 @@
           popup: [{ k: 'url', t: 'text', l: 'Page link', ph: 'https://…', hint: state.exp.proxy ? 'Paste the normal link. bethanynaz.org pages go through the pop-up proxy automatically; other sites load as they are, and some may refuse to show in a pop-up.' : 'No pop-up proxy is set in the Export tab, so this link opens in a new tab.' },
             { k: 'direct', t: 'checkbox', l: 'Skip the pop-up proxy for this link', when: () => !!state.exp.proxy },
             { k: 'title', t: 'text', l: 'Pop-up title', ph: 'Same as the label', hint: 'Leave blank to use the label of the button or card.' }, { k: 'icon', t: 'emoji', l: 'Pop-up icon' }],
-          sheet: [{ k: 'sheet', t: 'select', l: 'Menu', opts: [['', '— choose —']].concat(state.sheets.map((s) => [s.id, TD.iconLabel(s.icon) + s.title])) }],
+          sheet: [{ k: 'sheet', t: 'select', l: 'Menu or list', opts: [['', '— choose —']].concat(state.sheets.map((s) => [s.id, TD.iconLabel(s.icon) + s.title]),
+            // RSS feed blocks set to open in a pop-up can be opened from any button too.
+            state.blocks.filter((b) => b.type === 'feed' && (b.show === 'button' || b.show === 'popup')).map((b) => ['feed-' + b.id, '📰 ' + ((b.show === 'button' && b.sheetTitle) || b.openLabel || 'RSS feed') + ' (RSS feed)'])) }],
           copy: [{ k: 'text', t: 'textarea', l: 'Text to copy' }, { k: 'toast', t: 'text', l: 'Message after copying' }],
           phone: [{ k: 'phone', t: 'text', l: 'Phone number' }],
           sms: [{ k: 'phone', t: 'text', l: 'Phone number' }, { k: 'body', t: 'text', l: 'Starting message (optional)' }],
