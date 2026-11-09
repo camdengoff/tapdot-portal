@@ -202,6 +202,7 @@
     const { church, role, pages, members } = data;
     const responses = data.responses || {};
     const manage = role === 'owner' || role === 'admin';
+    const viewer = role === 'viewer'; // "Stats only": sees the page list and tap stats, nothing else
     document.title = church.name + ' · TapDot';
     const reload = () => drawChurch(id);
 
@@ -221,7 +222,7 @@
         responses[p.id] ? h('button', { class: 'answers' + (responses[p.id].unseen ? ' new' : ''), onclick: () => showResponses(church, p, reload) },
           '📥 ', plural(responses[p.id].total, 'connect card answer', 'connect card answers'),
           responses[p.id].unseen ? h('span', { class: 'pill ok' }, responses[p.id].unseen + ' new') : null) : null,
-        h('div', { class: 'row wrap' },
+        viewer ? (p.publishedAt ? h('div', { class: 'row wrap' }, h('a', { class: 'ghost btn', href: live, target: '_blank', rel: 'noopener' }, '↗ Live page')) : null) : h('div', { class: 'row wrap' },
           h('a', { class: 'primary btn', href: 'editor.html?church=' + enc(church.id) + '&page=' + enc(p.id) }, '✎ Edit'),
           p.publishedAt ? h('a', { class: 'ghost btn', href: live, target: '_blank', rel: 'noopener' }, '↗ Live page') : null,
           h('button', { class: 'ghost', onclick: () => copy(code, 'Code block copied. Paste it into a Squarespace code block once.') }, '📋 Code block'),
@@ -270,7 +271,7 @@
         bars(days, two.views));
     }
 
-    const roleName = { owner: 'Owner', editor: 'Editor' };
+    const roleName = { owner: 'Owner', editor: 'Editor', viewer: 'Stats only' };
     const personRow = (m) => h('div', { class: 'person' },
       h('div', { class: 'who' },
         h('b', null, m.name || m.email),
@@ -298,22 +299,22 @@
         }) }, 'Rename') : null,
         h('div', { class: 'grow' }),
         manage ? h('button', { class: 'ghost', title: 'A read-only page of this church’s tap stats, for people who don’t edit', onclick: () => shareDialog(church) }, '📊 Share stats') : null,
-        h('button', { class: 'primary', onclick: () => newPage(church) }, '+ New page')),
+        viewer ? h('span', { class: 'pill' }, 'Stats only') : h('button', { class: 'primary', onclick: () => newPage(church) }, '+ New page')),
       pages.length ? h('div', { class: 'grid' }, pages.map(pageCard))
-        : h('div', { class: 'card center muted' }, 'No pages yet. Create one to start editing.'),
-      h('div', { class: 'head' }, h('h2', null, 'People'),
+        : h('div', { class: 'card center muted' }, viewer ? 'No pages yet.' : 'No pages yet. Create one to start editing.'),
+      viewer ? null : h('div', { class: 'head' }, h('h2', null, 'People'),
         h('div', { class: 'grow' }),
         manage ? h('button', { class: 'ghost', onclick: act(async () => {
           const v = await ask('Add a person', [
             { k: 'email', l: 'Email', type: 'email', placeholder: 'name@church.org' },
-            { k: 'role', l: 'Role', value: 'editor', options: [['editor', 'Editor: edits and publishes pages'], ['owner', 'Owner: also adds and removes people']] },
+            { k: 'role', l: 'Role', value: 'editor', options: [['editor', 'Editor: edits and publishes pages'], ['owner', 'Owner: also adds and removes people'], ['viewer', 'Stats only: sees visits and taps, can’t edit']] },
           ], 'Add');
           if (!v) return;
           const r = await api('/churches/' + enc(church.id) + '/members', { method: 'POST', body: v });
           await reload();
           if (r.link) showLink(r.email, r.link); else toast(r.email + ' already has an account and can sign in now.');
         }) }, '+ Add person') : null),
-      h('div', { class: 'card list' }, members.length ? members.map(personRow) : h('p', { class: 'muted' }, 'Nobody yet.')),
+      viewer ? null : h('div', { class: 'card list' }, members.length ? members.map(personRow) : h('p', { class: 'muted' }, 'Nobody yet.')),
       me.admin ? h('div', { class: 'dangerzone' }, h('button', { class: 'ghost sm danger', onclick: act(async () => {
         const v = await ask('Delete ' + church.name + '?', [{ k: 'confirm', l: 'Type the church’s id (' + church.id + ') to confirm' }], 'Delete church',
           'This deletes every page (taking them off the site) and removes everyone’s access. It can’t be undone.');

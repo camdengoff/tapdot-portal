@@ -47,6 +47,9 @@ async function churchRole(d, user, churchId) {
   return { church, role: m.role };
 }
 const canManage = (role) => role === 'admin' || role === 'owner';
+// Members are owners, editors, or viewers ("Stats only": can see tap stats and nothing else).
+const ROLES = ['owner', 'editor', 'viewer'];
+const pickRole = (r) => (ROLES.includes(r) ? r : 'editor');
 
 // A password link signs in as that person, so a church owner may only make one for someone who
 // is brand new (no password, no Google, in no other church). Resets for anyone else go to an admin.
@@ -152,7 +155,7 @@ export async function handle({ request, env, waitUntil }) {
     // Photos and PDFs for the full-screen viewer (see files.js).
     if (route('POST', 2, 'files')) {
       if (parts[1] === '_templates') { if (!user.admin) throw new HttpError(403, 'Only an admin can edit templates.'); }
-      else await churchRole(d, user, parts[1]);
+      else if ((await churchRole(d, user, parts[1])).role === 'viewer') throw new HttpError(403, 'You can only see stats for this church.');
       return json(await files.upload(env, request, parts[1]), 201);
     }
 
@@ -172,12 +175,18 @@ export async function handle({ request, env, waitUntil }) {
 
     const churchId = parts[1];
     const { church, role } = await churchRole(d, user, churchId);
+    // Stats-only members: the church's page list, stats and activity log, nothing else.
+    if (role === 'viewer') {
+      const ok = (parts.length === 2 && M === 'GET') || (route('GET', 3) && (parts[2] === 'stats' || parts[2] === 'activity'));
+      if (!ok) throw new HttpError(403, 'You can only see stats for this church.');
+    }
 
     if (parts.length === 2) {
       if (M === 'GET') {
         const pages = (await all(d, 'SELECT * FROM pages WHERE church_id = ? ORDER BY name', churchId)).map(pageOut);
         const members = await all(d, 'SELECT m.email, m.role, m.added_at AS addedAt, u.name, (u.pw_hash IS NOT NULL) AS hasPassword, (u.google_sub IS NOT NULL) AS hasGoogle FROM members m LEFT JOIN users u ON u.email = m.email WHERE m.church_id = ? ORDER BY m.email', churchId);
         members.forEach((m) => { m.hasPassword = !!m.hasPassword; m.hasGoogle = !!m.hasGoogle; });
+        if (role === 'viewer') return json({ church, role, pages, members: [], responses: {} });
         return json({ church, role, pages, members, responses: await forms.counts(d, churchId) });
       }
       if (M === 'PATCH') {
@@ -239,7 +248,7 @@ export async function handle({ request, env, waitUntil }) {
         const b = await body(request);
         const email = normEmail(b.email);
         if (!isEmail(email)) throw new HttpError(400, 'That doesn’t look like an email address.');
-        const newRole = b.role === 'owner' ? 'owner' : 'editor';
+        const newRole = pickRole(b.role);
         await run(d, 'INSERT INTO members (church_id, email, role, added_at) VALUES (?, ?, ?, ?) ON CONFLICT (church_id, email) DO UPDATE SET role = excluded.role', churchId, email, newRole, now());
         const u = await one(d, 'SELECT pw_hash, google_sub FROM users WHERE email = ?', email);
         const fresh = !u || (!u.pw_hash && !u.google_sub);
@@ -255,7 +264,7 @@ export async function handle({ request, env, waitUntil }) {
       }
       if (route('PATCH', 4)) {
         const b = await body(request);
-        await run(d, 'UPDATE members SET role = ? WHERE church_id = ? AND email = ?', b.role === 'owner' ? 'owner' : 'editor', churchId, email);
+        await run(d, 'UPDATE members SET role = ? WHERE church_id = ? AND email = ?', pickRole(b.role), churchId, email);
         return json({ ok: true });
       }
       if (route('DELETE', 4)) {
