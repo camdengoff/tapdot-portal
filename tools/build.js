@@ -54,5 +54,12 @@ fs.writeFileSync(path.join(root, 'dist/app/editor.html'), html);
 mkdir('dist/app/td');
 for (const f of ['schema.js', 'render.js']) fs.copyFileSync(path.join(root, 'editor', f), path.join(root, 'dist/app/td', f));
 // Folders too (public/email/ holds pictures for TapDot's update emails).
-fs.cpSync(path.join(root, 'public'), path.join(root, 'dist'), { recursive: true });
+// (Copied by hand: Cloudflare's build image may have a Node too old for fs.cpSync.)
+(function copyDir(from, to) {
+  fs.mkdirSync(to, { recursive: true });
+  for (const f of fs.readdirSync(from)) {
+    const a = path.join(from, f), b = path.join(to, f);
+    if (fs.statSync(a).isDirectory()) copyDir(a, b); else fs.copyFileSync(a, b);
+  }
+})(path.join(root, 'public'), path.join(root, 'dist'));
 console.log('dist/app/ (portal) and public/ files');
