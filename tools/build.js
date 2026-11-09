@@ -53,5 +53,6 @@ fs.writeFileSync(path.join(root, 'dist/app/editor.html'), html);
 // The portal's New page picker draws template previews with the editor's own templates and renderer.
 mkdir('dist/app/td');
 for (const f of ['schema.js', 'render.js']) fs.copyFileSync(path.join(root, 'editor', f), path.join(root, 'dist/app/td', f));
-for (const f of fs.readdirSync(path.join(root, 'public'))) fs.copyFileSync(path.join(root, 'public', f), path.join(root, 'dist', f));
+// Folders too (public/email/ holds pictures for TapDot's update emails).
+fs.cpSync(path.join(root, 'public'), path.join(root, 'dist'), { recursive: true });
 console.log('dist/app/ (portal) and public/ files');
