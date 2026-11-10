@@ -1,0 +1,468 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TapDot: tap pages for churches</title>
+<meta name="description" content="TapDot builds the page people see when they tap an NFC tag or scan a QR code in your church, and keeps it live on your own website.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script>try { var t = localStorage.getItem('tapdot-theme'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {}</script>
+<style>
+:root {
+  --page: #fdfdfc; --panel: #ffffff; --panel2: #f5f5f4; --line: #e4e4e2; --line2: #c8c8c5;
+  --text: #262626; --muted: #6b6b6b; --accent: #ff5e1f; --ink: #c2410c; --btn: #cc4410; --btn2: #b93c0a;
+  --tint: #fff7f3; --tint-line: #ffd2bf; --grid-dot: rgba(0,0,0,.07); --ok: #1d7a46;
+  --shadow: 0 4px 60px rgba(255, 80, 10, .07), 0 2px 12px rgba(0, 0, 0, .04);
+  --phone: #1c1c1c; --r: 4px;
+  --font: 'Hanken Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --page: #0f0f0f; --panel: #1a1a1a; --panel2: #222; --line: #2f2f2f; --line2: #474747;
+    --text: #f2f2f0; --muted: #a3a3a0; --accent: #ff6a2e; --ink: #ff8a5c; --btn: #cc4410; --btn2: #e0500f;
+    --tint: #26170f; --tint-line: #5c2c14; --grid-dot: rgba(255,255,255,.06); --ok: #5fd39a;
+    --shadow: 0 4px 60px rgba(255, 80, 10, .06), 0 2px 12px rgba(0, 0, 0, .4); --phone: #2a2a2a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --page: #0f0f0f; --panel: #1a1a1a; --panel2: #222; --line: #2f2f2f; --line2: #474747;
+  --text: #f2f2f0; --muted: #a3a3a0; --accent: #ff6a2e; --ink: #ff8a5c; --btn: #cc4410; --btn2: #e0500f;
+  --tint: #26170f; --tint-line: #5c2c14; --grid-dot: rgba(255,255,255,.06); --ok: #5fd39a;
+  --shadow: 0 4px 60px rgba(255, 80, 10, .06), 0 2px 12px rgba(0, 0, 0, .4); --phone: #2a2a2a;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: var(--page); color: var(--text); font: 16px/1.55 var(--font); letter-spacing: -.16px; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+a { color: var(--ink); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+.mono { font-family: var(--mono); font-size: 12px; letter-spacing: 0; text-transform: uppercase; color: var(--ink); }
+h1, h2, h3 { font-weight: 500; margin: 0; }
+h1 { font-size: clamp(40px, 6.4vw, 68px); line-height: 1.02; letter-spacing: -.045em; }
+h2 { font-size: clamp(30px, 4vw, 44px); line-height: 1.08; letter-spacing: -.035em; }
+h3 { font-size: 19px; line-height: 1.25; letter-spacing: -.02em; }
+p { margin: 0; }
+.lead { font-size: 19px; color: var(--muted); max-width: 34em; }
+.btn { display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 20px; border-radius: var(--r); font: 500 15px var(--font); letter-spacing: -.15px; text-decoration: none; border: 1px solid transparent; cursor: pointer; transition: background-color .12s, border-color .12s; }
+.btn.primary { background: var(--btn); color: #fff; }
+.btn.primary:hover { background: var(--btn2); }
+.btn.ghost { background: var(--panel); color: var(--text); border-color: var(--line); }
+.btn.ghost:hover { border-color: var(--line2); }
+
+/* Top bar */
+header { position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--page) 86%, transparent); backdrop-filter: saturate(1.4) blur(10px); -webkit-backdrop-filter: saturate(1.4) blur(10px); border-bottom: 1px solid var(--line); }
+header .wrap { display: flex; align-items: center; gap: 24px; height: 60px; }
+.logo { display: flex; align-items: center; gap: 9px; font-weight: 600; font-size: 18px; letter-spacing: -.4px; color: var(--text); text-decoration: none; }
+.logo i { width: 22px; height: 22px; border-radius: 50%; background: var(--accent); position: relative; box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 18%, transparent); }
+nav { display: flex; gap: 22px; margin-left: 12px; }
+nav a { color: var(--muted); text-decoration: none; font-size: 14.5px; }
+nav a:hover { color: var(--text); }
+.top-r { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+.top-r .btn { height: 36px; padding: 0 14px; font-size: 14px; }
+.theme { width: 36px; height: 36px; border-radius: var(--r); border: 1px solid var(--line); background: var(--panel); color: var(--text); font-size: 16px; cursor: pointer; }
+@media (max-width: 760px) { nav { display: none; } }
+
+/* Hero */
+.hero { padding: 72px 0 40px; background-image: radial-gradient(var(--grid-dot) 1px, transparent 1px); background-size: 22px 22px; border-bottom: 1px solid var(--line); }
+.hero .wrap { display: grid; grid-template-columns: 1.1fr .9fr; gap: 48px; align-items: center; }
+.hero h1 em { font-style: normal; color: var(--accent); }
+.hero .lead { margin: 22px 0 30px; }
+.cta { display: flex; flex-wrap: wrap; gap: 10px; }
+.facts { display: flex; flex-wrap: wrap; gap: 8px 22px; margin-top: 34px; color: var(--muted); font-size: 14px; }
+.facts span::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-right: 8px; vertical-align: 2px; }
+@media (max-width: 900px) { .hero .wrap { grid-template-columns: 1fr; } .hero { padding-top: 48px; } }
+
+/* Phones: real TapDot pages, drawn by the editor's own templates and renderer */
+.phone { --w: 300px; width: var(--w); aspect-ratio: 375 / 780; border-radius: 44px; background: var(--phone); padding: 11px; box-shadow: var(--shadow), 0 30px 60px -20px rgba(0,0,0,.25); position: relative; flex: none; }
+.phone .screen { width: 100%; height: 100%; border-radius: 34px; overflow: hidden; background: #fff; position: relative; }
+.phone iframe { position: absolute; top: 0; left: 0; width: 375px; height: 780px; border: 0; transform-origin: 0 0; background: #fff; }
+.phone::after { content: ''; position: absolute; top: 20px; left: 50%; transform: translateX(-50%); width: 84px; height: 22px; border-radius: 12px; background: var(--phone); z-index: 2; pointer-events: none; }
+.hero-phone { display: flex; justify-content: center; position: relative; }
+.tag { position: absolute; left: calc(50% - 265px); top: 64px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; box-shadow: var(--shadow); font-size: 13.5px; display: flex; gap: 10px; align-items: center; max-width: 200px; }
+.tag b { display: block; font-weight: 600; }
+.tag .dot { width: 34px; height: 34px; border-radius: 50%; background: var(--accent); flex: none; display: grid; place-items: center; color: #fff; font-size: 16px; }
+@media (max-width: 900px) { .tag { left: calc(50% - 230px); } }
+@media (max-width: 520px) { .phone { --w: 260px !important; } .tag { display: none; } }
+
+section { padding: 96px 0; border-bottom: 1px solid var(--line); }
+.sec-head { max-width: 720px; margin-bottom: 48px; }
+.sec-head .mono { margin-bottom: 14px; display: block; }
+.sec-head .lead { margin-top: 16px; }
+
+/* What it is: three steps */
+.steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+.step { background: var(--panel); padding: 28px; }
+.step .n { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.step h3 { margin: 14px 0 8px; }
+.step p { color: var(--muted); font-size: 15px; }
+.code { margin-top: 18px; font: 12px/1.6 var(--mono); background: var(--panel2); border: 1px solid var(--line); border-radius: var(--r); padding: 10px 12px; color: var(--text); overflow-x: auto; white-space: pre; letter-spacing: 0; }
+.code .k { color: var(--ink); }
+@media (max-width: 860px) { .steps { grid-template-columns: 1fr; } }
+
+/* Big features: text + visual */
+.feature { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: center; padding: 56px 0; }
+.feature + .feature { border-top: 1px dashed var(--line); }
+.feature.flip .vis { order: -1; }
+.feature .mono { display: block; margin-bottom: 12px; }
+.feature h2 { font-size: clamp(26px, 3.2vw, 36px); }
+.feature p.lead { font-size: 17px; margin-top: 14px; }
+.ticks { list-style: none; padding: 0; margin: 22px 0 0; display: grid; gap: 10px; }
+.ticks li { padding-left: 26px; position: relative; font-size: 15px; }
+.ticks li::before { content: ''; position: absolute; left: 2px; top: 7px; width: 10px; height: 6px; border-left: 2px solid var(--accent); border-bottom: 2px solid var(--accent); transform: rotate(-45deg); }
+.vis { display: flex; justify-content: center; }
+.shot { width: 290px; height: auto; border-radius: 40px; box-shadow: var(--shadow), 0 30px 60px -20px rgba(0,0,0,.25); }
+@media (max-width: 900px) { .feature { grid-template-columns: 1fr; gap: 32px; } .feature.flip .vis { order: 0; } }
+
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--shadow); width: 100%; max-width: 470px; }
+.panel-h { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--line); font-size: 13.5px; font-weight: 600; }
+.panel-h .pill { margin-left: auto; font: 500 11px var(--mono); color: var(--muted); border: 1px solid var(--line); border-radius: 99px; padding: 2px 8px; text-transform: uppercase; }
+.panel-b { padding: 18px 16px; }
+
+/* Stats picture */
+.nums { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.num { border: 1px solid var(--line); border-radius: var(--r); padding: 10px 12px; }
+.num small { color: var(--muted); font-size: 12px; display: block; }
+.num b { font-size: 26px; font-weight: 500; letter-spacing: -.04em; }
+.bars { display: flex; align-items: flex-end; gap: 5px; height: 110px; margin: 18px 0 6px; }
+.bars i { flex: 1; background: color-mix(in srgb, var(--accent) 28%, transparent); border-radius: 2px 2px 0 0; }
+.bars i.sun { background: var(--accent); }
+.legend { display: flex; justify-content: space-between; font: 11px var(--mono); color: var(--muted); }
+.tops { margin-top: 16px; display: grid; gap: 7px; font-size: 13.5px; }
+.tops div { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
+.tops div span:first-child { position: relative; padding: 4px 8px; border-radius: 3px; overflow: hidden; }
+.tops div span:first-child::before { content: ''; position: absolute; inset: 0; width: var(--p); background: var(--tint); border-right: 2px solid var(--tint-line); z-index: -1; }
+.tops div span:first-child { z-index: 0; }
+.tops em { font-style: normal; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+
+/* Viewer picture */
+.viewer { position: relative; aspect-ratio: 4 / 3.1; background: #2a2a2a; border-radius: var(--r); overflow: hidden; display: grid; place-items: center; }
+.flyer { height: 84%; aspect-ratio: 8.5 / 11; margin-bottom: 8%; background: #fff; border-radius: 2px; padding: 16px 16px; display: flex; flex-direction: column; gap: 6px; color: #262626; box-shadow: 0 10px 30px rgba(0,0,0,.4); }
+.flyer .t { font-weight: 700; font-size: 17px; letter-spacing: -.03em; line-height: 1.05; }
+.flyer .l { height: 5px; border-radius: 3px; background: #e6e6e4; }
+.flyer .row { display: flex; gap: 10px; align-items: center; margin-top: auto; }
+.flyer .qr { width: 40px; height: 40px; flex: none; background:
+  conic-gradient(from 90deg at 30% 30%, #262626 25%, transparent 0) 0 0 / 12px 12px,
+  #fff; border: 4px solid #262626; outline: 3px solid var(--accent); outline-offset: 2px; }
+.flyer .addr { font-size: 10px; background: color-mix(in srgb, var(--accent) 18%, transparent); outline: 2px solid var(--accent); border-radius: 2px; padding: 1px 4px; }
+.pills { position: absolute; left: 0; right: 0; bottom: 12px; display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; padding: 0 10px; }
+.pills span { background: rgba(255,255,255,.95); color: #262626; font-size: 12.5px; font-weight: 600; border-radius: 99px; padding: 6px 12px; box-shadow: 0 2px 8px rgba(0,0,0,.3); }
+
+/* Feature grid */
+.grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+.cell { background: var(--panel); padding: 24px; }
+.cell .ic { width: 34px; height: 34px; border-radius: var(--r); background: var(--tint); border: 1px solid var(--tint-line); display: grid; place-items: center; font-size: 17px; margin-bottom: 14px; }
+.cell h3 { font-size: 16.5px; margin-bottom: 6px; }
+.cell p { color: var(--muted); font-size: 14.5px; }
+@media (max-width: 900px) { .grid { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 560px) { .grid { grid-template-columns: 1fr; } }
+
+/* Template gallery */
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 28px; }
+.tabs button { height: 34px; padding: 0 14px; border-radius: 99px; border: 1px solid var(--line); background: var(--panel); color: var(--text); font: 500 14px var(--font); cursor: pointer; }
+.tabs button[aria-selected="true"] { background: var(--text); color: var(--page); border-color: var(--text); }
+.gallery { display: grid; grid-template-columns: auto 1fr; gap: 48px; align-items: center; }
+.gallery .about h3 { font-size: 26px; letter-spacing: -.03em; }
+.gallery .about p { color: var(--muted); margin-top: 10px; font-size: 16px; max-width: 30em; }
+.hint { margin-top: 18px; font-size: 13.5px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+@media (max-width: 760px) { .gallery { grid-template-columns: 1fr; justify-items: center; text-align: center; } .gallery .about p { margin-inline: auto; } .hint { justify-content: center; } }
+
+/* Closing */
+.end { text-align: center; border-bottom: 0; background-image: radial-gradient(var(--grid-dot) 1px, transparent 1px); background-size: 22px 22px; }
+.end .lead { margin: 16px auto 28px; }
+.end .cta { justify-content: center; }
+footer { border-top: 1px solid var(--line); padding: 26px 0; color: var(--muted); font-size: 13.5px; }
+footer .wrap { display: flex; flex-wrap: wrap; gap: 10px 24px; justify-content: space-between; }
+footer a { color: var(--muted); }
+
+@media (max-width: 560px) { .wrap { padding: 0 16px; } section { padding: 64px 0; } .step, .cell { padding: 20px; } }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <a class="logo" href="/"><i aria-hidden="true"></i>TapDot</a>
+    <nav aria-label="Sections">
+      <a href="#how">How it works</a>
+      <a href="#features">Features</a>
+      <a href="#templates">Templates</a>
+    </nav>
+    <div class="top-r">
+      <button class="theme" type="button" id="theme" title="Theme: follows your device" aria-label="Switch light or dark">◐</button>
+      <a class="btn primary" href="/app/">Sign in</a>
+    </div>
+  </div>
+</header>
+
+<main>
+<section class="hero" style="border-bottom:1px solid var(--line)">
+  <div class="wrap">
+    <div>
+      <span class="mono">Tap pages for churches</span>
+      <h1 style="margin-top:16px">Your church’s front door, <em>one tap</em> away.</h1>
+      <p class="lead">TapDot builds the page people see when they tap an NFC tag or scan a QR code in your building, with welcome, giving, events, groups and a connect card in one place. It lives on your own website, and you change it whenever you like without ever touching code again.</p>
+      <div class="cta">
+        <a class="btn primary" href="/app/">Sign in to your church</a>
+        <a class="btn ghost" href="#how">See how it works</a>
+      </div>
+      <div class="facts"><span>Works on Squarespace or any site</span><span>No app to download</span><span>Stats without cookies</span></div>
+    </div>
+    <div class="hero-phone">
+      <div class="phone" data-tpl="welcome" style="--w:310px"><div class="screen"></div></div>
+      <div class="tag" aria-hidden="true"><span class="dot">⌁</span><span><b>Tapped at the welcome desk</b>Opens instantly on any phone</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="how">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="mono">What TapDot is</span>
+      <h2>A page builder, a publisher and a scoreboard for the moments people walk in.</h2>
+      <p class="lead">Put a tag on the welcome desk, a QR code in the bulletin or a sticker on the seat backs. They all open one TapDot page, and you keep that page fresh from your phone or laptop.</p>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <span class="n">01</span>
+        <h3>Build it visually</h3>
+        <p>Pick a starter template or a blank page, then add blocks: a hero photo, buttons, a live events list, a connect card. Colors, photos and corners are all yours, and nothing needs code.</p>
+      </div>
+      <div class="step">
+        <span class="n">02</span>
+        <h3>Paste one code block, once</h3>
+        <p>TapDot gives you two lines to paste into a page on your website. That’s the last time anyone touches your site’s code.</p>
+        <div class="code"><span class="k">&lt;div</span> class="tapdot-page" data-page="…"<span class="k">&gt;&lt;/div&gt;</span>
+<span class="k">&lt;script</span> src="…/embed.js"<span class="k">&gt;&lt;/script&gt;</span></div>
+      </div>
+      <div class="step">
+        <span class="n">03</span>
+        <h3>Publish, and watch it work</h3>
+        <p>Press Publish and the live page updates in seconds. The tags and QR codes never change. Then see how many people visited and what they tapped.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="features" style="padding-bottom:40px">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="mono">The most helpful parts</span>
+      <h2>Built with a real church, one Sunday at a time.</h2>
+      <p class="lead">TapDot started as the tap tag page for one congregation. Every feature here came from something they needed on a real Sunday.</p>
+    </div>
+
+    <div class="feature">
+      <div>
+        <span class="mono">Tap stats</span>
+        <h2>Know what people actually tap.</h2>
+        <p class="lead">Every page shows its visits, taps and most-used buttons, with a chart for the last two weeks. You can tell which Sunday was busy and whether anyone found the giving button.</p>
+        <ul class="ticks">
+          <li>No cookies and no tracking banners. A refresh within 30 minutes isn’t counted twice.</li>
+          <li>Give your pastor or board a read-only stats link, with no sign-in needed.</li>
+          <li>Add people as <b>Stats only</b>, so they can see the numbers without editing anything.</li>
+        </ul>
+      </div>
+      <div class="vis">
+        <div class="panel" role="img" aria-label="Example of TapDot's stats: visits, taps and top buttons">
+          <div class="panel-h">📊 Welcome page <span class="pill">Example</span></div>
+          <div class="panel-b">
+            <div class="nums">
+              <div class="num"><small>Visits</small><b>312</b></div>
+              <div class="num"><small>Taps</small><b>187</b></div>
+              <div class="num"><small>On Sundays</small><b>56%</b></div>
+            </div>
+            <div class="bars" aria-hidden="true"><i style="height:14%"></i><i style="height:22%"></i><i style="height:10%"></i><i style="height:18%"></i><i style="height:12%"></i><i style="height:9%"></i><i class="sun" style="height:74%"></i><i style="height:16%"></i><i style="height:25%"></i><i style="height:13%"></i><i style="height:20%"></i><i style="height:11%"></i><i style="height:15%"></i><i class="sun" style="height:92%"></i></div>
+            <div class="legend"><span>2 weeks ago</span><span>Today</span></div>
+            <div class="tops">
+              <div><span style="--p:100%">Plan a visit</span><em>34</em></div>
+              <div><span style="--p:71%">Connect card</span><em>24</em></div>
+              <div><span style="--p:53%">Give</span><em>18</em></div>
+              <div><span style="--p:35%">Guest Wi-Fi</span><em>12</em></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="feature flip">
+      <div>
+        <span class="mono">Live lists</span>
+        <h2>Events and small groups that keep themselves up to date.</h2>
+        <p class="lead">Point an Upcoming events block at your Squarespace events page, or an RSS feed block at your small groups or blog. When the website changes, the tap page changes with it.</p>
+        <ul class="ticks">
+          <li>Show it as a list, big cards or side-scrolling cards, with category filters.</li>
+          <li>Tuck the whole list behind a banner card or a button, so it opens in a sheet.</li>
+          <li>Each item opens a details sheet with its photo, summary and links.</li>
+        </ul>
+      </div>
+      <div class="vis">
+        <img class="shot" src="/email/2026-11-rss-context.png" width="290" height="557" loading="lazy" alt="A real church's tap page: banner cards, including Find a Small Group, above a live Upcoming Events list">
+      </div>
+    </div>
+
+    <div class="feature">
+      <div>
+        <span class="mono">Connect card</span>
+        <h2>The welcome card, without the pencils.</h2>
+        <p class="lead">Add a Connect card block and visitors fill it in on their phone. Answers land on the page’s card in your portal, ready to read or download as a spreadsheet.</p>
+        <ul class="ticks">
+          <li>Text, email, phone, choices and checkboxes, required or not.</li>
+          <li>Use it for first-time guests, event sign-ups or prayer requests.</li>
+          <li>Put a form under a photo or video with the Spotlight block.</li>
+        </ul>
+      </div>
+      <div class="vis">
+        <div class="phone" data-tpl="connect" style="--w:290px"><div class="screen"></div></div>
+      </div>
+    </div>
+
+    <div class="feature flip">
+      <div>
+        <span class="mono">Photo and PDF viewer</span>
+        <h2>Drop in the bulletin. TapDot finds the links.</h2>
+        <p class="lead">Any button can open a photo or PDF full screen. TapDot reads the file, finds its web addresses, emails, phone numbers and QR codes, and turns them into buttons named after what they do.</p>
+        <ul class="ticks">
+          <li>“Email Pastor Mike”, “Give online” and “Register”, named from the words beside each link.</li>
+          <li>Reads scanned pages and phone photos too, even slightly tilted ones.</li>
+          <li>On a PDF, each page shows only its own buttons.</li>
+        </ul>
+      </div>
+      <div class="vis">
+        <div class="viewer" style="width:100%;max-width:470px" role="img" aria-label="A flyer open full screen with buttons made from its QR code and web address">
+          <div class="flyer">
+            <div class="t">Fall Festival</div>
+            <div class="l" style="width:80%"></div><div class="l" style="width:92%"></div><div class="l" style="width:64%"></div>
+            <div class="row"><span class="qr"></span><span style="display:grid;gap:5px;flex:1"><span class="l"></span><span class="addr">yourchurch.org/register</span></span></div>
+          </div>
+          <div class="pills"><span>🔗 Register</span><span>✉️ Email Pastor Mike</span><span>📞 Call the office</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="mono">And everything else</span>
+      <h2>The small things that make Sunday easier.</h2>
+    </div>
+    <div class="grid">
+      <div class="cell"><div class="ic">🪟</div><h3>Pop-up sheets</h3><p>Prayer forms, giving pages and event details open in a sheet over the page, so nobody gets lost in your full website.</p></div>
+      <div class="cell"><div class="ic">🧩</div><h3>20 kinds of blocks</h3><p>Hero photos, buttons, banners, cards, slides, FAQs, photo grids, video, copy boxes for Wi-Fi and more.</p></div>
+      <div class="cell"><div class="ic">⏳</div><h3>Countdowns</h3><p>Count down to Christmas Eve or camp sign-ups in boxes, plain numbers or a rolling slot machine.</p></div>
+      <div class="cell"><div class="ic">🕒</div><h3>Special times</h3><p>Show a different banner during chapel or on Wednesday nights, and switch back on its own.</p></div>
+      <div class="cell"><div class="ic">✨</div><h3>Spotlight</h3><p>A photo or silent looping video with a title over it, plus a button or a form underneath.</p></div>
+      <div class="cell"><div class="ic">👥</div><h3>Your whole team</h3><p>Sign in with Google or a password. Owners, editors and stats-only people each see just what they need.</p></div>
+      <div class="cell"><div class="ic">🕘</div><h3>Version history</h3><p>Name a version before a big change, and open any earlier one if Sunday morning goes sideways.</p></div>
+      <div class="cell"><div class="ic">📋</div><h3>Copy buttons</h3><p>One tap copies the Wi-Fi password, the mailing address for checks or a giving code.</p></div>
+      <div class="cell"><div class="ic">🌗</div><h3>Looks like you</h3><p>Your colors, fonts, photos and corner shapes, in light or dark, on any phone.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="templates">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="mono">Start from a template</span>
+      <h2>Pick a starting point. Make it yours in minutes.</h2>
+    </div>
+    <div class="tabs" role="tablist" aria-label="Templates"></div>
+    <div class="gallery">
+      <div class="phone" id="gallery-phone" style="--w:300px"><div class="screen"></div></div>
+      <div class="about">
+        <h3 id="tpl-name"></h3>
+        <p id="tpl-desc"></p>
+        <p class="hint">👆 These are real TapDot pages. Scroll and tap around.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="end">
+  <div class="wrap">
+    <h2>Give every tag in your building somewhere good to go.</h2>
+    <p class="lead">TapDot is set up for each church by hand right now. If your church already has an account, sign in to build and publish your pages.</p>
+    <div class="cta">
+      <a class="btn primary" href="/app/">Sign in</a>
+      <a class="btn ghost" href="#features">Back to features</a>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>© <span id="yr">2026</span> TapDot</span>
+    <span><a href="/app/">Sign in</a></span>
+  </div>
+</footer>
+
+<script src="/app/td/schema.js"></script>
+<script src="/app/td/render.js"></script>
+<script>
+(function () {
+  document.getElementById('yr').textContent = new Date().getFullYear();
+
+  // ◐ cycles Auto → Light → Dark, the same switch (and saved choice) as the portal.
+  var root = document.documentElement, btn = document.getElementById('theme');
+  var label = function () { var t = root.getAttribute('data-theme'); btn.title = 'Theme: ' + (t === 'light' ? 'light' : t === 'dark' ? 'dark' : 'follows your device'); };
+  label();
+  btn.addEventListener('click', function () {
+    var t = root.getAttribute('data-theme'), next = !t ? 'light' : t === 'light' ? 'dark' : '';
+    if (next) root.setAttribute('data-theme', next); else root.removeAttribute('data-theme');
+    try { if (next) localStorage.setItem('tapdot-theme', next); else localStorage.removeItem('tapdot-theme'); } catch (e) {}
+    label();
+  });
+
+  var TD = window.TD;
+  if (!TD || !TD.TEMPLATES || !TD.render) return;
+
+  // A template as a live, tappable page inside a phone frame.
+  // Entrance animations are off: a phone further down the page would stay blank until it plays.
+  function page(key) {
+    var tpl = TD.TEMPLATES[key];
+    var p = TD.normalize(JSON.parse(JSON.stringify(tpl.build())));
+    p.exp = Object.assign({}, p.exp, { fullDoc: true, embed: false });
+    return TD.render(p, { noAnim: true });
+  }
+  function fill(phone, key) {
+    var screen = phone.querySelector('.screen');
+    var f = document.createElement('iframe');
+    f.title = TD.TEMPLATES[key].name + ' example page';
+    f.setAttribute('sandbox', 'allow-scripts');
+    try { f.srcdoc = page(key); } catch (e) { return; }
+    screen.innerHTML = '';
+    screen.appendChild(f);
+    var fit = function () { f.style.transform = 'scale(' + screen.clientWidth / 375 + ')'; f.style.height = Math.ceil(screen.clientHeight * 375 / screen.clientWidth) + 'px'; };
+    fit();
+    if (window.ResizeObserver) new ResizeObserver(fit).observe(screen);
+  }
+  document.querySelectorAll('.phone[data-tpl]').forEach(function (ph) { if (TD.TEMPLATES[ph.dataset.tpl]) fill(ph, ph.dataset.tpl); });
+
+  // Template gallery: the starter templates churches pick from when they make a page.
+  var keys = ['welcome', 'connect', 'event', 'giving', 'links'].filter(function (k) { return TD.TEMPLATES[k]; });
+  var tabs = document.querySelector('.tabs'), gp = document.getElementById('gallery-phone');
+  function pick(k) {
+    tabs.querySelectorAll('button').forEach(function (b) { b.setAttribute('aria-selected', String(b.dataset.k === k)); });
+    document.getElementById('tpl-name').textContent = TD.TEMPLATES[k].name;
+    document.getElementById('tpl-desc').textContent = TD.TEMPLATES[k].desc;
+    fill(gp, k);
+  }
+  keys.forEach(function (k) {
+    var b = document.createElement('button');
+    b.type = 'button'; b.role = 'tab'; b.dataset.k = k; b.textContent = TD.TEMPLATES[k].name;
+    b.addEventListener('click', function () { pick(k); });
+    tabs.appendChild(b);
+  });
+  if (keys.length) pick(keys[0]);
+})();
+</script>
+</body>
+</html>
