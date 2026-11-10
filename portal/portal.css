@@ -8,12 +8,12 @@
   --text: #262626;
   --label: #3a3a3a;
   --muted: #6b6b6b;
-  --accent: #ff5e1f;
+  --accent: #ff5e1f; --green: #15784f; --green-bg: #e8f5ee; --green-line: #b5dfc8;
   --ink: #c2410c;
   --btn: #cc4410;
   --btn2: #b93c0a;
   --danger: #c62828;
-  --ok: #1d7a46;
+  --ok: #15784f;
   --warn: #9a6200;
   --r: 4px;
   --shadow: 0 4px 60px rgba(255, 80, 10, .06), 0 2px 12px rgba(0, 0, 0, .03);
@@ -24,7 +24,7 @@
   --tint: #fff7f3;
   --tint2: #fff1ea;
   --tint-line: #ffd2bf;
-  --ok-bg: #e7f6ee; --ok-line: #b6e2c9;
+  --ok-bg: #e8f5ee; --ok-line: #b5dfc8;
   --warn-bg: #fff4e0; --warn-ink: #7a4d00; --warn-line: #f2d49b;
   --danger-bg: #fdecec; --danger-line: #f1b5b5;
   --group: #fbfbfa;
@@ -46,12 +46,12 @@
     --text: #f2f2f0;
     --label: #d6d6d3;
     --muted: #a3a3a0;
-    --accent: #ff6a2e;
+    --accent: #ff6a2e; --green: #4fd197; --green-bg: #10291d; --green-line: #24573b;
     --ink: #ff8a5c;
     --btn: #cc4410;
     --btn2: #e0500f;
     --danger: #ff8080;
-    --ok: #5fd39a;
+    --ok: #4fd197;
     --warn: #f5b942;
     --shadow: 0 4px 60px rgba(255, 80, 10, .05), 0 2px 12px rgba(0, 0, 0, .4);
     --hover: #2a2a2a;
@@ -79,12 +79,12 @@
   --text: #f2f2f0;
   --label: #d6d6d3;
   --muted: #a3a3a0;
-  --accent: #ff6a2e;
+  --accent: #ff6a2e; --green: #4fd197; --green-bg: #10291d; --green-line: #24573b;
   --ink: #ff8a5c;
   --btn: #cc4410;
   --btn2: #e0500f;
   --danger: #ff8080;
-  --ok: #5fd39a;
+  --ok: #4fd197;
   --warn: #f5b942;
   --shadow: 0 4px 60px rgba(255, 80, 10, .05), 0 2px 12px rgba(0, 0, 0, .4);
   --hover: #2a2a2a;
@@ -137,7 +137,7 @@ button, a, input, select { transition: background-color .1s, border-color .1s, c
 .top { display: flex; align-items: center; gap: 12px; padding: 12px 24px; background: var(--panel); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 5; }
 .brand { font-weight: 800; font-size: 16px; display: flex; align-items: center; gap: 8px; color: var(--text); text-decoration: none; }
 .brand.big { font-size: 20px; justify-content: center; margin-bottom: 18px; }
-.dot { width: 16px; height: 16px; border-radius: 50%; background: radial-gradient(circle, #fff 30%, var(--accent) 34%); border-radius: 50%; }
+.dot { width: 16px; height: 16px; border-radius: 50%; background: radial-gradient(circle, var(--green) 30%, var(--accent) 34%); border-radius: 50%; }
 .churchsel { width: auto; max-width: 50vw; }
 
 .main { max-width: 1680px; margin: 0 auto; padding: 36px 24px 72px; }
@@ -217,7 +217,7 @@ dialog:has(.statsdlg) { width: min(1280px, calc(100vw - 32px)); max-height: calc
 .tapRow { display: grid; grid-template-columns: minmax(0, 1.2fr) 1fr 3.5em; gap: 10px; align-items: center; }
 .tapLabel { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tapBar { height: 8px; background: var(--panel2); border-radius: 3px; overflow: hidden; }
-.tapBar i { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
+.tapBar i { display: block; height: 100%; background: var(--green); border-radius: 3px; }
 .tapRow b { text-align: right; }
 
 /* connect card answers */
