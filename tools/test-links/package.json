@@ -1,0 +1,12 @@
+{
+  "name": "tapdot-link-finder-tests",
+  "private": true,
+  "description": "Tests for the photo/PDF viewer's link and QR finder. See README.md.",
+  "dependencies": {
+    "@tesseract.js-data/eng": "1.0.0",
+    "jsqr": "1.4.0",
+    "pdfjs-dist": "3.11.174",
+    "tesseract.js": "5.1.1",
+    "tesseract.js-core": "5.1.1"
+  }
+}

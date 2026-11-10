@@ -320,11 +320,22 @@
     workerPath: TESS + 'worker.min.js',
     corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@5.1.1',
     langPath: 'https://cdn.jsdelivr.net/npm/@tesseract.js-data/eng@1.0.0/4.0.0_best_int',
-  })).catch((e) => { ocrWorker = null; throw e; }));
+  })).then(async (w) => {
+    // Sparse text: flyers are scattered labels, so labels side by side stay separate words.
+    await w.setParameters({ tessedit_pageseg_mode: '11' });
+    return w;
+  }).catch((e) => { ocrWorker = null; throw e; }));
   // The lines of text in a picture (photo flyers, scanned PDFs), with where each one sits.
   // Words on top of a QR code are noise, so `skip` (the QR codes' boxes) leaves them out.
   async function ocrLines(canvas, skip) {
-    const { data } = await (await ocr()).recognize(canvas);
+    const k = Math.max(1, Math.min(2.5, 1800 / Math.max(canvas.width, canvas.height)));
+    let src = canvas;
+    if (k > 1.05) {
+      src = document.createElement('canvas'); src.width = Math.round(canvas.width * k); src.height = Math.round(canvas.height * k);
+      const g = src.getContext('2d'); g.imageSmoothingQuality = 'high'; g.drawImage(canvas, 0, 0, src.width, src.height);
+    }
+    const { data } = await (await ocr()).recognize(src);
+    (data.words || []).forEach((w) => { if (k > 1.05) ['x0', 'y0', 'x1', 'y1'].forEach((c) => { w.bbox[c] /= k; }); });
     const inQr = (w) => (skip || []).some((b) => { const cx = (w.bbox.x0 + w.bbox.x1) / 2, cy = (w.bbox.y0 + w.bbox.y1) / 2; return cx > b.x0 - 10 && cx < b.x1 + 10 && cy > b.y0 - 10 && cy < b.y1 + 10; });
     // Tesseract puts side-by-side headings on one line, so rebuild lines from words, split at wide gaps.
     return joinRuns((data.words || []).filter((w) => w.confidence > 60 && w.text.trim() && !inQr(w)).map((w) => ({ str: w.text, x0: w.bbox.x0, y0: w.bbox.y0, x1: w.bbox.x1, y1: w.bbox.y1 })));
@@ -341,23 +352,42 @@
           if (!found.has(c.rawValue)) found.set(c.rawValue, { x0: b.x, y0: b.y, x1: b.x + b.width, y1: b.y + b.height });
         });
       } catch (e) { /* use jsQR */ }
-      if (found.size) return [...found].map(([raw, box]) => ({ raw, box }));
     }
+    // jsQR as well: it catches codes the built-in reader misses (and is all Safari and Firefox have).
     const read = await jsqr();
-    const g = canvas.getContext('2d', { willReadFrequently: true });
     const W = canvas.width, H = canvas.height;
-    for (const part of [1, 1 / 2, 1 / 3]) {
-      const w = Math.round(W * part), hh = Math.round(H * part);
-      for (let y = 0; y + hh <= H + 1; y += Math.max(1, Math.round(hh / 2))) {
-        for (let x = 0; x + w <= W + 1; x += Math.max(1, Math.round(w / 2))) {
-          const img = g.getImageData(x, y, Math.min(w, W - x), Math.min(hh, H - y));
-          const c = read(img.data, img.width, img.height, { inversionAttempts: 'attemptBoth' });
-          if (!c || !c.data || found.has(c.data)) continue;
-          const pts = ['topLeftCorner', 'topRightCorner', 'bottomLeftCorner', 'bottomRightCorner'].map((k) => c.location[k]);
-          const xs = pts.map((p) => p.x + x), ys = pts.map((p) => p.y + y);
-          found.set(c.data, { x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys) });
+    // Work on a copy: each code found is painted over so the next look can find another one.
+    const work = document.createElement('canvas'); work.width = W; work.height = H;
+    const g = work.getContext('2d', { willReadFrequently: true });
+    g.drawImage(canvas, 0, 0);
+    const cover = (b) => { const m = Math.max(8, (b.x1 - b.x0) * 0.12); g.fillStyle = '#fff'; g.fillRect(b.x0 - m, b.y0 - m, b.x1 - b.x0 + 2 * m, b.y1 - b.y0 + 2 * m); };
+    found.forEach(cover);
+    const readAt = (x, y, w, h) => {
+      const img = g.getImageData(x, y, w, h);
+      const c = read(img.data, img.width, img.height, { inversionAttempts: 'attemptBoth' });
+      if (!c || !c.data) return false;
+      const pts = ['topLeftCorner', 'topRightCorner', 'bottomLeftCorner', 'bottomRightCorner'].map((k) => c.location[k]);
+      const xs = pts.map((p) => p.x + x), ys = pts.map((p) => p.y + y);
+      const box = { x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys) };
+      // How far the code is turned, from its top edge: a photo taken at a slant can be straightened.
+      box.angle = Math.atan2(c.location.topRightCorner.y - c.location.topLeftCorner.y, c.location.topRightCorner.x - c.location.topLeftCorner.x);
+      const isNew = !found.has(c.data);
+      if (isNew) found.set(c.data, box);
+      cover(box);
+      return isNew;
+    };
+    // The whole picture, then overlapping halves and thirds (small codes, or a code that only
+    // reads once its neighbor is painted over). Repeat while that keeps turning up new codes.
+    for (let round = 0; round < 4; round++) {
+      const before = found.size;
+      for (let i = 0; i < 12 && readAt(0, 0, W, H); i++);
+      for (const part of [1 / 2, 1 / 3]) {
+        const w = Math.round(W * part), hh = Math.round(H * part);
+        for (let y = 0; y + hh <= H + 1; y += Math.max(1, Math.round(hh / 2))) {
+          for (let x = 0; x + w <= W + 1; x += Math.max(1, Math.round(w / 2))) readAt(x, y, Math.min(w, W - x), Math.min(hh, H - y));
         }
       }
+      if (found.size === before) break;
     }
     return [...found].map(([raw, box]) => ({ raw, box }));
   }
@@ -381,11 +411,17 @@
   // PDF text comes in runs; join runs that sit on the same line into one line of text.
   function joinRuns(runs) {
     const lines = [];
-    runs.slice().sort((a, b) => a.y1 - b.y1 || a.x0 - b.x0).forEach((r) => {
+    const mid = (r) => (r.y0 + r.y1) / 2;
+    runs.slice().sort((a, b) => mid(a) - mid(b) || a.x0 - b.x0).sort((a, b) => (Math.abs(mid(a) - mid(b)) < Math.min(a.y1 - a.y0, b.y1 - b.y0) * 0.5 ? a.x0 - b.x0 : 0)).forEach((r) => {
       const h = r.y1 - r.y0;
-      const l = lines.find((x) => Math.abs(x.y1 - r.y1) < h * 0.5 && r.x0 - x.x1 < h * 1.5 && r.x0 >= x.x0 - 1);
-      if (l) { l.str += (r.x0 - l.x1 > h * 0.15 && !/[\s@.]$/.test(l.str) && !/^[@.]/.test(r.str) ? ' ' : '') + r.str; l.x1 = Math.max(l.x1, r.x1); l.y0 = Math.min(l.y0, r.y0); }
-      else lines.push(Object.assign({}, r));
+      // Same line: the two overlap by at least half the smaller height, and the gap between them
+      // is a word space, not the gutter between two columns.
+      const l = lines.find((x) => {
+        const lh = x.h || x.y1 - x.y0, ov = Math.min(x.y1, r.y1) - Math.max(x.y0, r.y0);
+        return ov >= Math.min(h, lh) * 0.5 && r.x0 - x.x1 < Math.max(h, lh) * 0.9 && r.x0 >= x.x0 - 1;
+      });
+      if (l) { l.str += (r.x0 - l.x1 > h * 0.15 && !/[\s@.]$/.test(l.str) && !/^[@.]/.test(r.str) ? ' ' : '') + r.str; l.x1 = Math.max(l.x1, r.x1); l.y0 = Math.min(l.y0, r.y0); l.y1 = Math.max(l.y1, r.y1); l.h = Math.max(l.h, h); }
+      else lines.push(Object.assign({ h }, r));
     });
     return lines.filter((l) => l.str.trim());
   }
@@ -394,14 +430,35 @@
   // can be named after the words next to it.
   async function findLinks(blob, kind) {
     const out = [];
-    const fromLines = (lines, page) => lines.forEach((l) => (l.str.match(LINK_RE) || []).forEach((raw) => out.push({ raw: /@/.test(raw) ? raw.replace(/\s+/g, '') : raw, page, box: l, lines })));
+    const fromLines = (lines, page) => lines.forEach((l) => (l.str.match(LINK_RE) || []).forEach((raw) => {
+      // A web address that ends a line with / or - usually carries on at the start of the next line.
+      if (/^(https?:|www\.)|\//i.test(raw) && /[/-]$/.test(raw) && l.str.trimEnd().endsWith(raw)) {
+        const h = l.y1 - l.y0;
+        const next = lines.find((x) => x !== l && x.y0 >= l.y1 - h * 0.3 && x.y0 - l.y1 < h * 1.2 && Math.abs(x.x0 - l.x0) < h * 3);
+        const rest = next && /^[\w./%?=&#-]+/.exec(next.str.trim());
+        if (rest && !/^[A-Z][a-z]/.test(rest[0])) raw += rest[0].replace(/[.,;:]+$/, '');
+      }
+      out.push({ raw: /@/.test(raw) ? raw.replace(/\s+/g, '') : raw, page, box: l, lines });
+    }));
     if (kind === 'image') {
       const url = URL.createObjectURL(blob);
       let c;
       try { c = await canvasOf(url, 2000); } finally { URL.revokeObjectURL(url); }
-      const qrs = await qrCodes(c);
+      let qrs = await qrCodes(c);
+      // A photo taken at a slant: turn it straight (by its QR codes) so the words read cleanly.
+      const angles = qrs.map((q) => q.box.angle).filter((a) => typeof a === 'number').sort((a, b) => a - b);
+      const tilt = angles.length ? angles[angles.length >> 1] : 0;
+      if (Math.abs(tilt) > 0.03 && Math.abs(tilt) < 0.6) {
+        const r = document.createElement('canvas'), cos = Math.abs(Math.cos(tilt)), sin = Math.abs(Math.sin(tilt));
+        r.width = Math.round(c.width * cos + c.height * sin); r.height = Math.round(c.width * sin + c.height * cos);
+        const g = r.getContext('2d', { willReadFrequently: true });
+        g.fillStyle = '#fff'; g.fillRect(0, 0, r.width, r.height);
+        g.translate(r.width / 2, r.height / 2); g.rotate(-tilt); g.drawImage(c, -c.width / 2, -c.height / 2);
+        const again = await qrCodes(r);
+        if (again.length >= qrs.length) { c = r; qrs = again; }
+      }
       const lines = await ocrLines(c, qrs.map((q) => q.box)).catch(() => []);
-      qrs.forEach((q) => out.push({ raw: q.raw, page: 0, box: q.box, lines }));
+      qrs.forEach((q) => out.push({ raw: q.raw, page: 0, box: q.box, lines, qr: true }));
       fromLines(lines, 0);
       return out;
     }
@@ -430,53 +487,75 @@
         out.push({ raw: a.url, page: n, box: { x0: Math.min(r[0], r[2]), y0: Math.min(r[1], r[3]), x1: Math.max(r[0], r[2]), y1: Math.max(r[1], r[3]) }, lines });
       });
       fromLines(lines, n);
-      qrs.forEach((q) => out.push({ raw: q.raw, page: n, box: q.box, lines }));
+      qrs.forEach((q) => out.push({ raw: q.raw, page: n, box: q.box, lines, qr: true }));
     }
     return out;
   }
 
   // ── Naming a found link after what it does ──
-  const GENERIC = /^(click( here)?|here|tap here|scan( me| here)?|link|qr( code)?|website|web ?site|online|url|more info|info|or|and|at|to|visit|go|see|call|e-?mail|text|contact( us)?|questions|or visit|visit us)$/i;
-  const titleCase = (s) => s.toLowerCase().replace(/(^|[\s/&-])([a-z])/g, (m, a, b) => a + b.toUpperCase());
+  const GENERIC = /^(click( here)?|here|tap here|scan( me| here)?|link|qr( code)?|(our )?(new )?(web ?site|site|page|homepage)|online|url|more info|more details|details|info|(?:learn|read|find out|see|know) more|more|or|and|at|to|visit|go|see|call|e-?mail|email us|text|contact( us)?|questions|or visit|visit us|office hours|hours|phone|tel|web)$/i;
+  // FALL FESTIVAL → Fall Festival, but RSVP, VBS and FAQ stay as they are.
+  const KEEP_CAPS = /^(?:[B-DF-HJ-NP-TV-XZ]+|FAQ|BFC|USA|GPS|ASL|ESL|AWANA|MOPS)$/;
+  const titleCase = (s) => s.split(/(\s+|[/&-])/).map((w) => (KEEP_CAPS.test(w) ? w : w.toLowerCase().replace(/^([a-z])/, (m, a) => a.toUpperCase()))).join('');
   // A short, readable name from a line of text, or '' when the line isn't one.
   function cleanLabel(s) {
     let t = String(s || '').replace(LINK_RE, ' ').replace(/\+?\(?\d[\d\s().-]{7,}\d/g, ' ').replace(/\s+/g, ' ').trim();
-    t = t.replace(/^[\s:–—|•·>*-]+|[\s:–—|•·>*,-]+$/g, '');
-    t = t.replace(/^(?:(?:please\s+)?(?:scan|tap|click|visit|go to|head to|check out)(?:\s+(?:here|me|the code|this code|this|below|the qr code|the link))?(?:\s+(?:to|for))?\s+)/i, '');
-    t = t.replace(/[\s:–—|•·>*,(-]+$/g, '').replace(/[?!.]+$/, '').trim();
+    t = t.replace(/[()[\]]/g, ' ').replace(/\s+/g, ' ').replace(/^[\s:–—|•·>*-]+|[\s:–—|•·>*,.-]+$/g, '');
+    t = t.replace(/^(?:(?:please\s+)?(?:scan|tap|click|visit|go to|head to|check out|see|find (?:it|us|out more))(?:\s+(?:here|me|the code|this code|this|below|the qr code|the link))?(?:\s+(?:to|for))?\s+)/i, '');
+    // "Small Groups: find one at …" → Small Groups
+    const head = /^([^:]{2,30}):\s+\S/.exec(t);
+    if (head && head[1].split(' ').length <= 4 && !GENERIC.test(head[1].trim())) t = head[1];
+    // Words that only lead into the address ("Register online at", "Sign up on").
+    for (let i = 0; i < 3; i++) t = t.replace(/[\s:–—|•·>*,(-]+$/g, '').replace(/\s+(?:at|on|to|via|by|from|is|here|below|or)$/i, '').replace(/^(?:or|and)\s+/i, '');
+    t = t.replace(/[?!.]+$/, '').trim();
     if (!/[a-z]/i.test(t) || t.length < 2 || t.length > 30 || t.split(' ').length > 5 || GENERIC.test(t)) return '';
-    if (t === t.toUpperCase() && t.length > 3) t = titleCase(t);
+    if (t === t.toUpperCase() && !KEEP_CAPS.test(t)) t = titleCase(t);
+    t = t.replace(/\b([A-Z])([A-Z]+)([a-z]+)\b/g, (m, a, b, c) => a + b.toLowerCase() + c); // "YOur", misread by OCR
     return t.charAt(0).toUpperCase() + t.slice(1);
   }
   // The text right next to a link: its own words for a clickable link, or a heading just above
   // (or beside) a QR code.
   function nearbyText(f) {
     if (!f.box || !f.lines) return '';
+    // A written link with words of its own on the line ("Register online at …") is named by them,
+    // or by its address when those words say nothing ("Our new site: …"), never by a neighbor.
+    if (!f.qr && typeof f.box.str === 'string') {
+      const own = cleanLabel(f.box.str);
+      if (own) return own;
+      // "Learn more" on its own is named by the heading above it instead.
+      const cta = /^\W*(?:(?:learn|read|find out|see|know) more|more (?:info|details)|details)\W*$/i.test(f.box.str.replace(LINK_RE, ' '));
+      if (!cta && f.box.str.replace(LINK_RE, ' ').split(/[^a-z]+/i).filter((w) => w.length > 1).length) return '';
+    }
     const b = f.box, bh = b.y1 - b.y0;
-    const reach = Math.max(70, bh * 1.2);
+    // A QR code's label sits within about its own size; a written link's within two line heights.
+    const reach = f.qr ? Math.max(70, bh * 1.2) : Math.max(70, bh * 2.2);
     let best = '', bestD = Infinity;
     f.lines.forEach((l) => {
       const name = cleanLabel(l.str);
       if (!name) return;
       const dx = Math.max(0, l.x0 - b.x1, b.x0 - l.x1);
       const above = l.y1 <= b.y0 + 2, below = l.y0 >= b.y1 - 2;
-      const dy = above ? b.y0 - l.y1 : below ? (l.y0 - b.y1) * 1.4 : 0;
-      const d = Math.hypot(dx, dy);
+      const dy = above ? b.y0 - l.y1 : below ? (l.y0 - b.y1) * 1.1 : 0;
+      const d = Math.hypot(dx, dy) * (/^\s*(?:please\s+)?(?:scan|tap|click)\b/i.test(l.str) ? 1.6 : 1);
       if (d <= reach && d < bestD) { best = name; bestD = d; }
     });
     return best;
   }
-  const NOT_NAMES = /^(info|office|contact|hello|hi|admin|mail|email|church|team|support|welcome|connect|noreply|no-reply|web|webmaster|staff|general|questions)$/i;
+  const NOT_NAMES = /^(info|office|contact|hello|hi|admin|mail|email|church|team|support|welcome|connect|noreply|no-reply|web|webmaster|staff|general|questions|giving|give|pray|prayer|kids|youth|students|events|media|worship|care|missions|groups|serve|finance|accounting|reception|front|frontdesk|members|ministry|ministries)$/i;
   // "Pastor Thaddeus", "Thaddeus Smith", "Dr. Ann Lee": a title, or a first and last name.
   const TITLE = /^((?:pastor|pr\.?|rev\.?|reverend|dr\.?|mr\.?|mrs\.?|ms\.?|miss|brother|sister)\s+)/i;
   const NAME = /^([A-Z][a-z'’-]+)(?:\s+[A-Z]\.?)?(?:\s+([A-Z][a-z'’-]+))?$/;
-  function personIn(s, local) {
-    s = String(s || '').replace(/^(?:questions\?\s*)?(?:e-?mail|contact|call|text|message|ask|reach( out to)?)\s+/i, '');
+  // `loose`: the words come from the link's own line, so a plain "Sarah Miller" counts; from a
+  // nearby line, only a title ("Pastor Mike") or a name matching the email address does.
+  function personIn(s, local, loose) {
+    s = String(s || '').trim();
+    for (let i = 0; i < 3; i++) s = s.replace(/[\s:,–—-]+$/, '').replace(/\s+(?:at|on|or|by|via)$/i, '');
+    s = s.replace(/^.*[?:]\s*/, '').replace(/^(?:please\s+)?(?:e-?mail|contact|call|text|message|ask|reach(?: out to)?|questions?)\s+/i, '');
     const t = TITLE.exec(s);
     const m = NAME.exec(t ? s.slice(t[0].length) : s);
     if (!m) return '';
     const sameAsEmail = local && local.toLowerCase().indexOf(m[1].toLowerCase()) === 0;
-    if (!t && !m[2] && !sameAsEmail) return ''; // one capitalized word ("Questions") isn't a name
+    if (!t && !sameAsEmail && !(loose && m[2])) return ''; // "Small Groups" isn't a person
     return (t ? titleCase(t[1].trim().replace(/^pr\.?$/i, 'Pastor')) + ' ' : '') + m[1];
   }
   // Found text → a button (label + action), or null for things that aren't links.
@@ -485,13 +564,20 @@
     const near = nearbyText(f);
     if (/^mailto:/i.test(t)) t = t.slice(7).split('?')[0];
     if (/^[\w.+-]+@[\w-]+\.[\w.-]+$/.test(t)) {
-      const local = t.split('@')[0], first = local.split(/[._+-]/)[0];
-      const name = personIn(near, local) || (/^[a-z]{3,}$/i.test(first) && !NOT_NAMES.test(first) ? first.charAt(0).toUpperCase() + first.slice(1).toLowerCase() : '');
+      const local = t.split('@')[0], parts = local.split(/[._+-]/), first = parts[0];
+      // The words just before the address on its own line ("Email Pastor Thaddeus at …").
+      const at = f.box && typeof f.box.str === 'string' ? f.box.str.search(new RegExp(local.replace(/[.+]/g, '\\$&') + '\\s?@', 'i')) : -1;
+      const own = at > 0 ? f.box.str.slice(0, at) : '';
+      // first.last@ is a person; a single word (giving@, pray@) only when the text names them.
+      const fromLocal = parts.length > 1 && /^[a-z]{3,}$/i.test(first) && !NOT_NAMES.test(first) ? first.charAt(0).toUpperCase() + first.slice(1).toLowerCase() : '';
+      const name = personIn(own, local, true) || personIn(near, local) || fromLocal;
       return { key: 'mailto:' + t.toLowerCase(), named: !!name, label: name ? 'Email ' + name : /^office$/i.test(first) ? 'Email the office' : 'Email us', action: Object.assign(TD.newAction('email'), { email: t }) };
     }
     const who = personIn(near);
-    if (/^tel:/i.test(t)) return { key: t.toLowerCase(), named: !!who, label: who ? 'Call ' + who : 'Call us', action: Object.assign(TD.newAction('phone'), { phone: t.slice(4) }) };
-    if (/^sms(to)?:/i.test(t)) return { key: t.toLowerCase(), named: !!who, label: who ? 'Text ' + who : 'Text us', action: Object.assign(TD.newAction('sms'), { phone: t.replace(/^sms(to)?:/i, '').split(/[?:]/)[0] }) };
+    // "Call the church office" next to a phone link already says what it does.
+    const says = (verb) => (new RegExp('^' + verb + '\\b', 'i').test(near) ? near : '');
+    if (/^tel:/i.test(t)) return { key: t.toLowerCase(), named: !!(who || says('call')), label: says('call') || (who ? 'Call ' + who : 'Call us'), action: Object.assign(TD.newAction('phone'), { phone: t.slice(4) }) };
+    if (/^sms(to)?:/i.test(t)) return { key: t.toLowerCase(), named: !!who, label: says('text') || (who ? 'Text ' + who : 'Text us'), action: Object.assign(TD.newAction('sms'), { phone: t.replace(/^sms(to)?:/i, '').split(/[?:]/)[0] }) };
     if (!/^https?:\/\//i.test(t)) { if (/^[\w-]+(\.[\w-]+)+(\/|$)/.test(t)) t = 'https://' + t; else return null; }
     let u;
     try { u = new URL(t); } catch (e) { return null; }
@@ -551,6 +637,7 @@
     }
     return byKey.size ? 'The links in this file are already buttons below.' : 'No links or QR codes found in this file.';
   }
+  TD.linkFinder = { findLinks, linkButton, addFoundLinks, cleanLabel, qrCodes, ocrLines, canvasOf }; // for tools/test-links
   const scanNotes = new WeakMap();
   async function uploadFile(file) {
     if (file.size > FILE_MAX) throw new Error('That file is ' + (file.size / 1048576).toFixed(1) + ' MB. Please keep it under 20 MB.');
