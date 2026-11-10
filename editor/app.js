@@ -1,10 +1,10 @@
-/* TapDot Editor — editor UI: block list, generic form builder, theme,
+/* DoorStep Editor — editor UI: block list, generic form builder, theme,
    pop-up menus, live preview, import/export, undo/redo, autosave. */
 (function () {
   const TD = window.TD;
   const STORE = 'tapdot-editor-project-v1';
 
-  // Portal mode: opened from the TapDot portal as /app/editor.html?church=…&page=…, the page is
+  // Portal mode: opened from the DoorStep portal as /app/editor.html?church=…&page=…, the page is
   // loaded from and saved to the church's account instead of this browser.
   const CLOUD = (() => {
     try {
@@ -1741,7 +1741,7 @@
       changed(true); snapshot(true);
       toast('Project opened');
     } catch (e) {
-      toast('No TapDot project found. HTML only works if exported with “Keep editable copy” on.');
+      toast('No DoorStep project found. HTML only works if exported with “Keep editable copy” on.');
     }
   }
 
@@ -1764,7 +1764,7 @@
         document.body.replaceChildren(h('div', { class: 'cloud-err' }, h('p', null, 'This page could not open: ' + e.message), h('a', { href: '/app/' }, 'Back to the portal')));
         return;
       }
-      document.title = CLOUD.name + ' · TapDot';
+      document.title = CLOUD.name + ' · DoorStep';
       // Pages can hold custom HTML, so the preview runs sandboxed, away from the portal's sign-in.
       $('#preview').setAttribute('sandbox', 'allow-scripts allow-popups allow-popups-to-escape-sandbox allow-forms allow-modals');
       $('.brand').replaceChildren(h('a', { href: CLOUD.back, class: 'back', title: 'Back to the portal', onclick: async (e) => {

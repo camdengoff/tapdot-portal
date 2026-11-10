@@ -1,4 +1,4 @@
-// TapDot pop-up proxy (Cloudflare Worker)
+// DoorStep pop-up proxy (Cloudflare Worker)
 //
 // Lets pages that normally refuse to be framed open inside the tap page's pop-up sheet.
 // Two ways to call it:

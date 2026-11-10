@@ -1,4 +1,4 @@
-/* TapDot portal sign-in: email + password, Google, and one-time "set your password" links. */
+/* DoorStep portal sign-in: email + password, Google, and one-time "set your password" links. */
 (function () {
   const $ = (s) => document.querySelector(s);
   const hash = new URLSearchParams(location.hash.slice(1));

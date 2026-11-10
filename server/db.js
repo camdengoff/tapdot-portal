@@ -1,4 +1,4 @@
-// Database for the TapDot portal (Cloudflare D1, bound as DB).
+// Database for the DoorStep portal (Cloudflare D1, bound as DB).
 // Tables are created on first use, so a new D1 database needs no manual setup.
 // Page contents live in KV (bound as PAGES), because D1 rows are capped at about 2 MB and
 // pages with uploaded photos can be bigger than that.

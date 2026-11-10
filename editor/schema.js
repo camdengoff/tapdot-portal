@@ -1,4 +1,4 @@
-/* TapDot Editor — block definitions, theme schema and starter templates.
+/* DoorStep Editor — block definitions, theme schema and starter templates.
    Plain script (no modules) so index.html also works when opened from disk. */
 (function () {
   const TD = (window.TD = window.TD || {});
@@ -334,7 +334,7 @@
         { k: 'btnLabel', t: 'text', l: 'Details button', ph: 'Learn more', when: (b) => b.tap === 'sheet', hint: 'The button at the bottom of the details that opens the item’s page.' },
         { k: 'btnPopup', t: 'checkbox', l: 'Details button opens the page in a pop-up', when: (b) => b.tap === 'sheet' },
         { group: 'More options', fields: [
-          { k: 'proxies', t: 'checkbox', l: 'Retry through public proxies if blocked', hint: 'Only used if the TapDot feed reader can’t reach the feed.' },
+          { k: 'proxies', t: 'checkbox', l: 'Retry through public proxies if blocked', hint: 'Only used if the DoorStep feed reader can’t reach the feed.' },
           { k: 'loading', t: 'text', l: 'Loading message' },
           { k: 'error', t: 'text', l: 'Error message' },
           { k: 'empty', t: 'text', l: 'Message when the feed is empty' },
@@ -397,7 +397,7 @@
         { k: 'btnLabel', t: 'text', l: 'Send button text' },
         { k: 'thanks', t: 'textarea', l: 'Message after sending', rich: true },
         { k: 'notify', t: 'text', l: 'Also email answers to (optional)', ph: 'office@church.org, pastor@church.org', when: () => TD.FORM_EMAIL,
-          hint: 'Answers always show in the TapDot portal. Email needs to be turned on for the portal. Up to 5 addresses, separated by commas.' },
+          hint: 'Answers always show in the DoorStep portal. Email needs to be turned on for the portal. Up to 5 addresses, separated by commas.' },
       ],
       defaults: () => ({
         title: 'Connect card', intro: 'We’re so glad you’re here! Tell us a little about yourself.',
@@ -859,7 +859,7 @@
           blk('gallery', { images: [21, 22, 23, 24, 25, 26].map(pic) }),
           blk('text', { body: 'Text blocks support **bold**, *italic*, ==accent color== and [links](https://example.com).', card: true }),
           blk('spacer', { height: 8, line: true }),
-          blk('text', { body: 'Made with the TapDot editor', size: 12, align: 'center', muted: true }),
+          blk('text', { body: 'Made with the DoorStep editor', size: 12, align: 'center', muted: true }),
         ];
         return p;
       },

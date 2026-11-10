@@ -1,7 +1,7 @@
-/* TapDot live page loader. Paste once into a Squarespace code block:
+/* DoorStep live page loader. Paste once into a Squarespace code block:
      <div class="tapdot-page" data-page="church/page"></div>
      <script src="https://<portal address>/embed.js"></script>
-   It always shows the latest version published from the TapDot portal, and counts visits and
+   It always shows the latest version published from the DoorStep portal, and counts visits and
    button taps for the portal's stats (no cookies, nothing about the visitor is kept). */
 (function () {
   var me = document.currentScript;
@@ -64,7 +64,7 @@
     if (el.getAttribute('data-loaded')) return;
     el.setAttribute('data-loaded', '1');
     var page = (el.getAttribute('data-page') || '').replace(/^\/+|\/+$/g, '');
-    if (!/^[a-z0-9-]+\/[a-z0-9-]+$/.test(page)) { el.textContent = 'TapDot: set data-page to "church/page".'; return; }
+    if (!/^[a-z0-9-]+\/[a-z0-9-]+$/.test(page)) { el.textContent = 'DoorStep: set data-page to "church/page".'; return; }
     if (el.hasAttribute('data-live')) { countView(page); watchTaps(el, page); return; } // already on the page (/view links)
     fetch(base + '/p/' + page, { cache: 'no-cache' })
       .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })

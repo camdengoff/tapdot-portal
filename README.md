@@ -1,6 +1,6 @@
-# TapDot Portal
+# DoorStep Portal
 
-TapDot builds mobile "tap tag" landing pages (for NFC tags and QR codes) and keeps them live on a church's
+DoorStep builds mobile "tap tag" landing pages (for NFC tags and QR codes) and keeps them live on a church's
 website. This repo has the visual page editor and the client portal around it, hosted on Cloudflare Pages
 at `tapdot.camdengoff.com`.
 
@@ -54,7 +54,7 @@ every Publish updates the live page.
   answers", with a download for Excel. Spam is slowed by a hidden field, a minimum fill time and 5 sends per
   visitor every 10 minutes. Email is hidden in the editor for now (`TD.FORM_EMAIL = false` in
   `editor/schema.js`); to turn it on and also email answers to the addresses set on the block, add `RESEND_API_KEY`
-  (Secret) and `MAIL_FROM` (Text, e.g. `TapDot <forms@camdengoff.com>`, on a domain verified at resend.com).
+  (Secret) and `MAIL_FROM` (Text, e.g. `DoorStep <forms@camdengoff.com>`, on a domain verified at resend.com).
 
 ### One-time setup in Cloudflare
 
@@ -76,8 +76,8 @@ every Publish updates the live page.
 
 ### Sign in with Google
 
-1. console.cloud.google.com → create a project (e.g. TapDot).
-2. APIs & Services → OAuth consent screen: External, app name TapDot, your email as support contact.
+1. console.cloud.google.com → create a project (e.g. DoorStep).
+2. APIs & Services → OAuth consent screen: External, app name DoorStep, your email as support contact.
    Publish the app so it isn't limited to test users (the email/profile scopes need no Google review).
 3. APIs & Services → Credentials → Create credentials → OAuth client ID → Web application.
    Authorized redirect URI: `https://tapdot.camdengoff.com/api/auth/google/callback`.

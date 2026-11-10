@@ -29,7 +29,7 @@ export async function feedProxy(request, waitUntil) {
   try {
     r = await fetch(target.href, {
       redirect: 'follow',
-      headers: { 'User-Agent': 'TapDot feed reader', Accept: 'application/rss+xml, application/atom+xml, application/xml;q=0.9, text/xml;q=0.9, */*;q=0.5' },
+      headers: { 'User-Agent': 'DoorStep feed reader', Accept: 'application/rss+xml, application/atom+xml, application/xml;q=0.9, text/xml;q=0.9, */*;q=0.5' },
     });
   } catch (e) { return fail(502, 'Could not reach that feed.'); }
   if (!r.ok) return fail(502, 'The feed answered with an error (' + r.status + ').');

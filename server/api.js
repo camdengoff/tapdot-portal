@@ -1,4 +1,4 @@
-// The TapDot portal API, served by Cloudflare Pages Functions under /api/.
+// The DoorStep portal API, served by Cloudflare Pages Functions under /api/.
 //
 // Roles: admins (ADMIN_EMAILS) see and manage every church. In a church, an "owner" can add
 // and remove people, and an "editor" can create, edit and publish pages.
@@ -259,7 +259,7 @@ export async function handle({ request, env, waitUntil }) {
       const m = await one(d, 'SELECT role FROM members WHERE church_id = ? AND email = ?', churchId, email);
       if (!m) throw new HttpError(404, 'That person is not in this church.');
       if (route('POST', 5) && parts[4] === 'link') {
-        if (!(await mayMakeLink(d, env, role, churchId, email))) throw new HttpError(403, email + ' already has an account. Ask your TapDot admin to reset their password.');
+        if (!(await mayMakeLink(d, env, role, churchId, email))) throw new HttpError(403, email + ' already has an account. Ask your DoorStep admin to reset their password.');
         return json({ link: await auth.makeLink(d, request, email) });
       }
       if (route('PATCH', 4)) {

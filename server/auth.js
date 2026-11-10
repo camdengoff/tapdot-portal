@@ -1,4 +1,4 @@
-// Sign-in for the TapDot portal: email + password, and Sign in with Google.
+// Sign-in for the DoorStep portal: email + password, and Sign in with Google.
 //
 // Nobody can sign up on their own. A person can sign in once their email is an admin
 // (ADMIN_EMAILS) or a member of a church. Passwords are set through one-time links that an

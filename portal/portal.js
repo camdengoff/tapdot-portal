@@ -1,4 +1,4 @@
-/* TapDot portal: churches, their pages, and the people who can edit them. */
+/* DoorStep portal: churches, their pages, and the people who can edit them. */
 (function () {
   // ── Helpers ──────────────────────────────────────────────────────────
   function h(tag, attrs, ...kids) {
@@ -203,7 +203,7 @@
     const responses = data.responses || {};
     const manage = role === 'owner' || role === 'admin';
     const viewer = role === 'viewer'; // "Stats only": sees the page list and tap stats, nothing else
-    document.title = church.name + ' · TapDot';
+    document.title = church.name + ' · DoorStep';
     const reload = () => drawChurch(id);
 
     const pageCard = (p) => {
@@ -379,7 +379,7 @@
   // ── Admin: the starter templates churches pick from ────────────────────
   async function drawTemplates() {
     const main = $('#main');
-    document.title = 'Templates · TapDot';
+    document.title = 'Templates · DoorStep';
     let list;
     try {
       list = (await api('/templates?full=1')).templates;

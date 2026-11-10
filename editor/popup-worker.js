@@ -1,4 +1,4 @@
-/* TapDot Editor — the copy-and-paste Cloudflare Worker that lets a church's pop-up sheets show
+/* DoorStep Editor — the copy-and-paste Cloudflare Worker that lets a church's pop-up sheets show
    sites that refuse to be framed. TD.popupWorkerCode(hosts) returns the whole worker, with the
    church's chosen sites filled in. The editor sends links to those sites as <worker>/?url=… */
 (function () {
@@ -24,7 +24,7 @@
         if (self.pathname === '/_tapdot/hosts') return new Response(JSON.stringify({ hosts: ALLOWED_HOSTS }), { headers: Object.assign({ 'Content-Type': 'application/json' }, CORS) });
 
         let target;
-        try { target = new URL(self.searchParams.get('url') || ''); } catch (e) { return page('TapDot pop-up worker', 'This worker is running. Pop-up links reach it as <code>?url=</code>.', 200); }
+        try { target = new URL(self.searchParams.get('url') || ''); } catch (e) { return page('DoorStep pop-up worker', 'This worker is running. Pop-up links reach it as <code>?url=</code>.', 200); }
         if (!/^https?:$/.test(target.protocol)) return page('Bad link', 'That link is not a web page.', 400);
         if (!isAllowed(target.hostname)) {
           return page('Open page', '<p>This site isn’t on this pop-up worker’s list.</p><p><a href="' + esc(target.href) + '" target="_blank" rel="noopener">Open ' + esc(target.hostname) + '</a></p>', 403);
@@ -69,8 +69,8 @@
 
   TD.popupWorkerCode = function (hosts) {
     const list = (hosts || []).filter(Boolean);
-    return '// TapDot pop-up worker: lets these sites show inside your tap page’s pop-up sheets.\n' +
-      '// Made by the TapDot editor. To change the list, copy the code again from the Export tab.\n' +
+    return '// DoorStep pop-up worker: lets these sites show inside your tap page’s pop-up sheets.\n' +
+      '// Made by the DoorStep editor. To change the list, copy the code again from the Export tab.\n' +
       'const ALLOWED_HOSTS = ' + JSON.stringify(list, null, 2) + ';\n\n' +
       'export default (' + worker.toString() + ')();\n';
   };

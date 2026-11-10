@@ -2,7 +2,7 @@
 // kept here for the church's staff to read in the portal (and emailed to them when email is set up).
 //
 // Email is optional and uses Resend (resend.com): set RESEND_API_KEY (secret) and MAIL_FROM
-// (e.g. "TapDot <forms@camdengoff.com>", on a domain verified in Resend).
+// (e.g. "DoorStep <forms@camdengoff.com>", on a domain verified in Resend).
 import { HttpError, all, one, run, now, isEmail, normEmail } from './db.js';
 
 const MAX_BODY = 30000;
@@ -65,7 +65,7 @@ async function sendEmail(env, to, form, pageName, answers, portal) {
   const filled = answers.filter((x) => x.a.trim());
   const replyTo = filled.map((x) => x.a.trim()).find((a) => isEmail(a));
   const name = (filled.find((x) => /name/i.test(x.q)) || filled[0]).a.trim();
-  const text = filled.map((x) => x.q + ':\n' + x.a).join('\n\n') + '\n\n—\nSent from “' + pageName + '”. See every answer in the TapDot portal: ' + portal + '\n';
+  const text = filled.map((x) => x.q + ':\n' + x.a).join('\n\n') + '\n\n—\nSent from “' + pageName + '”. See every answer in the DoorStep portal: ' + portal + '\n';
   const r = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: 'Bearer ' + env.RESEND_API_KEY, 'Content-Type': 'application/json' },

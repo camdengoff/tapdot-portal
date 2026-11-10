@@ -1,4 +1,4 @@
-/* TapDot Editor — turns a project (theme + blocks + pop-up menus) into one
+/* DoorStep Editor — turns a project (theme + blocks + pop-up menus) into one
    self-contained HTML page that can be pasted into a Squarespace code block. */
 (function () {
   const TD = (window.TD = window.TD || {});
@@ -1051,7 +1051,7 @@ fieldset.td-bad legend,.td-f-check.td-bad span{color:#ef4444}
         }
         if (PREVIEW) { toast('Preview: answers are not sent'); finish(); return; }
         var post = f.getAttribute('data-td-post');
-        if (!post) { fail('This form isn’t connected yet. Publish the page from the TapDot portal to collect answers.'); return; }
+        if (!post) { fail('This form isn’t connected yet. Publish the page from the DoorStep portal to collect answers.'); return; }
         var label = btn.textContent;
         btn.disabled = true; btn.textContent = 'Sending…';
         var hp = $('.td-hp', f);
@@ -1268,7 +1268,7 @@ fieldset.td-bad legend,.td-f-check.td-bad span{color:#ef4444}
       }).catch(fail);
     });
 
-    // RSS / Atom feed. The TapDot feed reader (data-td-via) fetches it for us, because most sites
+    // RSS / Atom feed. The DoorStep feed reader (data-td-via) fetches it for us, because most sites
     // don't let other sites read their feed; a feed on this same site is read directly.
     function fetchText(url) {
       var c = W.AbortController ? new AbortController() : null, t = setTimeout(function () { if (c) c.abort(); }, 8000);
@@ -1557,8 +1557,8 @@ fieldset.td-bad legend,.td-f-check.td-bad span{color:#ef4444}
     const bodyAll = page + '\n' + ov + '\n' + pre + script + embed;
 
     if (p.exp.fullDoc || opts.preview) {
-      return '<!DOCTYPE html>\n<html lang="en">\n<head>\n' + head + '\n</head>\n<body>\n<!-- Built with TapDot Editor -->\n' + bodyAll + '\n</body>\n</html>\n';
+      return '<!DOCTYPE html>\n<html lang="en">\n<head>\n' + head + '\n</head>\n<body>\n<!-- Built with DoorStep Editor -->\n' + bodyAll + '\n</body>\n</html>\n';
     }
-    return '<!-- Built with TapDot Editor -->\n' + fontLink(t) + '\n<style>\n' + css + '</style>\n' + bodyAll + '\n';
+    return '<!-- Built with DoorStep Editor -->\n' + fontLink(t) + '\n<style>\n' + css + '</style>\n' + bodyAll + '\n';
   };
 })();
