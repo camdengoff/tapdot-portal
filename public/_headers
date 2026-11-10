@@ -14,3 +14,8 @@
 /email/*
   ! Cache-Control
   Cache-Control: public, max-age=31536000
+
+# The 3D phone model on the homepage: cache it, it rarely changes.
+/demo/iphone-17-pro.glb
+  ! Cache-Control
+  Cache-Control: public, max-age=604800

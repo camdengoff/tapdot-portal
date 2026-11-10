@@ -97,13 +97,13 @@ nav a:hover { color: var(--text); }
 .dev .body { inset: 0; padding: calc(var(--w) * .01); transform: translateZ(1px); background: linear-gradient(140deg, var(--al-hi) 0%, var(--al) 18%, var(--al-lo) 50%, var(--al) 80%, var(--al-hi) 100%); box-shadow: 0 0 0 .5px rgba(0,0,0,.4), inset 0 0 0 .5px rgba(255,255,255,.35); }
 .dev .bezel { position: relative; height: 100%; border-radius: calc(var(--w) * .146); background: #000; padding: calc(var(--w) * .016); box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
 .dev .screen { position: relative; height: 100%; border-radius: calc(var(--w) * .13); overflow: hidden; background: #fff; isolation: isolate; }
-.dev .vp { position: absolute; top: 0; left: 0; width: 390px; height: 844px; transform-origin: 0 0; background: var(--sbg, #fff); }
-.dev .sb { position: absolute; top: 0; left: 0; right: 0; height: 54px; display: flex; align-items: center; justify-content: space-between; padding: 6px 30px 0 52px; color: var(--sbc, #000); font: 600 16.5px/1 -apple-system, 'SF Pro Text', 'Hanken Grotesk', system-ui, sans-serif; letter-spacing: -.2px; z-index: 2; pointer-events: none; }
-.dev .sb svg { display: block; }
-.dev .sb .ico { display: flex; gap: 6px; align-items: center; }
-.dev iframe { position: absolute; top: 54px; left: 0; width: 390px; height: 762px; border: 0; background: var(--sbg, #fff); }
-.dev .island { position: absolute; top: 11px; left: 50%; width: 124px; height: 36px; margin-left: -62px; border-radius: 20px; background: #000; z-index: 3; pointer-events: none; }
-.dev .hi { position: absolute; bottom: 8px; left: 50%; width: 136px; height: 5px; margin-left: -68px; border-radius: 3px; background: var(--sbc, #000); opacity: .85; z-index: 3; pointer-events: none; }
+.phone .vp { position: absolute; top: 0; left: 0; width: 390px; height: 844px; transform-origin: 0 0; background: var(--sbg, #fff); }
+.phone .sb { position: absolute; top: 0; left: 0; right: 0; height: 54px; display: flex; align-items: center; justify-content: space-between; padding: 6px 30px 0 52px; color: var(--sbc, #000); font: 600 16.5px/1 -apple-system, 'SF Pro Text', 'Hanken Grotesk', system-ui, sans-serif; letter-spacing: -.2px; z-index: 2; pointer-events: none; }
+.phone .sb svg { display: block; }
+.phone .sb .ico { display: flex; gap: 6px; align-items: center; }
+.phone iframe { position: absolute; top: 54px; left: 0; width: 390px; height: 762px; border: 0; background: var(--sbg, #fff); }
+.phone .island { position: absolute; top: 11px; left: 50%; width: 124px; height: 36px; margin-left: -62px; border-radius: 20px; background: #000; z-index: 3; pointer-events: none; }
+.phone .hi { position: absolute; bottom: 8px; left: 50%; width: 136px; height: 5px; margin-left: -68px; border-radius: 3px; background: var(--sbc, #000); opacity: .85; z-index: 3; pointer-events: none; }
 .dev .glare { position: absolute; inset: 0; z-index: 4; pointer-events: none; border-radius: inherit; background: linear-gradient(115deg, rgba(255,255,255,.22) 0%, rgba(255,255,255,.07) 26%, rgba(255,255,255,0) 40%, rgba(255,255,255,0) 78%, rgba(255,255,255,.06) 100%); }
 .dev .key { border-radius: 3px; width: calc(var(--w) * .016); transform: translateZ(calc(var(--w) * -.06)); background: linear-gradient(90deg, var(--al-lo), var(--al-hi) 50%, var(--al-lo)); }
 .dev .key.cc { background: linear-gradient(90deg, #111318, #3b4150 50%, #111318); box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); width: calc(var(--w) * .011); right: calc(var(--w) * -.005); }
@@ -114,11 +114,20 @@ nav a:hover { color: var(--text); }
 :root[data-theme="dark"] .floor { background: radial-gradient(closest-side, rgba(0,0,0,.8), rgba(0,0,0,0)); }
 @media (max-width: 760px) { .phone { --k: .55; } .phone:hover .dev { --k: .3; } }
 @media (prefers-reduced-motion: reduce) { .dev { transition: none; } }
+/* With WebGL, the real iPhone 17 Pro model takes over from the drawn phone (the page itself
+   sits in the model's screen opening, still live and tappable). */
+.phone .stage { position: absolute; left: -45%; right: -45%; top: -12%; bottom: -12%; pointer-events: none; }
+.phone .stage .css3d { position: absolute; inset: 0; pointer-events: none; }
+.phone .stage .css3d .vp { pointer-events: auto; transform-origin: 50% 50%; overflow: hidden; border-radius: 52px; }
+.phone .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.phone.is3d .dev { visibility: hidden; }
+.phone.is3d .stage .vp .island { display: none; }
+
 .hero-phone { display: flex; justify-content: center; position: relative; }
-.tag { position: absolute; left: calc(50% - 335px); bottom: 90px; z-index: 2; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; box-shadow: var(--shadow); font-size: 13.5px; display: flex; gap: 10px; align-items: center; max-width: 200px; }
+.tag { position: absolute; left: calc(50% - 370px); bottom: 90px; z-index: 2; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; box-shadow: var(--shadow); font-size: 13.5px; display: flex; gap: 10px; align-items: center; max-width: 200px; }
 .tag b { display: block; font-weight: 600; }
 .tag .dot { width: 34px; height: 34px; border-radius: 50%; background: var(--accent); flex: none; display: grid; place-items: center; color: #fff; font-size: 16px; }
-@media (max-width: 900px) { .tag { left: calc(50% - 300px); } }
+@media (max-width: 900px) { .tag { left: calc(50% - 330px); } }
 @media (max-width: 520px) { .phone { --w: 250px !important; } .tag { display: none; } }
 
 section { padding: 96px 0; border-bottom: 1px solid var(--line); }
@@ -419,7 +428,7 @@ footer a { color: var(--muted); }
 <footer>
   <div class="wrap">
     <span>© <span id="yr">2026</span> DoorStep</span>
-    <span><a href="/app/">Sign in</a></span>
+    <span><a href="https://sketchfab.com/3d-models/iphone-17-pro-4541aa8a28324b33a2baaf81d263aaec">iPhone 17 Pro model</a> by Ranguel, <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a> · <a href="/app/">Sign in</a></span>
   </div>
 </footer>
 
@@ -520,10 +529,12 @@ footer a { color: var(--muted); }
       '<div class="body"><div class="bezel"><div class="screen"><div class="vp"><div class="sb"><span>9:41</span><span class="ico">' + BARS + '</span></div><div class="island"></div><div class="hi"></div></div><div class="glare"></div></div></div></div>' +
       '</div><div class="floor" aria-hidden="true"></div>';
     var screen = phone.querySelector('.screen'), vp = phone.querySelector('.vp');
-    var fit = function () { vp.style.transform = 'scale(' + screen.clientWidth / 390 + ')'; };
+    var fit = function () { if (!phone._3d) vp.style.transform = 'scale(' + screen.clientWidth / 390 + ')'; };
     fit();
     if (window.ResizeObserver) new ResizeObserver(fit).observe(screen);
     phone._vp = vp;
+    (window.__phones = window.__phones || []).push(phone);
+    if (window.__phone3d) window.__phone3d(phone);
     return phone;
   }
   function fill(phone, key) {
@@ -556,6 +567,127 @@ footer a { color: var(--muted); }
   });
   if (keys.length) pick(keys[0]);
 })();
+</script>
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }</script>
+<script type="module">
+// The phones as a real 3D iPhone 17 Pro ("iPhone 17 Pro" by Ranguel on Sketchfab, CC BY 4.0,
+// recolored Cosmic Orange and compressed: /demo/iphone-17-pro.glb). WebGL draws the phone; the
+// live page is a CSS 3D layer underneath, showing through a hole cut where the model's screen is,
+// so the frame, bezel and island cover its edges exactly. Without WebGL the drawn phone stays.
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+import { CSS3DRenderer, CSS3DObject } from 'three/addons/renderers/CSS3DRenderer.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+const probe = document.createElement('canvas');
+if (!(probe.getContext('webgl2') || probe.getContext('webgl'))) throw new Error('no WebGL');
+const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+const gltf = await loader.loadAsync('/demo/iphone-17-pro.glb');
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// The model lies with its screen facing -Z; measure the screen in the model's own frame.
+const base = gltf.scene;
+base.updateMatrixWorld(true);
+let oled = null;
+base.traverse((o) => { if (o.isMesh && o.material && o.material.name === 'OLED') oled = o; });
+const box = new THREE.Box3().setFromObject(oled), sz = box.getSize(new THREE.Vector3()), mid = box.getCenter(new THREE.Vector3());
+const all = new THREE.Box3().setFromObject(base), allMid = all.getCenter(new THREE.Vector3()), allSz = all.getSize(new THREE.Vector3());
+const front = mid.z < allMid.z ? -1 : 1;
+
+function materials(root) {
+  root.traverse((o) => {
+    if (!o.isMesh) return;
+    const n = o.material.name;
+    if (n === 'OLED') {
+      // The hole: writes transparent pixels so the live page beneath shows through.
+      // Drawn after the rest, ignoring depth (the black display layer sits in the same plane).
+      o.material = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0, blending: THREE.NoBlending, depthTest: false, depthWrite: false, side: THREE.DoubleSide });
+      o.renderOrder = 10;
+    } else if (n === 'OLED off') {
+      // The Dynamic Island, on top of the hole.
+      o.material = new THREE.MeshBasicMaterial({ color: 0x000000, depthTest: false, side: THREE.DoubleSide });
+      o.renderOrder = 11;
+    } else if (n === 'Glass') {
+      o.material = new THREE.MeshPhysicalMaterial({ color: 0x000000, transparent: true, opacity: 0.06, roughness: 0.05, metalness: 0, depthWrite: false, depthTest: false, side: THREE.DoubleSide });
+      o.renderOrder = 12;
+    } else {
+      o.material = o.material.clone();
+    }
+  });
+}
+
+const env = (() => { const r = new THREE.WebGLRenderer(); const t = new THREE.PMREMGenerator(r).fromScene(new RoomEnvironment(), 0.03).texture; return t; })();
+
+function make(phone) {
+  if (phone._3d) return;
+  const vp = phone._vp;
+  const stage = document.createElement('div'); stage.className = 'stage';
+  const cssLayer = new CSS3DRenderer(); cssLayer.domElement.className = 'css3d';
+  const gl = new THREE.WebGLRenderer({ antialias: true, alpha: true, premultipliedAlpha: true });
+  gl.setPixelRatio(Math.min(devicePixelRatio, 2));
+  gl.toneMapping = THREE.ACESFilmicToneMapping; gl.toneMappingExposure = 1.05;
+  gl.outputColorSpace = THREE.SRGBColorSpace;
+  stage.appendChild(cssLayer.domElement); stage.appendChild(gl.domElement);
+  phone.appendChild(stage);
+
+  const scene = new THREE.Scene(); scene.environment = env;
+  const key = new THREE.DirectionalLight(0xffffff, 2.2); key.position.set(-0.4, 0.6, front * 0.8); scene.add(key);
+  const rim = new THREE.DirectionalLight(0xffe2cc, 1.4); rim.position.set(0.6, 0.2, -front * 0.5); scene.add(rim);
+  scene.add(new THREE.AmbientLight(0xffffff, 0.35));
+
+  // Pivot at the phone's middle; the model and the page layer turn together.
+  const pivot = new THREE.Group(); scene.add(pivot);
+  const model = base.clone(true); materials(model); model.position.sub(allMid); pivot.add(model);
+  const page = new CSS3DObject(vp);
+  const pxW = 390, pxH = Math.round(390 * sz.y / sz.x);
+  vp.style.height = pxH + 'px'; vp.style.transform = 'none';
+  const f = vp.querySelector('iframe'); if (f) f.style.height = (pxH - 54 - 28) + 'px';
+  page.scale.setScalar(sz.x / pxW);
+  page.position.copy(mid).sub(allMid); page.position.z += front * 0.00002;
+  if (front < 0) page.rotation.y = Math.PI;
+  pivot.add(page);
+
+  const cam = new THREE.PerspectiveCamera(22, 1, 0.01, 10);
+  const cs = getComputedStyle(phone);
+  const deg = (v, d) => (parseFloat(cs.getPropertyValue(v)) || d) * Math.PI / 180;
+  const target = { x: deg('--rx', 8), y: deg('--ry', -27), z: deg('--rz', 2) };
+  // Our angles were for a phone facing +Z; the model faces the other way.
+  const cur = { k: 1 }, want = { k: 1 };
+  let raf = 0, visible = false;
+  function size() {
+    const w = stage.clientWidth, h = stage.clientHeight; if (!w || !h) return;
+    gl.setSize(w, h, false); cssLayer.setSize(w, h);
+    cam.aspect = w / h;
+    // Fit the phone's height to the phone box (stage is 124% of it).
+    const dist = (allSz.y / 2) / Math.tan(THREE.MathUtils.degToRad(cam.fov / 2)) * 1.24 / 1.0;
+    cam.position.set(0, 0, front * dist); cam.lookAt(0, 0, 0); cam.updateProjectionMatrix();
+    draw();
+  }
+  function draw() {
+    const k = cur.k * (innerWidth < 760 ? 0.55 : 1);
+    pivot.rotation.set(target.x * k * -front, target.y * k * -front, target.z * k);
+    gl.render(scene, cam); cssLayer.render(scene, cam);
+  }
+  function tick() {
+    raf = 0;
+    cur.k += (want.k - cur.k) * 0.12;
+    draw();
+    if (Math.abs(want.k - cur.k) > 0.002) raf = requestAnimationFrame(tick);
+  }
+  const go = () => { if (!raf && visible) raf = requestAnimationFrame(tick); };
+  if (!reduce) {
+    phone.addEventListener('mouseenter', () => { want.k = 0.45; go(); });
+    phone.addEventListener('mouseleave', () => { want.k = 1; go(); });
+  }
+  new IntersectionObserver((es) => { visible = es[0].isIntersecting; if (visible) draw(); }).observe(phone);
+  new ResizeObserver(size).observe(stage);
+  phone.classList.add('is3d');
+  phone._3d = true;
+  size();
+}
+window.__phone3d = (p) => { try { make(p); } catch (e) { console.warn('3D phone', e); } };
+(window.__phones || []).forEach(window.__phone3d);
 </script>
 </body>
 </html>
