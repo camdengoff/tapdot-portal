@@ -123,11 +123,10 @@ nav a:hover { color: var(--text); }
 .phone.is3d .dev { visibility: hidden; }
 .phone.is3d .stage .vp .island { display: none; }
 
-.hero-phone { display: flex; justify-content: center; position: relative; }
-.tag { position: absolute; left: calc(50% - 370px); bottom: 90px; z-index: 2; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; box-shadow: var(--shadow); font-size: 13.5px; display: flex; gap: 10px; align-items: center; max-width: 200px; }
+.hero-phone { display: flex; flex-direction: column; align-items: center; gap: 46px; position: relative; }
+.tag { position: relative; z-index: 2; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; box-shadow: var(--shadow); font-size: 13.5px; display: flex; gap: 10px; align-items: center; max-width: none; white-space: nowrap; }
 .tag b { display: block; font-weight: 600; }
 .tag .dot { width: 34px; height: 34px; border-radius: 50%; background: var(--accent); flex: none; display: grid; place-items: center; color: #fff; font-size: 16px; }
-@media (max-width: 900px) { .tag { left: calc(50% - 330px); } }
 @media (max-width: 520px) { .phone { --w: 250px !important; } .tag { display: none; } }
 
 section { padding: 96px 0; border-bottom: 1px solid var(--line); }
@@ -249,7 +248,7 @@ footer a { color: var(--muted); }
     </div>
     <div class="hero-phone">
       <div class="phone c-orange" data-tpl="welcome" style="--w:300px"></div>
-      <div class="tag" aria-hidden="true"><span class="dot">⌁</span><span><b>Tapped at the welcome desk</b>Opens instantly on any phone</span></div>
+      <div class="tag" aria-hidden="true"><span class="dot">⌁</span><span><b>Tapped at the welcome desk</b>Opens instantly on any phone, no app</span></div>
     </div>
   </div>
 </section>
