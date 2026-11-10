@@ -48,4 +48,17 @@ def dark(im, d):
     im.paste(qr('https://bethanynaz.org/kids', 110), (1820, 1220)); d.text((1560, 1250), 'Kids check-in', font=font(34), fill='white')
 im = Image.new('RGB', (2000, 1400)); dark(im, ImageDraw.Draw(im)); im.save(f'{D}/dark-flyer.jpg', quality=85)
 E['dark-flyer.jpg'] = [['https://youtube.com/@bethanyfirst/live', 'Watch Live'], ['mailto:mike.jones@bethanynaz.org', 'Email Pastor Mike'], ['tel:+14057891234', 'Call the office'], ['https://bethanynaz.org/kids', 'Kids check-in']]
+# Giving card: an email split after its @, and a short-link QR beside paragraphs (no label of its own)
+c = canvas.Canvas(f'{D}/giving-card.pdf', pagesize=letter); c.setFont('Helvetica-Oblique', 10)
+for i, t in enumerate(['Would you consider', 'setting up a recurring', 'gift using your credit card', 'or bank account? We rely', 'on monthly gifts from our', 'supporters.']):
+    c.drawCentredString(130, H-80-i*12, t)
+c.drawImage(ImageReader(qr('https://qr.codes/Y3Poqe', 300)), 230, H-160, 80, 80)
+c.setFont('Helvetica', 10)
+c.drawString(50, H-200, 'If you become a recurring donor, email friendsoftulakes@')
+c.drawString(50, H-212, 'gmail.com by December 31 to claim your gift.')
+c.setFont('Helvetica', 9)
+for i, t in enumerate(['Food Center', '7202 Lyrewood Lane, Oklahoma City, OK 73132', 'Clinic', '7301 N Comanche Avenue, Oklahoma City, OK 73132', 'tulakes.org']):
+    c.drawString(50, H-260-i*11, t)
+c.save()
+E['giving-card.pdf'] = [['https://qr.codes/Y3Poqe', 'Give'], ['mailto:friendsoftulakes@gmail.com', 'Email us'], ['https://tulakes.org', 'Tulakes']]
 json.dump(E, open(os.path.join(os.path.dirname(__file__), 'expected2.json'), 'w'), indent=1); print('ok', list(E))

@@ -430,16 +430,27 @@
   // can be named after the words next to it.
   async function findLinks(blob, kind) {
     const out = [];
-    const fromLines = (lines, page) => lines.forEach((l) => (l.str.match(LINK_RE) || []).forEach((raw) => {
+    const nextLine = (lines, l) => { const h = l.y1 - l.y0; return lines.find((x) => x !== l && x.y0 >= l.y1 - h * 0.3 && x.y0 - l.y1 < h * 1.2 && Math.abs(x.x0 - l.x0) < h * 3); };
+    const fromLines = (lines, page) => {
+      // An email split after its @ ("friendsoftulakes@" / "gmail.com by …") is one address, and
+      // the site name starting the next line isn't a link of its own.
+      const taken = new Set();
+      lines.forEach((l) => {
+        const m = /([\w.+-]+)@\s*$/.exec(l.str), next = m && nextLine(lines, l);
+        const dom = next && /^\s*([\w-]+(?:\.[\w-]+)*\.[a-z]{2,})\b/i.exec(next.str);
+        if (dom) { out.push({ raw: m[1] + '@' + dom[1], page, box: l, lines }); taken.add(next); }
+      });
+      lines.forEach((l) => (l.str.match(LINK_RE) || []).forEach((raw, i) => {
+      if (i === 0 && taken.has(l) && l.str.trimStart().startsWith(raw)) return;
       // A web address that ends a line with / or - usually carries on at the start of the next line.
       if (/^(https?:|www\.)|\//i.test(raw) && /[/-]$/.test(raw) && l.str.trimEnd().endsWith(raw)) {
-        const h = l.y1 - l.y0;
-        const next = lines.find((x) => x !== l && x.y0 >= l.y1 - h * 0.3 && x.y0 - l.y1 < h * 1.2 && Math.abs(x.x0 - l.x0) < h * 3);
+        const next = nextLine(lines, l);
         const rest = next && /^[\w./%?=&#-]+/.exec(next.str.trim());
         if (rest && !/^[A-Z][a-z]/.test(rest[0])) raw += rest[0].replace(/[.,;:]+$/, '');
       }
       out.push({ raw: /@/.test(raw) ? raw.replace(/\s+/g, '') : raw, page, box: l, lines });
     }));
+    };
     if (kind === 'image') {
       const url = URL.createObjectURL(blob);
       let c;
@@ -515,6 +526,22 @@
   }
   // The text right next to a link: its own words for a clickable link, or a heading just above
   // (or beside) a QR code.
+  // Lines in the middle of a paragraph (three or more lines of the same size stacked tightly) are
+  // sentences, not labels: "supporters." ending a paragraph beside a QR code isn't its name.
+  const paraOf = new WeakMap();
+  function inParagraph(lines, l) {
+    if (!paraOf.has(lines)) {
+      const set = new Set(), h = (x) => x.y1 - x.y0;
+      const touch = (a, b) => b.y0 - a.y1 > -h(a) * 0.3 && b.y0 - a.y1 < Math.min(h(a), h(b)) * 0.7 && Math.abs(h(a) - h(b)) < Math.max(h(a), h(b)) * 0.25 && Math.min(a.x1, b.x1) > Math.max(a.x0, b.x0);
+      lines.forEach((x) => {
+        const chain = [x];
+        for (let cur = x, nx; (nx = lines.find((y) => y !== cur && !chain.includes(y) && touch(cur, y))); cur = nx) chain.push(nx);
+        if (chain.length >= 3) chain.forEach((y) => set.add(y));
+      });
+      paraOf.set(lines, set);
+    }
+    return paraOf.get(lines).has(l);
+  }
   function nearbyText(f) {
     if (!f.box || !f.lines) return '';
     // A written link with words of its own on the line ("Register online at …") is named by them,
@@ -532,7 +559,7 @@
     let best = '', bestD = Infinity;
     f.lines.forEach((l) => {
       const name = cleanLabel(l.str);
-      if (!name) return;
+      if (!name || (l !== b && inParagraph(f.lines, l))) return;
       const dx = Math.max(0, l.x0 - b.x1, b.x0 - l.x1);
       const above = l.y1 <= b.y0 + 2, below = l.y0 >= b.y1 - 2;
       const dy = above ? b.y0 - l.y1 : below ? (l.y0 - b.y1) * 1.1 : 0;
@@ -587,13 +614,21 @@
     const host = u.hostname.replace(/^www\./, '').toLowerCase();
     const all = host + u.pathname.toLowerCase();
     const words = [
-      [/give|giving|donat|tithe|pushpay|tithe\.ly/, 'Give'], [/regist|sign-?up|rsvp|typeform|jotform|forms?\b|forms\.|\/forms/, 'Sign up'],
+      [/give|giving|donat|tithe|pushpay|tithe\.ly|recurring gift|offering/, 'Give'], [/regist|sign-?up|rsvp|typeform|jotform|forms?\b|forms\.|\/forms/, 'Sign up'],
       [/youtube|youtu\.be|vimeo|livestream|\/live\b|watch/, 'Watch live'], [/maps\.|goo\.gl\/maps|maps\.app/, 'Get directions'], [/facebook|fb\.com/, 'Facebook'],
       [/instagram/, 'Instagram'], [/spotify|podcast/, 'Listen'], [/calendar|\/events?\b/, 'See events'], [/prayer|pray/, 'Prayer requests'],
       [/volunteer|\/serve/, 'Serve'], [/connect|card/, 'Connect card'], [/groups?\b/, 'Find a group'], [/kids|children|nursery/, 'Kids'], [/youth|students/, 'Youth'],
       [/bible|sermon|notes/, 'Sermon notes'], [/visit|plan/, 'Plan a visit'], [/contact/, 'Contact us'],
     ];
-    const hit = words.find(([re]) => re.test(all));
+    let hit = words.find(([re]) => re.test(all));
+    // A short link (qr.codes/Y3Poqe, bit.ly/…) says nothing; the sentences around it might ("scan
+    // the QR code and select give…").
+    if (!hit && f.box && f.lines) {
+      const bx = f.box, r = Math.max(120, (bx.y1 - bx.y0) * 1.8);
+      const around = f.lines.filter((l) => l !== bx && Math.hypot(Math.max(0, l.x0 - bx.x1, bx.x0 - l.x1), Math.max(0, l.y0 - bx.y1, bx.y0 - l.y1)) <= r).map((l) => l.str.replace(LINK_RE, ' ')).join(' ').toLowerCase();
+      const prose = [[/\b(give|giving|donat\w*|tithe|recurring gift|offering)\b/, 'Give'], [/\b(register|sign up|rsvp)\b/, 'Sign up'], [/\b(watch|livestream)\b/, 'Watch live'], [/\bpray(er)?\b/, 'Prayer requests'], [/\b(volunteer|serve)\b/, 'Serve']];
+      hit = around && prose.find(([re]) => re.test(around));
+    }
     // Otherwise the last word of the address path (…/fall-festival → Fall festival), or the site name.
     const tail = decodeURIComponent(u.pathname.split('/').filter(Boolean).pop() || '').replace(/\.\w+$/, '').replace(/[-_]+/g, ' ').trim();
     const nice = /^[a-z][a-z ]{2,24}$/i.test(tail) ? tail.charAt(0).toUpperCase() + tail.slice(1).toLowerCase() : '';
