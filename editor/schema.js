@@ -723,7 +723,7 @@
     },
     giving: {
       name: 'Giving',
-      desc: 'Give online, text to give, mailing address and giving FAQ.',
+      desc: 'Buttons to your own online giving and text-to-give, mailing address and giving FAQ.',
       build: () => {
         const p = starter('Give', 'Forest');
         p.blocks = [
