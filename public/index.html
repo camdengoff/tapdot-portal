@@ -302,7 +302,7 @@ footer a { color: var(--muted); }
         </ul>
       </div>
       <div class="vis">
-        <img class="shot" src="/email/2026-11-rss-context.png" width="290" height="557" loading="lazy" alt="A real church's tap page: banner cards, including Find a Small Group, above a live Upcoming Events list">
+        <div class="phone" data-tpl="lists" style="--w:290px"><div class="screen"></div></div>
       </div>
     </div>
 
@@ -425,9 +425,33 @@ footer a { color: var(--muted); }
   if (!TD || !TD.TEMPLATES || !TD.render) return;
 
   // A template as a live, tappable page inside a phone frame.
+  // Example pages that aren't starter templates. "lists" reads a made-up small groups feed
+  // (/demo/groups.xml) live, the same way a church's RSS feed block does.
+  var DEMOS = {
+    lists: {
+      name: 'Live small groups list',
+      build: function () {
+        var p = TD.TEMPLATES.welcome.build();
+        var feed = function (o) { return Object.assign(TD.newBlock('feed'), { url: location.origin + '/demo/groups.xml', proxies: false }, o); };
+        var head = function (o) { return Object.assign(TD.newBlock('heading'), o); };
+        p.blocks = [
+          head({ title: 'Find your ==people==', size: 26, style: { mt: 18 } }),
+          Object.assign(TD.newBlock('text'), { body: 'Every group, straight from our website. New ones show up here on their own.', muted: true }),
+          feed({ show: 'banner', bnEyebrow: 'Group life', openLabel: 'Find a small group', bnSub: 'Do life with others in a group that fits your season.', openIcon: '👥', layout: 'cards', style: { mt: 10 } }),
+          head({ title: 'Browse by group', size: 19, style: { mt: 14 } }),
+          feed({ layout: 'scroll', max: 8, summary: false, filter: true, more: false }),
+          head({ title: 'Meeting this week', size: 19, style: { mt: 14 } }),
+          feed({ layout: 'list', max: 3, filter: false, more: true }),
+        ];
+        return p;
+      },
+    },
+  };
+  var source = function (key) { return DEMOS[key] || TD.TEMPLATES[key]; };
+
   // Entrance animations are off: a phone further down the page would stay blank until it plays.
   function page(key) {
-    var tpl = TD.TEMPLATES[key];
+    var tpl = source(key);
     var p = TD.normalize(JSON.parse(JSON.stringify(tpl.build())));
     p.exp = Object.assign({}, p.exp, { fullDoc: true, embed: false });
     return TD.render(p, { noAnim: true });
@@ -435,7 +459,7 @@ footer a { color: var(--muted); }
   function fill(phone, key) {
     var screen = phone.querySelector('.screen');
     var f = document.createElement('iframe');
-    f.title = TD.TEMPLATES[key].name + ' example page';
+    f.title = source(key).name + ' example page';
     f.setAttribute('sandbox', 'allow-scripts');
     try { f.srcdoc = page(key); } catch (e) { return; }
     screen.innerHTML = '';
@@ -444,7 +468,7 @@ footer a { color: var(--muted); }
     fit();
     if (window.ResizeObserver) new ResizeObserver(fit).observe(screen);
   }
-  document.querySelectorAll('.phone[data-tpl]').forEach(function (ph) { if (TD.TEMPLATES[ph.dataset.tpl]) fill(ph, ph.dataset.tpl); });
+  document.querySelectorAll('.phone[data-tpl]').forEach(function (ph) { if (source(ph.dataset.tpl)) fill(ph, ph.dataset.tpl); });
 
   // Template gallery: the starter templates churches pick from when they make a page.
   var keys = ['welcome', 'connect', 'event', 'giving', 'links'].filter(function (k) { return TD.TEMPLATES[k]; });
