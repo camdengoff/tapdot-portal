@@ -81,13 +81,15 @@ nav a:hover { color: var(--text); }
 /* Phones: real DoorStep pages (drawn live by the editor's own templates and renderer) in a
    3D device: metal rim, black bezel, status bar, Dynamic Island, side keys, glare and a floor
    shadow. The screen is a 390 × 844 viewport, scaled to fit, so nothing is cut off. */
-.phone { --w: 300px; --rx: 6deg; --ry: -20deg; --rz: 1.5deg; --k: 1; width: var(--w); aspect-ratio: 1 / 2.085; position: relative; flex: none; perspective: 1800px; perspective-origin: 50% 40%; }
-.phone.face-r { --ry: 20deg; --rz: -1.5deg; }
-.phone.soft { --ry: 12deg; --rx: 4deg; --rz: -1deg; }
+.phone { --w: 300px; --rx: 8deg; --ry: -27deg; --rz: 2deg; --k: 1; width: var(--w); aspect-ratio: 1 / 2.085; position: relative; flex: none; perspective: 1800px; perspective-origin: 50% 40%; }
+.phone.face-r { --ry: 27deg; --rz: -2deg; }
+.phone.soft { --ry: 18deg; --rx: 5deg; --rz: -1deg; }
 .dev { position: absolute; inset: 0; transform-style: preserve-3d; transform: rotateX(calc(var(--rx) * var(--k))) rotateY(calc(var(--ry) * var(--k))) rotateZ(calc(var(--rz) * var(--k))); transition: transform 1.1s var(--ease, cubic-bezier(.19,1,.22,1)); }
 .phone:hover .dev { --k: .45; }
 .dev > * { position: absolute; border-radius: calc(var(--w) * .158); }
-.dev .edge { inset: 0; background: linear-gradient(90deg, #5d5d62, #2a2a2d 18%, #19191b 50%, #2e2e31 82%, #6a6a6f); transform: translateZ(calc(var(--z) * -1px)); }
+.dev .edge { inset: 0; background: var(--c); transform: translateZ(calc(var(--w) * var(--z) * -.0042)); }
+.dev .back { inset: 0; transform: translateZ(calc(var(--w) * -.122)) rotateY(180deg); background: linear-gradient(150deg, #3b3b40, #1d1d21 45%, #2a2a2f); box-shadow: inset 0 0 0 calc(var(--w) * .012) #6c6c72; }
+.dev .back::after { content: ''; position: absolute; top: 4%; left: 6%; width: 42%; aspect-ratio: 1; border-radius: 28%; background: #141417; box-shadow: inset 0 0 0 2px #4b4b51; }
 .dev .body { inset: 0; padding: calc(var(--w) * .012); transform: translateZ(1px); background: linear-gradient(140deg, #b9b9be 0%, #55555a 14%, #2a2a2d 40%, #1d1d20 60%, #4b4b50 86%, #c4c4c9 100%); box-shadow: 0 0 0 1px rgba(0,0,0,.35); }
 .dev .bezel { position: relative; height: 100%; border-radius: calc(var(--w) * .146); background: #050506; padding: calc(var(--w) * .022); box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
 .dev .screen { position: relative; height: 100%; border-radius: calc(var(--w) * .124); overflow: hidden; background: #fff; isolation: isolate; }
@@ -99,9 +101,9 @@ nav a:hover { color: var(--text); }
 .dev .island { position: absolute; top: 11px; left: 50%; width: 124px; height: 36px; margin-left: -62px; border-radius: 20px; background: #000; z-index: 3; pointer-events: none; }
 .dev .hi { position: absolute; bottom: 8px; left: 50%; width: 136px; height: 5px; margin-left: -68px; border-radius: 3px; background: var(--sbc, #000); opacity: .85; z-index: 3; pointer-events: none; }
 .dev .glare { position: absolute; inset: 0; z-index: 4; pointer-events: none; border-radius: inherit; background: linear-gradient(115deg, rgba(255,255,255,.22) 0%, rgba(255,255,255,.07) 26%, rgba(255,255,255,0) 40%, rgba(255,255,255,0) 78%, rgba(255,255,255,.06) 100%); }
-.dev .key { border-radius: 2px; width: calc(var(--w) * .013); transform: translateZ(-5px); background: linear-gradient(90deg, #2a2a2d, #8d8d92 50%, #2a2a2d); }
-.dev .key.l { left: calc(var(--w) * -.009); }
-.dev .key.r { right: calc(var(--w) * -.009); }
+.dev .key { border-radius: 3px; width: calc(var(--w) * .016); transform: translateZ(calc(var(--w) * -.06)); background: linear-gradient(90deg, #2a2a2d, #8d8d92 50%, #2a2a2d); }
+.dev .key.l { left: calc(var(--w) * -.012); }
+.dev .key.r { right: calc(var(--w) * -.012); }
 .floor { position: absolute; left: 6%; right: 6%; bottom: -5%; height: 7%; border-radius: 50%; background: radial-gradient(closest-side, rgba(0,0,0,.38), rgba(0,0,0,0)); filter: blur(8px); transform: translateX(calc(var(--ry) * var(--k) * -.6px)); pointer-events: none; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .floor { background: radial-gradient(closest-side, rgba(0,0,0,.8), rgba(0,0,0,0)); } }
 :root[data-theme="dark"] .floor { background: radial-gradient(closest-side, rgba(0,0,0,.8), rgba(0,0,0,0)); }
@@ -501,7 +503,14 @@ footer a { color: var(--muted); }
   function device(phone) {
     if (phone._vp) return phone;
     var edges = '';
-    for (var z = 2; z <= 12; z += 2) edges += '<i class="edge" style="--z:' + z + '"></i>';
+    // The sides: thin slices stacked back to front make a solid band about as thick as a real
+    // phone. Each slice is shaded like brushed metal, brighter near the front and back chamfers.
+    for (var z = 1; z <= 28; z++) {
+      var t = z / 29, lift = Math.pow(Math.abs(t - 0.5) * 2, 3);
+      var a = Math.round(52 + 70 * lift), b = Math.round(26 + 40 * lift);
+      edges += '<i class="edge" style="--z:' + z + ';--c:linear-gradient(90deg,rgb(' + (a + 40) + ',' + (a + 40) + ',' + (a + 44) + '),rgb(' + b + ',' + b + ',' + (b + 3) + ') 22%,rgb(' + (b - 6) + ',' + (b - 6) + ',' + (b - 4) + ') 55%,rgb(' + a + ',' + a + ',' + (a + 4) + '))"></i>';
+    }
+    edges = '<i class="back"></i>' + edges;
     phone.innerHTML = '<div class="dev">' + edges +
       '<i class="key l" style="top:17%;height:5%"></i><i class="key l" style="top:25%;height:9%"></i><i class="key l" style="top:36%;height:9%"></i><i class="key r" style="top:28%;height:14%"></i>' +
       '<div class="body"><div class="bezel"><div class="screen"><div class="vp"><div class="sb"><span>9:41</span><span class="ico">' + BARS + '</span></div><div class="island"></div><div class="hi"></div></div><div class="glare"></div></div></div></div>' +
