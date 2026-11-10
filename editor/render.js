@@ -332,12 +332,15 @@
         '<button type="submit" class="td-form-btn">' + esc(b.btnLabel || 'Send') + '</button>' +
         '</form><div class="td-form-done td-card" hidden>' + md(b.thanks || 'Thank you!', true) + '</div>';
     },
+    // Invite messages: ready-made invites people copy, or send through the phone's share sheet.
     copy(b) {
       const rows = b.items.map((it) =>
-        '<div class="td-copy-row"><div class="td-copy-text">' + (it.label ? '<div class="td-tag">' + md(it.label) + '</div>' : '') +
-        '<div class="td-copy-val">' + esc(it.value).replace(/\n/g, '<br>') + '</div></div>' +
-        '<a href="#" class="td-copy-btn td-tap" data-td-act="copy" data-td-text="' + esc(it.value) + '" data-td-toast="' + esc(it.toast || 'Copied!') + '">' + esc(b.btnLabel || 'Copy') + '</a></div>').join('');
-      return '<div class="td-copy td-card">' + (b.title ? '<div class="td-copy-title td-head">' + md(b.title) + '</div>' : '') + rows + '</div>';
+        '<div class="td-copy-row">' + (it.label ? '<div class="td-tag">' + md(it.label) + '</div>' : '') +
+        '<div class="td-copy-val">' + esc(it.value).replace(/\n/g, '<br>') + '</div>' +
+        '<div class="td-copy-btns"><a href="#" class="td-copy-btn td-tap" data-td-act="copy" data-td-text="' + esc(it.value) + '" data-td-toast="' + esc(it.toast || 'Copied!') + '">' + esc(b.btnLabel || 'Copy') + '</a>' +
+        (b.send ? '<a href="sms:?&amp;body=' + esc(encodeURIComponent(it.value)) + '" class="td-copy-btn td-copy-send td-tap" data-td-act="invite" data-td-text="' + esc(it.value) + '">' + esc(b.sendLabel || 'Send') + '</a>' : '') +
+        '</div></div>').join('');
+      return '<div class="td-copy td-card">' + (b.title ? '<div class="td-copy-title td-head">' + md(b.title) + '</div>' : '') + (b.intro ? '<div class="td-copy-intro">' + md(b.intro) + '</div>' : '') + rows + '</div>';
     },
     events(b, ctx) {
       ctx.usesEvents = true;
@@ -606,11 +609,14 @@ ${t.pressFx ? '.td-tap:active{transform:scale(.97)}' : ''}
 .td-gal-item img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 /* copy */
 .td-copy-title{font-weight:700;font-size:15px;padding:14px 16px 0}
-.td-copy-row{display:flex;align-items:center;gap:12px;padding:12px 16px}
+.td-copy-intro{font-size:13.5px;opacity:.7;padding:4px 16px 0}
+.td-copy-row{padding:12px 16px 14px}
 .td-copy-row+.td-copy-row{border-top:1px solid rgba(128,128,128,.18)}
-.td-copy-text{flex:1;min-width:0}
-.td-copy-val{font-size:15px;font-weight:600;word-break:break-word}
-.td-copy-btn{flex-shrink:0;background:var(--td-accent);color:var(--td-accent-text) !important;border-radius:var(--td-btn-radius);padding:8px 14px;font-size:13px;font-weight:700}
+.td-copy-row .td-tag{margin-bottom:6px}
+.td-copy-val{font-size:15px;line-height:1.45;word-break:break-word;background:rgba(128,128,128,.12);border-radius:14px 14px 14px 4px;padding:10px 12px}
+.td-copy-btns{display:flex;gap:8px;margin-top:10px}
+.td-copy-btn{flex:1;text-align:center;background:var(--td-accent);color:var(--td-accent-text) !important;border-radius:var(--td-btn-radius);padding:9px 14px;font-size:13.5px;font-weight:700;text-decoration:none}
+.td-copy-send{background:rgba(128,128,128,.16);color:inherit !important}
 .td-copy-btn.td-tap:active{filter:brightness(.9)}
 /* spotlight */
 .td-bap{overflow:hidden;padding:0}
@@ -1004,6 +1010,11 @@ fieldset.td-bad legend,.td-f-check.td-bad span{color:#ef4444}
           if (/^mailto:/i.test(mt)) { mailWatch(mt); W.location.href = mt; }
           break;
         case 'copy': copy(g('text'), g('toast')); break;
+        case 'invite':
+          // The share sheet lets them pick Messages, WhatsApp and so on; otherwise a new text message.
+          if (navigator.share) navigator.share({ text: g('text') }).catch(function () {});
+          else location.href = a.getAttribute('href');
+          break;
         case 'scroll': closeAll(); scrollToId(a.getAttribute('href').slice(1)); break;
         case 'file': openFile(g('file')); break;
         case 'zoom': $('#td-zoom-img').src = g('src'); $('#td-zoom').classList.add('open'); lock(true); break;

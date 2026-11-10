@@ -275,19 +275,24 @@
       summary: (b) => b.images.length + ' photos',
     },
     copy: {
-      name: 'Copy boxes', icon: '📋', desc: 'Info rows with a Copy button (Wi-Fi, address, giving info…)',
+      name: 'Invite messages', icon: '💌', desc: 'Ready-made invites people copy or send to a friend in one tap',
       fields: [
         { k: 'title', t: 'text', l: 'Card title (optional)', rich: true },
-        { k: 'btnLabel', t: 'text', l: 'Button label' },
-        { k: 'items', t: 'list', l: 'Rows', itemName: 'Row', itemLabel: (i) => i.label || 'Row',
+        { k: 'intro', t: 'text', l: 'Line under the title (optional)', rich: true },
+        { k: 'btnLabel', t: 'text', l: 'Copy button' },
+        { k: 'send', t: 'checkbox', l: 'Show a Send button', hint: 'Opens the phone’s share sheet (Messages, WhatsApp, Instagram…) with the invite already written. Without a share sheet it opens a text message.' },
+        { k: 'sendLabel', t: 'text', l: 'Send button', when: (b) => b.send },
+        { k: 'items', t: 'list', l: 'Invites', itemName: 'Invite', itemLabel: (i) => i.label || 'Invite',
           item: [
-            { k: 'label', t: 'text', l: 'Label', rich: true },
-            { k: 'value', t: 'textarea', l: 'Text shown and copied' },
-            { k: 'toast', t: 'text', l: 'Message after copying', ph: 'Copied!' },
+            { k: 'label', t: 'text', l: 'Name (optional)', rich: true, ph: 'Sunday invite' },
+            { k: 'value', t: 'textarea', l: 'The invite people send' },
+            { k: 'toast', t: 'text', l: 'Message after copying', ph: 'Invite copied' },
           ],
-          newItem: () => ({ label: 'Label', value: 'Text to copy', toast: '' }) },
+          newItem: () => ({ label: 'Invite', value: 'Want to come to church with me this Sunday?', toast: '' }) },
       ],
-      defaults: () => ({ title: '', btnLabel: 'Copy', items: [{ label: 'Wi-Fi password', value: 'welcome123', toast: 'Wi-Fi password copied' }] }),
+      defaults: () => ({ title: 'Invite a friend', intro: 'Pick a message, then copy it or send it.', btnLabel: 'Copy', send: true, sendLabel: 'Send', items: [
+        { label: 'Sunday invite', value: 'Hey! I’ve been going to Your Church and I think you’d love it. Want to come with me this Sunday? Services are at 9 and 10:45. yourchurch.org/visit', toast: 'Invite copied. Paste it in a text!' },
+      ] }),
       summary: (b) => b.items.map((i) => i.label).join(' · '),
     },
     events: {
@@ -500,6 +505,8 @@
     s.blocks = (state.blocks || []).map((b) => (b && TD.RENAMED[b.type] ? Object.assign({}, b, { type: TD.RENAMED[b.type] }) : b)).filter((b) => b && TD.BLOCKS[b.type]).map((b) => {
       const d = TD.newBlock(b.type);
       const n = Object.assign(d, b);
+      // Copy boxes made before they became Invite messages keep looking the same (no Send button).
+      if (b.type === 'copy' && !('send' in b)) { n.send = false; n.intro = ''; }
       n.style = Object.assign(commonDefaults().style, b.style || {});
       n.hideIn = Array.isArray(b.hideIn) ? b.hideIn.slice() : [];
       if (b.schedule && b.schedule.on) {
@@ -645,7 +652,7 @@
   const STARTERS = {
     welcome: {
       name: 'Sunday welcome',
-      desc: 'Welcome hero, quick buttons, service times, connect card and guest Wi-Fi.',
+      desc: 'Welcome hero, quick buttons, service times, connect card and a friend invite.',
       build: () => {
         const p = starter('Welcome', 'Light');
         p.sheets = [visitSheet()];
@@ -664,7 +671,7 @@
             { icon: '👶', title: 'Kids and students', body: 'Kids check in at the ==Kids== desk by the main doors. Students meet in the youth room.', image: '', btnLabel: '', action: TD.newAction(), open: false },
             { icon: '☕', title: 'Coffee and connection', body: 'Grab a free coffee in the lobby before and after each service.', image: '', btnLabel: '', action: TD.newAction(), open: false },
           ] }),
-          blk('copy', { title: 'Guest Wi-Fi', style: { mt: 6 }, items: [{ label: 'Network', value: 'Guest', toast: 'Network name copied' }, { label: 'Password', value: 'welcome123', toast: 'Password copied' }] }),
+          blk('copy', {style: { mt: 6 }, title: 'Invite a friend', intro: 'Copy a message or send it straight from your phone.', btnLabel: 'Copy', send: true, sendLabel: 'Send', items: [{ label: 'Sunday invite', value: 'Hey! I’ve been going to Your Church and I think you’d love it. Want to come with me this Sunday? Services are at 9 and 10:45. yourchurch.org/visit', toast: 'Invite copied. Paste it in a text!' }, { label: 'Coffee first', value: 'Want to grab coffee before church Sunday? I’ll save you a seat. yourchurch.org/visit', toast: 'Invite copied' }] }),
           blk('form', { anchor: 'connect', style: { mt: 12 } }),
         ];
         return p;
@@ -728,7 +735,7 @@
             { label: 'Text to give', icon: '💬', iconBg: '#34c47c33', bg: '', color: '', action: act('sms', { phone: '5550102030', body: 'Give' }) },
             { label: 'Share', icon: '🔗', iconBg: '#34c47c33', bg: '', color: '', action: act('share', {}) },
           ] }),
-          blk('copy', { title: 'Give by mail', style: { mt: 6 }, items: [{ label: 'Make checks out to “Your Church” and mail to', value: '123 Main St\nSpringfield, IL 62701', toast: 'Address copied' }] }),
+          blk('text', { body: '**Give by mail**\nMake checks out to “Your Church” and mail to 123 Main St, Springfield, IL 62701.', card: true, style: { mt: 6 } }),
           blk('heading', { title: 'Questions', style: { mt: 12 } }),
           blk('accordion', { items: [
             { icon: '🧾', title: 'Will I get a giving statement?', body: 'Yes. Statements are emailed every January.', image: '', btnLabel: '', action: TD.newAction(), open: false },
@@ -854,7 +861,7 @@
             { icon: '👶', title: 'Is there something for kids?', body: 'Yes! Check in at the ==Kids== desk.', image: '', btnLabel: 'Kids info', action: act('link', { url: 'https://example.com' }), open: false },
             { icon: '🚗', title: 'Where do I park?', body: 'Visitor parking is by the main entrance.', image: '', btnLabel: '', action: TD.newAction(), open: false },
           ] }),
-          blk('copy', { title: 'Guest Wi-Fi', items: [{ label: 'Network', value: 'Guest', toast: 'Network name copied' }, { label: 'Password', value: 'welcome123', toast: 'Password copied' }] }),
+          blk('copy', { title: 'Invite a friend', intro: 'Copy a message or send it straight from your phone.', btnLabel: 'Copy', send: true, sendLabel: 'Send', items: [{ label: 'Sunday invite', value: 'Hey! I’ve been going to Your Church and I think you’d love it. Want to come with me this Sunday? Services are at 9 and 10:45. yourchurch.org/visit', toast: 'Invite copied. Paste it in a text!' }, { label: 'Coffee first', value: 'Want to grab coffee before church Sunday? I’ll save you a seat. yourchurch.org/visit', toast: 'Invite copied' }] }),
           blk('countdown', { label: 'Next big event in', target: '2026-12-24T18:00' }),
           blk('gallery', { images: [21, 22, 23, 24, 25, 26].map(pic) }),
           blk('text', { body: 'Text blocks support **bold**, *italic*, ==accent color== and [links](https://example.com).', card: true }),
