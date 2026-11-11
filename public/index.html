@@ -122,6 +122,10 @@ nav a:hover { color: var(--text); }
 .phone .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .phone.is3d { perspective: none; } /* a second perspective above the 3D layer breaks hit-testing: no taps or scrolling */
 .phone.is3d .dev { visibility: hidden; }
+.flat3d .phone { perspective: none; }
+.flat3d .dev { transform: none; transform-style: flat; }
+.flat3d .dev .edge, .flat3d .dev .back, .flat3d .dev .key { display: none; }
+.phone .stage .vp.flat { position: absolute; left: 0; top: 0; transform-origin: 0 0; pointer-events: auto; overflow: hidden; border-radius: 52px; }
 .phone.is3d .stage .vp .island { display: none; }
 
 .hero-phone { display: flex; justify-content: center; position: relative; }
@@ -217,6 +221,11 @@ footer a { color: var(--muted); }
 @media (max-width: 560px) { .wrap { padding: 0 16px; } section { padding: 64px 0; } .step, .cell { padding: 20px; } }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
 </style>
+<script>
+// iPhone and iPad browsers (all WebKit, Chrome included) leave a page inside an iframe blank when
+// it sits in a CSS 3D scene, so there the phones face forward and the page is laid out flat.
+if (/iP(hone|od|ad)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) document.documentElement.classList.add('flat3d');
+</script>
 </head>
 <body>
 <header>
@@ -623,12 +632,16 @@ function make(phone) {
   if (phone._3d) return;
   const vp = phone._vp;
   const stage = document.createElement('div'); stage.className = 'stage';
-  const cssLayer = new CSS3DRenderer(); cssLayer.domElement.className = 'css3d';
+  // On iPhone/iPad the page can't live in a CSS 3D layer (see flat3d above): face the phone forward
+  // and lay the page flat over the screen instead.
+  const flat = document.documentElement.classList.contains('flat3d');
+  const cssLayer = flat ? null : new CSS3DRenderer(); if (cssLayer) cssLayer.domElement.className = 'css3d';
   const gl = new THREE.WebGLRenderer({ antialias: true, alpha: true, premultipliedAlpha: true });
   gl.setPixelRatio(Math.min(devicePixelRatio, 2));
   gl.toneMapping = THREE.ACESFilmicToneMapping; gl.toneMappingExposure = 1.05;
   gl.outputColorSpace = THREE.SRGBColorSpace;
-  stage.appendChild(cssLayer.domElement); stage.appendChild(gl.domElement);
+  if (cssLayer) stage.appendChild(cssLayer.domElement); else { vp.classList.add('flat'); stage.appendChild(vp); }
+  stage.appendChild(gl.domElement);
   phone.appendChild(stage);
 
   const scene = new THREE.Scene(); scene.environment = env;
@@ -646,7 +659,7 @@ function make(phone) {
   page.scale.setScalar(sz.x / pxW);
   page.position.copy(mid).sub(allMid); page.position.z += front * 0.00002;
   if (front < 0) page.rotation.y = Math.PI;
-  pivot.add(page);
+  if (!flat) pivot.add(page);
 
   const cam = new THREE.PerspectiveCamera(22, 1, 0.01, 10);
   const cs = getComputedStyle(phone);
@@ -657,7 +670,7 @@ function make(phone) {
   let raf = 0, visible = false;
   function size() {
     const w = stage.clientWidth, h = stage.clientHeight; if (!w || !h) return;
-    gl.setSize(w, h, false); cssLayer.setSize(w, h);
+    gl.setSize(w, h, false); if (cssLayer) cssLayer.setSize(w, h);
     cam.aspect = w / h;
     // Fit the phone's height to the phone box (stage is 124% of it).
     const dist = (allSz.y / 2) / Math.tan(THREE.MathUtils.degToRad(cam.fov / 2)) * 1.24 / 1.0;
@@ -665,9 +678,23 @@ function make(phone) {
     draw();
   }
   function draw() {
-    const k = cur.k * (innerWidth < 760 ? 0.55 : 1);
+    const k = flat ? 0 : cur.k * (innerWidth < 760 ? 0.55 : 1);
     pivot.rotation.set(target.x * k * -front, target.y * k * -front, target.z * k);
-    gl.render(scene, cam); cssLayer.render(scene, cam);
+    gl.render(scene, cam);
+    if (cssLayer) cssLayer.render(scene, cam);
+    else {
+      // Project the screen's corners and stretch the flat page over them.
+      pivot.updateMatrixWorld(true);
+      const w = stage.clientWidth, h = stage.clientHeight; let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+      for (const sx of [-1, 1]) for (const sy of [-1, 1]) {
+        const v = page.position.clone().add(new THREE.Vector3(sx * sz.x / 2, sy * sz.y / 2, 0));
+        pivot.localToWorld(v).project(cam);
+        const px = (v.x + 1) / 2 * w, py = (1 - v.y) / 2 * h;
+        x0 = Math.min(x0, px); x1 = Math.max(x1, px); y0 = Math.min(y0, py); y1 = Math.max(y1, py);
+      }
+      vp.style.transform = 'translate(' + x0 + 'px,' + y0 + 'px) scale(' + (x1 - x0) / pxW + ',' + (y1 - y0) / pxH + ')';
+      vp.style.width = pxW + 'px';
+    }
   }
   function tick() {
     raf = 0;
