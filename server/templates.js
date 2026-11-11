@@ -37,10 +37,23 @@ async function create(d, env, user, name, desc, projectText, hidden) {
   return id;
 }
 
+// Templates saved before 2026-11-11 still point at random picsum.photos placeholders (dogs, mountains).
+// Swap them for the church photos the built-in templates use now, whenever a template is read.
+const OLD_PHOTOS = {
+  'https://picsum.photos/id/1018/1200/800': 'https://images.unsplash.com/photo-1560265036-021b3652b490?w=1200&h=800&fit=crop&q=75&fm=jpg',
+  'https://picsum.photos/id/1036/1200/800': 'https://images.unsplash.com/photo-1783697683283-0ffc4f70230e?w=1200&h=800&fit=crop&q=75&fm=jpg',
+  'https://picsum.photos/id/1015/1200/800': 'https://images.unsplash.com/photo-1653133672754-82025e7e9074?w=1200&h=800&fit=crop&q=75&fm=jpg',
+  'https://picsum.photos/seed/tapdot1/900/600': 'https://images.unsplash.com/photo-1740650511388-f693ce80016c?w=900&h=600&fit=crop&q=75&fm=jpg',
+  'https://picsum.photos/seed/tapdot2/900/600': 'https://images.unsplash.com/photo-1601373734970-a52f841b98b2?w=900&h=600&fit=crop&q=75&fm=jpg',
+  'https://picsum.photos/seed/tapdot3/900/600': 'https://images.unsplash.com/photo-1663162550928-2c2389cdb27d?w=900&h=600&fit=crop&q=75&fm=jpg',
+};
+const freshPhotos = (text) => text && text.indexOf('picsum.photos') >= 0 ? text.replace(/https:\/\/picsum\.photos\/[a-z0-9/]+/g, (m) => OLD_PHOTOS[m] || m) : text;
+const stored = async (env, id) => freshPhotos(await env.PAGES.get(key(id)));
+
 // The project a new page starts from, or null for a template that doesn't exist.
 export async function projectFor(d, env, id) {
   if (!isSlug(id) || !(await one(d, 'SELECT 1 FROM templates WHERE id = ?', id))) return null;
-  return env.PAGES.get(key(id));
+  return stored(env, id);
 }
 
 // /api/templates… for a signed-in user. `parts` is the path after /api/.
@@ -52,7 +65,7 @@ export async function route({ d, env, request, user, parts, url, json, body }) {
     const rows = await all(d, 'SELECT * FROM templates ' + (user.admin ? '' : 'WHERE hidden = 0 ') + 'ORDER BY position, name');
     const list = rows.map(out);
     if (url.searchParams.get('full')) {
-      await Promise.all(list.map(async (t) => { try { t.project = JSON.parse(await env.PAGES.get(key(t.id))); } catch (e) { t.project = null; } }));
+      await Promise.all(list.map(async (t) => { try { t.project = JSON.parse(await stored(env, t.id)); } catch (e) { t.project = null; } }));
     }
     return json({ templates: list });
   }
@@ -87,7 +100,7 @@ export async function route({ d, env, request, user, parts, url, json, body }) {
   }
   const t = await row(d, parts[1]);
   if (parts.length === 2 && M === 'GET') {
-    const proj = await env.PAGES.get(key(t.id));
+    const proj = await stored(env, t.id);
     // Same shape as a page, so the editor can open it.
     return json(Object.assign(out(t), { church: 'Templates', role: 'admin', template: true, draft: proj ? JSON.parse(proj) : null }));
   }

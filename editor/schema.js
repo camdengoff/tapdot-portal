@@ -635,7 +635,16 @@
   const PROXY = 'https://bethanynaz-proxy.cgoff.workers.dev';
 
   // Starter templates: generic pages any church can fill in. Photos are placeholders to replace.
-  const photo = (id) => 'https://picsum.photos/id/' + id + '/1200/800';
+  // Starter photos: free Unsplash photos (Unsplash License), loaded straight from Unsplash's CDN.
+  const PHOTOS = {
+    welcome: '1560265036-021b3652b490', // greeters waving at the church doors
+    festival: '1783697683283-0ffc4f70230e', // toddler on a pile of pumpkins
+    sanctuary: '1653133672754-82025e7e9074', // worship in a sanctuary with a cross
+    worship: '1740650511388-f693ce80016c', // hands raised in worship
+    gathering: '1601373734970-a52f841b98b2', // smiling congregation
+    friends: '1663162550928-2c2389cdb27d', // two friends with Bibles on the grass
+  };
+  const photo = (k, w, hgt) => 'https://images.unsplash.com/photo-' + PHOTOS[k] + '?w=' + (w || 1200) + '&h=' + (hgt || 800) + '&fit=crop&q=75&fm=jpg';
   const starter = (title, palette) => {
     const p = TD.newProject();
     p.title = title;
@@ -658,7 +667,7 @@
         const p = starter('Welcome', 'Light');
         p.sheets = [visitSheet()];
         p.blocks = [
-          blk('hero', { images: [photo(1018)], textPos: 'below', title: 'Welcome to ==Your Church==', subtitle: 'We’re so glad you’re here today.' }),
+          blk('hero', { images: [photo('welcome')], textPos: 'below', title: 'Welcome to ==Your Church==', subtitle: 'We’re so glad you’re here today.' }),
           blk('buttons', { layout: 'scroll', style: { mt: 14 }, items: [
             { label: 'Connect card', icon: '👋', iconBg: '#3b7de126', bg: '', color: '', action: act('scroll', { target: 'connect' }) },
             { label: 'Give', icon: '💵', iconBg: '#10b98126', bg: '', color: '', action: act('link', { url: 'https://example.com/give' }) },
@@ -699,7 +708,7 @@
         const d = new Date(); d.setDate(d.getDate() + 30);
         const target = d.toISOString().slice(0, 10) + 'T17:00';
         p.blocks = [
-          blk('hero', { images: [photo(1036)], textPos: 'overlay', title: 'Fall ==Festival==', subtitle: 'Food, games and fun for the whole family', titleSize: 30 }),
+          blk('hero', { images: [photo('festival')], textPos: 'overlay', title: 'Fall ==Festival==', subtitle: 'Food, games and fun for the whole family', titleSize: 30 }),
           blk('countdown', { label: 'Starts in', target, btnLabel: '', style: { mt: 12 } }),
           blk('text', { body: '**Saturday, 5:00 to 8:00 PM**\nOn the church lawn. Bring a lawn chair and a friend!', card: true, style: { mt: 6 } }),
           blk('buttons', { layout: 'grid2', variant: 'card', items: [
@@ -728,7 +737,7 @@
       build: () => {
         const p = starter('Give', 'Forest');
         p.blocks = [
-          blk('hero', { images: [photo(1015)], textPos: 'below', title: 'Thank you for ==giving==', subtitle: 'Your generosity helps our church serve our community.' }),
+          blk('hero', { images: [photo('sanctuary')], textPos: 'below', title: 'Thank you for ==giving==', subtitle: 'Your generosity helps our church serve our community.' }),
           blk('buttons', { layout: 'stack', variant: 'accent', style: { mt: 14 }, items: [
             { label: 'Give online', icon: '💳', iconBg: '', bg: '', color: '', action: act('link', { url: 'https://example.com/give' }) },
           ] }),
@@ -838,7 +847,7 @@
           { icon: '💬', iconBg: '#3b7de133', title: 'Text us', desc: 'We reply within a day', action: act('sms', { phone: '5550102030', body: 'Hi! I have a question:' }) },
           { icon: '✉️', iconBg: '#fbbf2433', title: 'Email', desc: 'hello@example.com', action: act('email', { email: 'hello@example.com', subject: 'Hello' }) },
         ] })];
-        const pic = (n) => 'https://picsum.photos/seed/tapdot' + n + '/900/600';
+        const pic = (n) => photo(['worship', 'gathering', 'friends'][n - 1], 900, 600);
         p.blocks = [
           blk('hero', { images: [pic(1), pic(2), pic(3)], interval: 4, textPos: 'overlay', title: '==Feature== Tour', subtitle: 'Every block the editor can make', titleSize: 28, style: { mt: 0 } }),
           blk('buttons', { layout: 'grid2', variant: 'card', items: [
