@@ -328,6 +328,7 @@
         { k: 'openLabel', t: 'text', l: 'Pop-up title', ph: 'e.g. Small groups', when: (b) => b.show === 'popup' },
         { k: 'layout', t: 'select', l: 'Layout', opts: [['list', 'List'], ['cards', 'Big cards'], ['scroll', 'Side-scrolling cards']] },
         { k: 'max', t: 'range', l: 'How many items', min: 1, max: 30, hint: 'How many show at first. With Show more on, the rest of the feed is a tap away.' },
+        { k: 'imgAspect', t: 'select', l: 'Photo shape', opts: [['', 'Layout default']].concat(TD.ASPECTS), when: (b) => b.layout !== 'list' && b.image, hint: 'Side-scrolling cards default to 4:3 and big cards to 16:9. Original size shows each photo uncropped.' },
         { k: 'more', t: 'checkbox', l: 'Show more button when there are more' },
         { k: 'moreLabel', t: 'text', l: 'Show more button', ph: 'Show more', when: (b) => b.more },
         { k: 'titles', t: 'checkbox', l: 'Show titles', hint: 'Turn off to show just each item’s photo, like a flyer. Items without a photo still show their title.' },
@@ -345,7 +346,7 @@
           { k: 'empty', t: 'text', l: 'Message when the feed is empty' },
         ] },
       ],
-      defaults: () => ({ url: '', show: 'page', openLabel: 'See all groups', openIcon: '👥', sheetTitle: '', bnIconBg: '#3b7de133', bnImage: '', bnEyebrow: '', bnSub: 'Tap to see every group.', bnArrow: true, layout: 'list', max: 10, titles: true, image: true, summary: true, date: false, filter: true, more: true, moreLabel: 'Show more', tap: 'sheet', btnLabel: 'Learn more', btnPopup: false, proxies: true, loading: 'Loading…', error: 'Could not load this list right now.', empty: 'Nothing here yet. Check back soon!' }),
+      defaults: () => ({ url: '', show: 'page', openLabel: 'See all groups', openIcon: '👥', sheetTitle: '', bnIconBg: '#3b7de133', bnImage: '', bnEyebrow: '', bnSub: 'Tap to see every group.', bnArrow: true, layout: 'list', imgAspect: '', max: 10, titles: true, image: true, summary: true, date: false, filter: true, more: true, moreLabel: 'Show more', tap: 'sheet', btnLabel: 'Learn more', btnPopup: false, proxies: true, loading: 'Loading…', error: 'Could not load this list right now.', empty: 'Nothing here yet. Check back soon!' }),
       summary: (b) => b.url,
     },
     video: {

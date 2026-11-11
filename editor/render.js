@@ -358,7 +358,9 @@
         ctx.usesPage = true;
         pop = d('px', px) + d('pxhosts', px === TD.BFC_PROXY.replace(/\/+$/, '') ? '@bfc' : (ctx.proxyHosts || []).join(' '));
       }
-      const html = '<div class="td-feed td-feed-' + esc(b.layout || 'list') + '"' + d('feed', url) + d('via', url ? TD.FEED_VIA || '' : '') + d('max', +b.max || 10) +
+      // Photo shape for card layouts; blank keeps the layout's own (4:3 side-scrolling, 16:9 big cards).
+      const ar = b.layout !== 'list' && /^(\d+\/\d+|auto)$/.test(b.imgAspect || '') ? b.imgAspect : '';
+      const html = '<div class="td-feed td-feed-' + esc(b.layout || 'list') + (ar === 'auto' ? ' td-feed-arauto' : '') + '"' + (ar && ar !== 'auto' ? ' style="--fd-ar:' + ar + '"' : '') + d('feed', url) + d('via', url ? TD.FEED_VIA || '' : '') + d('max', +b.max || 10) +
         d('opts', [b.titles === false ? 'notitle' : '', b.image ? 'img' : '', b.summary ? 'sum' : '', b.date ? 'date' : '', b.filter ? 'filter' : '', b.more ? 'more' : '', b.proxies ? 'proxies' : ''].filter(Boolean).join(' ')) +
         pop + d('tap', b.tap || 'sheet') + d('pop', b.btnPopup ? 1 : '') + d('btn', b.btnLabel || 'Learn more') + d('more', b.moreLabel || 'Show more') + d('error', b.error) + d('empty', b.empty) + '>' +
         '<div class="td-events-msg td-card">' + esc(url ? b.loading : 'Add a feed address') + '</div></div>';
@@ -691,7 +693,7 @@ fieldset.td-bad legend,.td-f-check.td-bad span{color:#ef4444}
 .td-feed-list .td-fd-img{width:84px;height:84px;flex:none;margin:10px 0 10px 10px;border-radius:calc(var(--td-radius)*.6)}
 .td-feed-list .td-fd-text{flex:1}
 .td-feed-list .td-arrow{padding-right:14px}
-.td-feed-cards .td-fd-img{aspect-ratio:16/9}
+.td-feed-cards .td-fd-img{aspect-ratio:var(--fd-ar,16/9)}
 .td-feed .td-fd-imgonly{display:block}
 .td-feed-open{justify-content:center;width:100%;box-sizing:border-box;background:var(--td-accent);border-color:var(--td-accent);color:var(--td-accent-text);font-size:15px;padding:13px 16px}
 .td-feed-open-ico{font-size:17px;line-height:1}
@@ -703,7 +705,9 @@ fieldset.td-bad legend,.td-f-check.td-bad span{color:#ef4444}
 .td-feed-scroll .td-feed-items{flex-direction:row;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;margin:0 calc(var(--td-side,16px)*-1);padding:0 var(--td-side,16px)}
 .td-feed-scroll .td-feed-items::-webkit-scrollbar{display:none}
 .td-feed-scroll .td-fd{flex:none;width:72%;max-width:280px;scroll-snap-align:start}
-.td-feed-scroll .td-fd-img{aspect-ratio:4/3}
+.td-feed-scroll .td-fd-img{aspect-ratio:var(--fd-ar,4/3)}
+.td-feed-arauto .td-fd-img{aspect-ratio:auto;height:auto}
+.td-feed-scroll.td-feed-arauto .td-feed-items{align-items:flex-start}
 .td-fd-body .td-fd-more{display:block;background:transparent;color:var(--td-accent);border:1.5px solid var(--td-accent);text-align:center;padding:12px;border-radius:10px;font-weight:700;font-size:14px;text-decoration:none;margin-top:8px}
 /* video, countdown, spacer */
 .td-video{position:relative}
