@@ -98,7 +98,7 @@ Run `node tools/build.js` after changing `portal/`, `public/` or the editor.
   (scrolling row, wrapping row, 2/3-across grid, full-width stack), banner cards, image card rows,
   dropdowns (FAQ style), swipeable slides, single image, photo grid with tap-to-zoom,
   copy boxes (Wi-Fi, address, giving info), live Squarespace events list, live RSS feed list (list, big cards or
-  side-scrolling cards, with category filter buttons and a details sheet; read through the portal's `/api/feed`), YouTube/Vimeo video,
+  side-scrolling cards, with category filter buttons and a details sheet; read through the portal's `/api/feed`, which takes any page link and finds its RSS, Atom or JSON feed, adding Squarespace tags from "Tags: …" SEO descriptions), YouTube/Vimeo video,
   countdown, spacer/divider and custom HTML.
 - **Button actions**: open a link, open a page in a pop-up sheet, open your own pop-up menu
   (like "Next Steps"), copy text with a confirmation message, call, text, email, scroll to a block, share.

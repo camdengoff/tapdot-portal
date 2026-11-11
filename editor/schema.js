@@ -314,7 +314,7 @@
     feed: {
       name: 'RSS feed', icon: '📰', desc: 'Live list from any RSS feed, like a small groups or blog page',
       fields: [
-        { k: 'url', t: 'text', l: 'Feed address', ph: 'https://www.yourchurch.org/small-groups?format=rss', hint: 'On Squarespace, open the page (a blog or other collection) and add ?format=rss to its address. Any RSS or Atom feed works.' },
+        { k: 'url', t: 'text', l: 'Page or feed address', ph: 'https://www.yourchurch.org/small-groups', hint: 'Paste the link to the page people visit, like your small groups, blog or sermons page. DoorStep finds its RSS or JSON feed for you (Squarespace pages work as they are). A feed address works too.' },
         { k: 'show', t: 'select', l: 'Show it', opts: [['page', 'On the page'], ['button', 'Behind a button'], ['banner', 'Behind a banner card'], ['popup', 'Only in a pop-up, opened from another button']], hint: 'Only in a pop-up: on any button, card or hero, choose When tapped → Open one of my pop-up menus or lists, then pick this list.' },
         { k: 'openLabel', t: 'text', l: 'Button', ph: 'See all groups', when: (b) => b.show === 'button' },
         { k: 'openIcon', t: 'text', l: 'Icon', ph: 'e.g. 👥', when: (b) => b.show !== 'page', hint: 'Also shown at the top of the pop-up.' },
