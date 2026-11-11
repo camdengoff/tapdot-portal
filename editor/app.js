@@ -1010,7 +1010,9 @@
             { k: 'title', t: 'text', l: 'Pop-up title', ph: 'Same as the label', hint: 'Leave blank to use the label of the button or card.' }, { k: 'icon', t: 'emoji', l: 'Pop-up icon' }],
           sheet: [{ k: 'sheet', t: 'select', l: 'Menu or list', opts: [['', '— choose —']].concat(state.sheets.map((s) => [s.id, TD.iconLabel(s.icon) + s.title]),
             // RSS feed blocks set to open in a pop-up can be opened from any button too.
-            state.blocks.filter((b) => b.type === 'feed' && (b.show && b.show !== 'page')).map((b) => ['feed-' + b.id, '📰 ' + ((b.show !== 'popup' && b.sheetTitle) || b.openLabel || 'RSS feed') + ' (RSS feed)'])) }],
+            state.blocks.filter((b) => b.type === 'feed' && (b.show && b.show !== 'page')).map((b) => ['feed-' + b.id, '📰 ' + ((b.show !== 'popup' && b.sheetTitle) || b.openLabel || 'RSS feed') + ' (RSS feed)']),
+            // So can connect cards set to show in a pop-up.
+            state.blocks.filter((b) => b.type === 'form' && b.show === 'popup').map((b) => ['form-' + b.id, '✍️ ' + String(b.title || 'Connect card').replace(/==|\*\*|__/g, '') + ' (connect card)'])) }],
           copy: [{ k: 'text', t: 'textarea', l: 'Text to copy' }, { k: 'toast', t: 'text', l: 'Message after copying' }],
           phone: [{ k: 'phone', t: 'text', l: 'Phone number' }],
           sms: [{ k: 'phone', t: 'text', l: 'Phone number' }, { k: 'body', t: 'text', l: 'Starting message (optional)' }],

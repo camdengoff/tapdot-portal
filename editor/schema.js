@@ -389,6 +389,8 @@
     form: {
       name: 'Connect card', icon: '✍️', desc: 'A form visitors fill in; answers show up in your portal',
       fields: [
+        { k: 'show', t: 'select', l: 'Show it', opts: [['page', 'On the page'], ['popup', 'In a pop-up, opened from a button']], hint: 'In a pop-up: on any button, banner or hero, choose When tapped → Open one of my pop-up menus or lists, then pick this connect card.' },
+        { k: 'popIcon', t: 'text', l: 'Pop-up icon', ph: 'e.g. 👋', when: (b) => b.show === 'popup' },
         { k: 'title', t: 'text', l: 'Title', rich: true },
         { k: 'intro', t: 'textarea', l: 'Intro text (optional)', rich: true },
         { k: 'items', t: 'list', l: 'Questions', itemName: 'Question', itemLabel: (i) => (i.required ? '* ' : '') + (i.label || 'Question'),
@@ -406,7 +408,7 @@
           hint: 'Answers always show in the DoorStep portal. Email needs to be turned on for the portal. Up to 5 addresses, separated by commas.' },
       ],
       defaults: () => ({
-        title: 'Connect card', intro: 'We’re so glad you’re here! Tell us a little about yourself.',
+        show: 'page', popIcon: '👋', title: 'Connect card', intro: 'We’re so glad you’re here! Tell us a little about yourself.',
         items: [
           { label: 'Name', kind: 'text', options: '', ph: 'First and last name', required: true },
           { label: 'Email', kind: 'email', options: '', ph: 'you@example.com', required: false },
@@ -666,15 +668,17 @@
       build: () => {
         const p = starter('Welcome', 'Light');
         p.sheets = [visitSheet()];
+        const card = blk('form', { show: 'popup' });
+        const openCard = () => act('sheet', { sheet: 'form-' + card.id });
         p.blocks = [
           blk('hero', { images: [photo('welcome')], textPos: 'below', title: 'Welcome to ==Your Church==', subtitle: 'We’re so glad you’re here today.' }),
           blk('buttons', { layout: 'scroll', style: { mt: 14 }, items: [
-            { label: 'Connect card', icon: '👋', iconBg: '#3b7de126', bg: '', color: '', action: act('scroll', { target: 'connect' }) },
+            { label: 'Connect card', icon: '👋', iconBg: '#3b7de126', bg: '', color: '', action: openCard() },
             { label: 'Give', icon: '💵', iconBg: '#10b98126', bg: '', color: '', action: act('link', { url: 'https://example.com/give' }) },
             { label: 'Contact', icon: '💬', iconBg: '#fbbf2426', bg: '', color: '', action: act('sheet', { sheet: 'contact' }) },
             { label: 'Share', icon: '🔗', iconBg: '#d36bff26', bg: '', color: '', action: act('share', {}) },
           ] }),
-          blk('banner', { icon: '👋', eyebrow: 'New here?', title: 'Fill out a connect card', subtitle: 'Let us know you visited. It takes a minute.', action: act('scroll', { target: 'connect' }), style: { mt: 6 } }),
+          blk('banner', { icon: '👋', eyebrow: 'New here?', title: 'Fill out a connect card', subtitle: 'Let us know you visited. It takes a minute.', action: openCard(), style: { mt: 6 } }),
           blk('heading', { title: 'Good to know', style: { mt: 12 } }),
           blk('accordion', { items: [
             { icon: '🕒', title: 'Service times', body: 'Sundays at **9:00** and **10:45 AM**.', image: '', btnLabel: '', action: TD.newAction(), open: true },
@@ -682,7 +686,7 @@
             { icon: '☕', title: 'Coffee and connection', body: 'Grab a free coffee in the lobby before and after each service.', image: '', btnLabel: '', action: TD.newAction(), open: false },
           ] }),
           blk('copy', {style: { mt: 6 }, title: 'Invite a friend', intro: 'Copy a message or send it straight from your phone.', btnLabel: 'Copy', send: true, sendLabel: 'Send', items: [{ label: 'Sunday invite', value: 'Hey! I’ve been going to Your Church and I think you’d love it. Want to come with me this Sunday? Services are at 9 and 10:45. yourchurch.org/visit', toast: 'Invite copied. Paste it in a text!' }, { label: 'Coffee first', value: 'Want to grab coffee before church Sunday? I’ll save you a seat. yourchurch.org/visit', toast: 'Invite copied' }] }),
-          blk('form', { anchor: 'connect', style: { mt: 12 } }),
+          card,
         ];
         return p;
       },

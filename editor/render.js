@@ -323,14 +323,19 @@
         return '<div class="td-f-q"><label for="' + id + '">' + lab + star + '</label>' + input + '</div>';
       }).join('');
       const labels = b.items.map((it) => it.label || 'Question');
-      return '<form class="td-form td-card" novalidate data-td-form="' + esc(b.id) + '" data-td-post="' + esc(ctx.formUrl || '') + '" data-td-labels="' + esc(JSON.stringify(labels)) + '">' +
-        (b.title ? '<div class="td-form-title td-head">' + md(b.title) + '</div>' : '') +
+      // "Only in a pop-up": the form lives in its own sheet, opened by any button's pop-up action.
+      const pop = b.show === 'popup';
+      const html = '<form class="td-form td-card" novalidate data-td-form="' + esc(b.id) + '" data-td-post="' + esc(ctx.formUrl || '') + '" data-td-labels="' + esc(JSON.stringify(labels)) + '">' +
+        (b.title && !pop ? '<div class="td-form-title td-head">' + md(b.title) + '</div>' : '') +
         (b.intro ? '<div class="td-form-intro">' + md(b.intro, true) + '</div>' : '') +
         q +
         '<input class="td-hp" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" />' +
         '<div class="td-form-err" role="alert"></div>' +
         '<button type="submit" class="td-form-btn">' + esc(b.btnLabel || 'Send') + '</button>' +
         '</form><div class="td-form-done td-card" hidden>' + md(b.thanks || 'Thank you!', true) + '</div>';
+      if (!pop) return html;
+      (ctx.feedSheets = ctx.feedSheets || []).push({ id: 'form-' + b.id, title: String(b.title || 'Connect card').replace(/==|\*\*|__/g, ''), icon: b.popIcon || '', html });
+      return '';
     },
     // Invite messages: ready-made invites people copy, or send through the phone's share sheet.
     copy(b) {
