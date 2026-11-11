@@ -1015,7 +1015,7 @@
           phone: [{ k: 'phone', t: 'text', l: 'Phone number' }],
           sms: [{ k: 'phone', t: 'text', l: 'Phone number' }, { k: 'body', t: 'text', l: 'Starting message (optional)' }],
           email: [{ k: 'email', t: 'text', l: 'Email address' }, { k: 'subject', t: 'text', l: 'Subject (optional)' }],
-          scroll: [{ k: 'target', t: 'select', l: 'Scroll to', opts: [['', '— choose —']].concat(state.blocks.filter((b) => b.anchor).map((b) => [b.anchor, TD.BLOCKS[b.type].name + ': ' + (TD.BLOCKS[b.type].summary(b) || '').slice(0, 30)])), hint: 'Give a block an Anchor name (in its Style overrides) to list it here.' }],
+          scroll: [{ k: 'target', t: 'select', l: 'Scroll to', opts: [['', '— choose —']].concat(state.blocks.filter((b) => b.anchor).map((b) => [b.anchor, TD.BLOCKS[b.type].name + ': ' + (TD.BLOCKS[b.type].summary(b) || '').slice(0, 30)])), hint: CLOUD && !CLOUD.advanced ? 'Turn on Advanced editing in this page’s Settings (in the portal), then give a block an Anchor name in its Style overrides to list it here.' : 'Give a block an Anchor name (in its Style overrides) to list it here.' }],
           file: [{ k: 'file', t: 'file', l: 'Photo or PDF' },
             { k: 'title', t: 'text', l: 'Viewer title', ph: 'Same as the label', hint: 'Shown at the top of the viewer. Leave blank to use the label of the button or card.' },
             { k: 'links', t: 'list', l: 'Buttons along the bottom (optional)', itemName: 'Button', itemLabel: (i) => i.label || 'Button', item: TD.FILE_LINK_FIELDS, newItem: TD.newFileLink,
@@ -1332,7 +1332,7 @@
           h('button', { title: 'Move down', disabled: i === state.blocks.length - 1, onclick: () => move(1) }, '↓'),
           h('button', { title: 'Duplicate', onclick: () => { const c = TD.clone(b); c.id = TD.uid('b'); c.anchor = ''; state.blocks.splice(i + 1, 0, c); open.add(c.id); changed(true); } }, '⧉'),
           h('button', { title: 'Delete', class: 'danger', onclick: () => { state.blocks.splice(i, 1); changed(true); snapshot(true); toast(def.name + ' deleted. Use Undo ↶ to bring it back.'); } }, '✕'))),
-      isOpen ? h('div', { class: 'bbody' }, form(b, def.fields.concat(TD.COMMON_FIELDS), () => changed(), () => changed())) : null);
+      isOpen ? h('div', { class: 'bbody' }, form(b, def.fields.concat(CLOUD && !CLOUD.advanced ? [] : TD.COMMON_FIELDS), () => changed(), () => changed())) : null);
       list.append(card);
     });
     return h('div', null,
@@ -1510,13 +1510,16 @@
     const e = state.exp;
     const opt = (k, label, hint) => h('div', { class: 'field row' }, h('label', { class: 'check' },
       h('input', { type: 'checkbox', checked: !!e[k], onchange: (ev) => { e[k] = ev.target.checked; changed(); drawExportCode(); } }), h('span', null, label)), hint ? info(hint) : null);
+    // In the portal there's no HTML to copy: Publish (with the one-time install code) is the only way out.
+    const paste = !CLOUD;
     const wrap = h('div', null,
-      h('div', { class: 'tabhead' },
+      CLOUD ? publishSection() : null,
+      paste ? h('div', { class: 'tabhead' },
         h('button', { class: 'primary', onclick: copyExport }, '📋 Copy HTML'),
         h('button', { class: 'ghost', onclick: downloadExport }, '⬇ Download .html'),
-        h('button', { class: 'ghost', onclick: () => { const u = URL.createObjectURL(new Blob([exportHtml()], { type: 'text/html' })); window.open(u, '_blank'); } }, '↗ Open')),
-      h('div', { id: 'exportSize', class: 'size' }),
-      h('textarea', { id: 'exportCode', class: 'mono code', readOnly: true, rows: 6, onfocus: (ev) => ev.target.select() }),
+        h('button', { class: 'ghost', onclick: () => { const u = URL.createObjectURL(new Blob([exportHtml()], { type: 'text/html' })); window.open(u, '_blank'); } }, '↗ Open')) : null,
+      paste ? h('div', { id: 'exportSize', class: 'size' }) : null,
+      paste ? h('textarea', { id: 'exportCode', class: 'mono code', readOnly: true, rows: 6, onfocus: (ev) => ev.target.select() }) : null,
       h('h3', null, 'Pop-up proxy'),
       h('div', { class: 'field' }, h('div', { class: 'fl row' }, 'Worker address',
           info('Your Cloudflare worker, so sites that block framing still load in pop-ups. Until you add one, pop-up links open in a new tab instead.')),
@@ -1524,15 +1527,15 @@
       ),
       ownWorker() ? proxySites() : null,
       workerSetup(),
-      SHOW_PUBLISH || CLOUD ? publishSection() : null,
-      h('h3', null, 'Export options'),
+      SHOW_PUBLISH && !CLOUD ? publishSection() : null,
+      h('h3', null, CLOUD ? 'Page options' : 'Export options'),
       opt('squarespace', 'Squarespace code block fixes', 'Forces the page background onto Squarespace wrappers, removes their padding and hides the site search bar, like base html does.'),
       h('div', { class: 'field inline' }, h('label', { class: 'fl' }, 'Layout'),
         h('select', { onchange: (ev) => { e.layout = ev.target.value; changed(); } },
           h('option', { value: 'app', selected: e.layout === 'app' }, 'Full-screen app'),
           h('option', { value: 'inline', selected: e.layout === 'inline' }, 'Inline (in the page flow)'))),
-      opt('fullDoc', 'Full HTML document (<html>, <head>, <body>)', 'Turn off to get just the styles and markup, for pasting into a block on an existing page.'),
-      opt('embed', 'Keep editable copy inside the HTML', 'Lets you reopen this exact export later with Open → .html. Roughly doubles the size of uploaded images.'),
+      paste ? opt('fullDoc', 'Full HTML document (<html>, <head>, <body>)', 'Turn off to get just the styles and markup, for pasting into a block on an existing page.') : null,
+      paste ? opt('embed', 'Keep editable copy inside the HTML', 'Lets you reopen this exact export later with Open → .html. Roughly doubles the size of uploaded images.') : null,
       h('details', { class: 'group more' }, h('summary', null, 'Uploaded image quality'),
         h('div', { class: 'form' },
           h('div', { class: 'field inline' }, h('label', { class: 'fl' }, 'Longest side'),
@@ -1540,11 +1543,11 @@
           h('div', { class: 'field inline' }, h('label', { class: 'fl' }, 'JPEG quality'),
             CTRL.range(e, { k: 'imgQ', min: 0.4, max: 0.95, step: 0.05 }, () => save())),
           h('div', { class: 'hint' }, 'Applies to photos you upload from now on.'))),
-      h('details', { class: 'group more' }, h('summary', null, 'Restore from pasted HTML'),
+      paste ? h('details', { class: 'group more' }, h('summary', null, 'Restore from pasted HTML'),
         h('div', { class: 'form' },
           h('div', { class: 'hint' }, 'Paste HTML that was exported with “Keep editable copy” on.'),
           h('textarea', { id: 'pasteIn', rows: 3, class: 'mono', placeholder: '<!DOCTYPE html>…' }),
-          h('button', { class: 'ghost', onclick: () => importText($('#pasteIn').value) }, 'Restore'))));
+          h('button', { class: 'ghost', onclick: () => importText($('#pasteIn').value) }, 'Restore'))) : null);
     setTimeout(drawExportCode, 0);
     setTimeout(checkWorker, 0);
     return wrap;
@@ -1703,12 +1706,12 @@
     const btn = h('button', { class: 'primary', onclick: () => cloudPublish(btn) }, '🚀 Publish');
     const view = location.origin + '/view/' + CLOUD.church + '/' + CLOUD.page;
     return h('div', null,
-      h('h3', { class: 'row' }, 'Publish', info('Your edits save to ' + (CLOUD.churchName || 'the portal') + ' as you go, but visitors only see them after you publish. Paste the code block into Squarespace once; after that, every publish updates the site.')),
+      h('h3', { class: 'row' }, 'Publish', info('Your edits save to ' + (CLOUD.churchName || 'the portal') + ' as you go, but visitors only see them after you publish. Paste the install code into your website once; after that, every publish updates the site.')),
       h('div', { class: 'tabhead' }, btn,
         h('button', { class: 'ghost', onclick: async () => {
-          try { await navigator.clipboard.writeText(cloudLoader()); toast('Code block copied. Paste it into a Squarespace code block once.'); }
-          catch (x) { download('tapdot-code-block.html', cloudLoader(), 'text/html'); }
-        } }, '📋 Copy code block'),
+          try { await navigator.clipboard.writeText(cloudLoader()); toast('Install code copied. Paste it into your site once.'); }
+          catch (x) { download('doorstep-install-code.html', cloudLoader(), 'text/html'); }
+        } }, '📋 Copy install code'),
         h('a', { class: 'ghost btnlink', href: view, target: '_blank', rel: 'noopener' }, '↗ Live page')),
       h('div', { class: 'hint' }, CLOUD.publishedAt ? 'Last published ' + new Date(CLOUD.publishedAt).toLocaleString() + '.' : 'Not published yet.'));
   }
@@ -1755,6 +1758,8 @@
       try {
         const p = await cloudFetch('', {});
         CLOUD.draftAt = p.draftAt; CLOUD.name = p.name; CLOUD.churchName = p.church; CLOUD.publishedAt = p.publishedAt;
+        // Style overrides only show with Advanced editing on (the page's Settings in the portal). Admins editing templates always see them.
+        CLOUD.advanced = !!CLOUD.isTemplate || !!(p.settings && p.settings.advanced);
         // A brand-new page starts from the template picked in the portal (?template=…), or blank.
         const tpl = new URLSearchParams(location.search).get('template');
         state = p.draft ? TD.normalize(p.draft) : (TD.TEMPLATES[tpl] || TD.TEMPLATES.blank).build();
@@ -1774,12 +1779,15 @@
         if (!CLOUD.dirty) location.href = CLOUD.back;
       } }, '←'), h('span', { class: 'dot' }), CLOUD.name);
       document.addEventListener('keydown', (e) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') { e.preventDefault(); cloudSaveNow(); } });
+      // In the portal, pages go live only through Publish and the one-time install code, never pasted HTML.
       if (!CLOUD.isTemplate) {
         const pub = h('button', { class: 'primary', title: 'Make your saved edits live' }, '🚀 Publish');
         pub.onclick = () => cloudPublish(pub);
-        $('#copyBtn').classList.replace('primary', 'ghost');
         $('#copyBtn').after(pub);
       }
+      $('#copyBtn').remove();
+      const expTab = document.querySelector('.tabs [data-tab=export]');
+      if (expTab) expTab.textContent = CLOUD.isTemplate ? 'Settings' : 'Publish';
       // Leaving with unsaved edits: start saving now, and ask the browser to hold the page until it's done.
       window.addEventListener('beforeunload', (e) => { if (CLOUD.dirty || CLOUD.saving) { cloudSaveNow(); e.preventDefault(); e.returnValue = ''; } });
       document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && CLOUD.dirty) cloudSaveNow(); });
@@ -1820,7 +1828,7 @@
     };
     $('#histBtn').onclick = showHistory;
     $('#saveBtn').onclick = () => { download(slug() + '.tapdot.json', JSON.stringify(state, null, 1), 'application/json'); toast('Project file saved'); };
-    $('#copyBtn').onclick = copyExport;
+    if ($('#copyBtn')) $('#copyBtn').onclick = copyExport;
     $('#pickBtn').onclick = () => { setPick(!picking); if (picking) document.body.classList.add('show-preview'); };
     $('#viewToggle').onclick = () => document.body.classList.toggle('show-preview');
     document.querySelectorAll('[data-dev]').forEach((b) => b.addEventListener('click', () => {

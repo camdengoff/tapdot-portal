@@ -63,11 +63,21 @@ async function mayMakeLink(d, env, role, churchId, email) {
 
 async function pageRow(d, churchId, pageId) {
   if (!isSlug(pageId)) throw new HttpError(404, 'No such page.');
-  const p = await one(d, 'SELECT * FROM pages WHERE church_id = ? AND id = ?', churchId, pageId);
+  const p = await one(d, PAGE_SELECT + ' WHERE p.church_id = ? AND p.id = ?', churchId, pageId);
   if (!p) throw new HttpError(404, 'No such page.');
   return p;
 }
-const pageOut = (p) => ({ id: p.id, name: p.name, createdAt: p.created_at, draftAt: p.draft_at, draftBy: p.draft_by, publishedAt: p.published_at, publishedBy: p.published_by });
+const PAGE_SELECT = 'SELECT p.*, s.data AS settings FROM pages p LEFT JOIN page_settings s ON s.church_id = p.church_id AND s.page_id = p.id';
+// Settings a page can have (see the page's Settings screen in the portal). Anything else is dropped.
+const SETTINGS = { advanced: 'boolean' };
+function readSettings(text) {
+  let o = {};
+  try { o = JSON.parse(text || '{}') || {}; } catch (e) { o = {}; }
+  const out = {};
+  for (const k in SETTINGS) out[k] = SETTINGS[k] === 'boolean' ? !!o[k] : o[k];
+  return out;
+}
+const pageOut = (p) => ({ id: p.id, name: p.name, createdAt: p.created_at, draftAt: p.draft_at, draftBy: p.draft_by, publishedAt: p.published_at, publishedBy: p.published_by, settings: readSettings(p.settings) });
 
 async function uniqueSlug(d, table, base, churchId) {
   const root = slugify(base) || (table === 'churches' ? 'church' : 'page');
@@ -183,7 +193,7 @@ export async function handle({ request, env, waitUntil }) {
 
     if (parts.length === 2) {
       if (M === 'GET') {
-        const pages = (await all(d, 'SELECT * FROM pages WHERE church_id = ? ORDER BY name', churchId)).map(pageOut);
+        const pages = (await all(d, PAGE_SELECT + ' WHERE p.church_id = ? ORDER BY p.name', churchId)).map(pageOut);
         const members = await all(d, 'SELECT m.email, m.role, m.added_at AS addedAt, u.name, (u.pw_hash IS NOT NULL) AS hasPassword, (u.google_sub IS NOT NULL) AS hasGoogle FROM members m LEFT JOIN users u ON u.email = m.email WHERE m.church_id = ? ORDER BY m.email', churchId);
         members.forEach((m) => { m.hasPassword = !!m.hasPassword; m.hasGoogle = !!m.hasGoogle; });
         if (role === 'viewer') return json({ church, role, pages, members: [], responses: {} });
@@ -204,6 +214,7 @@ export async function handle({ request, env, waitUntil }) {
         await files.removeAll(env, churchId);
         await d.batch([
           d.prepare('DELETE FROM pages WHERE church_id = ?').bind(churchId),
+          d.prepare('DELETE FROM page_settings WHERE church_id = ?').bind(churchId),
           d.prepare('DELETE FROM stats WHERE church_id = ?').bind(churchId),
           d.prepare('DELETE FROM events WHERE church_id = ?').bind(churchId),
           d.prepare('DELETE FROM responses WHERE church_id = ?').bind(churchId),
@@ -294,6 +305,7 @@ export async function handle({ request, env, waitUntil }) {
           await run(d, 'UPDATE pages SET draft_at = ?, draft_by = ? WHERE church_id = ? AND id = ?', now(), user.email, churchId, id);
         } else if (b.copyFrom && isSlug(b.copyFrom)) {
           const src = await env.PAGES.get('draft:' + churchId + '/' + b.copyFrom);
+          await run(d, 'INSERT OR IGNORE INTO page_settings (church_id, page_id, data) SELECT church_id, ?, data FROM page_settings WHERE church_id = ? AND page_id = ?', id, churchId, b.copyFrom);
           if (src) {
             await env.PAGES.put('draft:' + churchId + '/' + id, src);
             await run(d, 'UPDATE pages SET draft_at = ?, draft_by = ? WHERE church_id = ? AND id = ?', now(), user.email, churchId, id);
@@ -309,9 +321,16 @@ export async function handle({ request, env, waitUntil }) {
       }
       if (route('PATCH', 4)) {
         const b = await body(request);
-        const name = String(b.name || '').trim().slice(0, 80);
-        if (!name) throw new HttpError(400, 'Give the page a name.');
-        await run(d, 'UPDATE pages SET name = ? WHERE church_id = ? AND id = ?', name, churchId, p.id);
+        if (b.name !== undefined) {
+          const name = String(b.name || '').trim().slice(0, 80);
+          if (!name) throw new HttpError(400, 'Give the page a name.');
+          await run(d, 'UPDATE pages SET name = ? WHERE church_id = ? AND id = ?', name, churchId, p.id);
+        }
+        if (b.settings && typeof b.settings === 'object') {
+          const next = readSettings(JSON.stringify(Object.assign(readSettings(p.settings), b.settings)));
+          await run(d, 'INSERT INTO page_settings (church_id, page_id, data) VALUES (?, ?, ?) ON CONFLICT (church_id, page_id) DO UPDATE SET data = excluded.data', churchId, p.id, JSON.stringify(next));
+          return json({ ok: true, settings: next });
+        }
         return json({ ok: true });
       }
       if (route('DELETE', 4)) {
@@ -320,6 +339,7 @@ export async function handle({ request, env, waitUntil }) {
         await run(d, 'DELETE FROM stats WHERE church_id = ? AND page_id = ?', churchId, p.id);
         await run(d, 'DELETE FROM events WHERE church_id = ? AND page_id = ?', churchId, p.id);
         await run(d, 'DELETE FROM responses WHERE church_id = ? AND page_id = ?', churchId, p.id);
+        await run(d, 'DELETE FROM page_settings WHERE church_id = ? AND page_id = ?', churchId, p.id);
         return json({ ok: true });
       }
       if (route('PUT', 5) && parts[4] === 'draft') {

@@ -108,6 +108,13 @@ const SCHEMA = [
     created_at TEXT NOT NULL,
     created_by TEXT
   )`,
+  // Per-page settings from the page's Settings screen in the portal, as JSON (e.g. {"advanced":true}).
+  `CREATE TABLE IF NOT EXISTS page_settings (
+    church_id TEXT NOT NULL,
+    page_id TEXT NOT NULL,
+    data TEXT NOT NULL DEFAULT '{}',
+    PRIMARY KEY (church_id, page_id)
+  )`,
   'CREATE INDEX IF NOT EXISTS events_page ON events (church_id, page_id, at)',
   'CREATE INDEX IF NOT EXISTS members_email ON members (email)',
   'CREATE INDEX IF NOT EXISTS sessions_email ON sessions (email)',

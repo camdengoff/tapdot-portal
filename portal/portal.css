@@ -285,3 +285,14 @@ dialog:has(.newpage) { width: min(1080px, calc(100vw - 24px)); }
 @media (min-width: 1000px) { .wideov { display: grid; grid-template-columns: minmax(420px, 1fr) 2fr; align-items: stretch; } .wideov .statbig > div { justify-content: center; } }
 .page .taplist { max-height: none; }
 .foot { margin-top: 32px; text-align: center; }
+
+/* A page's Settings screen */
+.crumb { display: inline-block; margin: 0 0 14px; color: var(--muted); text-decoration: none; font-size: 13px; }
+.crumb:hover { color: var(--text); }
+.settings { display: flex; flex-direction: column; gap: 16px; max-width: 640px; }
+.settings h3 { margin: 0 0 12px; font-size: 15px; font-weight: 600; }
+.settings form.row { display: flex; gap: 8px; }
+.settings textarea { width: 100%; resize: none; margin: 10px 0 12px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); color: var(--text); }
+.settings .check { font-size: 14px; color: var(--text); }
+.settings .check input { width: 16px; height: 16px; padding: 0; flex: none; }
+.btn.icon { min-width: 40px; justify-content: center; font-size: 16px; }

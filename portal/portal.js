@@ -163,8 +163,61 @@
       churchPicker('');
       return drawHome();
     }
-    churchPicker(id);
+    // #<church>/<page> is that page's Settings screen.
+    const [cid, pid] = id.split('/');
+    churchPicker(cid);
+    if (pid) return drawPageSettings(cid, pid);
     return drawChurch(id);
+  }
+
+  // ── One page's Settings screen (#<church>/<page>) ───────────────────
+  async function drawPageSettings(cid, pid) {
+    const main = $('#main');
+    let data;
+    try { data = await api('/churches/' + enc(cid)); }
+    catch (e) { fill(main, h('div', { class: 'card center' }, h('p', null, e.message), h('a', { href: '#' }, 'Back'))); return; }
+    if (route() !== cid + '/' + pid) return;
+    const { church, role } = data;
+    const p = data.pages.find((x) => x.id === pid);
+    if (!p || role === 'viewer') { location.replace('#' + cid); return; }
+    document.title = p.name + ' settings · DoorStep';
+    const url = '/churches/' + enc(church.id) + '/pages/' + enc(p.id);
+    const save = (body) => api(url, { method: 'PATCH', body });
+    const code = '<div class="tapdot-page" data-page="' + church.id + '/' + p.id + '"></div>\n<script src="' + location.origin + '/embed.js"></' + 'script>';
+    const live = location.origin + '/view/' + church.id + '/' + p.id;
+
+    const nameIn = h('input', { type: 'text', value: p.name, maxlength: 80 });
+    const adv = h('input', { type: 'checkbox', checked: !!(p.settings && p.settings.advanced), onchange: act(async () => {
+      const r = await save({ settings: { advanced: adv.checked } });
+      adv.checked = !!r.settings.advanced;
+      toast(adv.checked ? 'Advanced editing is on for this page.' : 'Advanced editing is off for this page.');
+    }) });
+
+    fill(main,
+      h('a', { class: 'crumb', href: '#' + church.id }, '← ' + church.name),
+      h('div', { class: 'head' }, h('div', null, h('h1', null, 'Settings'), h('p', { class: 'muted sub' }, p.name))),
+      h('div', { class: 'settings' },
+        h('section', { class: 'card' },
+          h('h3', null, 'Page name'),
+          h('form', { class: 'row', onsubmit: act(async (ev) => {
+            ev.preventDefault();
+            const name = nameIn.value.trim();
+            if (!name) { toast('Give the page a name.'); return; }
+            await save({ name }); p.name = name;
+            $('.head .sub').textContent = name;
+            toast('Renamed. The page’s link stays the same.');
+          }) }, nameIn, h('button', { class: 'ghost', type: 'submit' }, 'Save'))),
+        h('section', { class: 'card' },
+          h('h3', null, 'Editing'),
+          h('label', { class: 'check' }, adv, h('span', null, 'Advanced editing',
+            h('span', { class: 'muted small' }, 'Shows Style overrides on every block in the editor: its own colors, corner radius, spacing, anchor name and CSS class. Leave it off to keep the editor simple and let the theme set the look. Overrides already on the page keep working either way.')))),
+        h('section', { class: 'card' },
+          h('h3', null, 'Install code'),
+          h('p', { class: 'muted small' }, 'Paste this into a code block on your website once. After that, Publish in the editor updates the page there.'),
+          h('textarea', { class: 'mono', readOnly: true, rows: 2, onfocus: (e) => e.target.select() }, code),
+          h('div', { class: 'row wrap' },
+            h('button', { class: 'primary', onclick: () => copy(code, 'Install code copied. Paste it into your site once.') }, '📋 Copy install code'),
+            p.publishedAt ? h('a', { class: 'ghost btn', href: live, target: '_blank', rel: 'noopener' }, '↗ Live page') : h('span', { class: 'muted small' }, 'Not published yet.')))));
   }
 
   // ── Home: every church (admins), or a note for people with none ──────
@@ -225,7 +278,8 @@
         viewer ? (p.publishedAt ? h('div', { class: 'row wrap' }, h('a', { class: 'ghost btn', href: live, target: '_blank', rel: 'noopener' }, '↗ Live page')) : null) : h('div', { class: 'row wrap' },
           h('a', { class: 'primary btn', href: 'editor.html?church=' + enc(church.id) + '&page=' + enc(p.id) }, '✎ Edit'),
           p.publishedAt ? h('a', { class: 'ghost btn', href: live, target: '_blank', rel: 'noopener' }, '↗ Live page') : null,
-          h('button', { class: 'ghost', onclick: () => copy(code, 'Code block copied. Paste it into a Squarespace code block once.') }, '📋 Code block'),
+          h('button', { class: 'ghost', title: 'Paste this into your website once. After that, Publish updates it.', onclick: () => copy(code, 'Install code copied. Paste it into your site once.') }, '📋 Install code'),
+          h('a', { class: 'ghost btn icon', href: '#' + church.id + '/' + p.id, title: 'Settings', 'aria-label': 'Settings' }, '⚙'),
           h('details', { class: 'more' }, h('summary', { class: 'ghost' }, '•••'),
             h('div', { class: 'menu' },
               h('button', { onclick: () => copy(live, 'Link copied. Use it for QR codes and tap tags.') }, 'Copy live link'),
