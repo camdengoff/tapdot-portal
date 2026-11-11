@@ -2,7 +2,7 @@
 
 DoorStep builds mobile "tap tag" landing pages (for NFC tags and QR codes) and keeps them live on a church's
 website. This repo has the visual page editor and the client portal around it, hosted on Cloudflare Pages
-at `tapdot.camdengoff.com`.
+at `doorstep.camdengoff.com`.
 
 Bethany First Church's original editor setup lives in the public repo
 `camdengoff/TapDot-Code-Editor-`, which stays as it is so their Squarespace code block keeps working.
@@ -11,7 +11,7 @@ Bethany First Church's original editor setup lives in the public repo
 
 Open `index.html` in a browser. Projects save in that browser, and Copy HTML gives a paste-ready block.
 
-## Client portal (tapdot.camdengoff.com/app/)
+## Client portal (doorstep.camdengoff.com/app/)
 
 The portal gives each church an account: its staff sign in, keep their pages online (not just in one
 browser), and publish them. A church pastes one code block into Squarespace per page, once; after that,
@@ -70,9 +70,9 @@ every Publish updates the live page.
    - `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` (secrets): from Google, below.
    - `SETUP_KEY` (secret, optional): lets an admin set a password before Google is set up, from
      "First-time admin setup" on the sign-in page. Delete it once you have signed in.
-6. Pages project → Custom domains: add `tapdot.camdengoff.com`.
+6. Pages project → Custom domains: add `doorstep.camdengoff.com`.
 7. Deployments → Retry the latest deployment so the settings take effect, then open
-   `https://tapdot.camdengoff.com/app/`.
+   `https://doorstep.camdengoff.com/app/`.
 
 ### Sign in with Google
 
@@ -80,7 +80,7 @@ every Publish updates the live page.
 2. APIs & Services → OAuth consent screen: External, app name DoorStep, your email as support contact.
    Publish the app so it isn't limited to test users (the email/profile scopes need no Google review).
 3. APIs & Services → Credentials → Create credentials → OAuth client ID → Web application.
-   Authorized redirect URI: `https://tapdot.camdengoff.com/api/auth/google/callback`.
+   Authorized redirect URI: `https://doorstep.camdengoff.com/api/auth/google/callback`.
 4. Copy the client ID and secret into the Cloudflare secrets above.
 
 ### Run it locally
@@ -120,7 +120,7 @@ Run `node tools/build.js` after changing `portal/`, `public/` or the editor.
   Versions live in that browser; use Save project for a copy elsewhere.
 - Autosaves in the browser, plus Save project (`.json`), Open, undo/redo and drag-to-reorder.
 
-## Help center (tapdot.camdengoff.com/help/)
+## Help center (doorstep.camdengoff.com/help/)
 
 Text tutorials for churches: getting started, the editor, publishing, each feature, stats and people,
 troubleshooting and an FAQ, with a search box. Linked from the homepage, the portal's top bar, the
