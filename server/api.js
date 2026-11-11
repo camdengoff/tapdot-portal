@@ -1,6 +1,7 @@
 // The DoorStep portal API, served by Cloudflare Pages Functions under /api/.
 //
-// Roles: admins (ADMIN_EMAILS) see and manage every church. In a church, an "owner" can add
+// Roles: admins (ADMIN_EMAILS, plus any a main admin adds on the Admin screen; see admin.js) see and
+// manage every church. In a church, an "owner" can add
 // and remove people, and an "editor" can create, edit and publish pages.
 //
 // Page storage (KV, bound as PAGES):
@@ -13,6 +14,7 @@ import * as forms from './forms.js';
 import * as templates from './templates.js';
 import * as files from './files.js';
 import * as shares from './shares.js';
+import * as admin from './admin.js';
 import { feedProxy } from './feed.js';
 
 const MAX_BODY = 20 * 1024 * 1024;
@@ -55,7 +57,7 @@ const pickRole = (r) => (ROLES.includes(r) ? r : 'editor');
 // is brand new (no password, no Google, in no other church). Resets for anyone else go to an admin.
 async function mayMakeLink(d, env, role, churchId, email) {
   if (role === 'admin') return true;
-  if (auth.isAdmin(env, email)) return false;
+  if (await auth.isAdmin(d, env, email)) return false;
   const u = await one(d, 'SELECT pw_hash, google_sub FROM users WHERE email = ?', email);
   if (u && (u.pw_hash || u.google_sub)) return false;
   return !(await one(d, 'SELECT 1 FROM members WHERE email = ? AND church_id != ? LIMIT 1', email, churchId));
@@ -119,9 +121,9 @@ export async function handle({ request, env, waitUntil }) {
         const b = await body(request);
         const email = normEmail(b.email);
         if (!env.SETUP_KEY) throw new HttpError(404, 'Setup is turned off.');
-        if (!auth.sameString(String(b.key || ''), env.SETUP_KEY) || !auth.isAdmin(env, email)) throw new HttpError(403, 'That setup key or admin email is not right.');
+        if (!auth.sameString(String(b.key || ''), env.SETUP_KEY) || !auth.isMainAdmin(env, email)) throw new HttpError(403, 'That setup key or admin email is not right.');
         await auth.setPassword(d, email, b.password);
-        return json({ ok: true }, 200, { 'Set-Cookie': await auth.startSession(d, email) });
+        return json({ ok: true }, 200, { 'Set-Cookie': await auth.startSession(d, email, 'setup') });
       }
       if (route('GET', 2) && parts[1] === 'google') return auth.googleStart(env, request);
       if (route('GET', 3) && parts[1] === 'google' && parts[2] === 'callback') return auth.googleCallback(d, env, request);
@@ -144,6 +146,7 @@ export async function handle({ request, env, waitUntil }) {
     // ── Everything else needs a signed-in person ─────────────────────
     const user = await auth.currentUser(d, env, request);
     if (!user) throw new HttpError(401, 'Please sign in.');
+    const log = (action, target, detail, churchId) => auth.log(d, user.email, action, target, detail, churchId);
 
     if (route('GET', 1, 'me')) {
       const churches = user.admin
@@ -169,6 +172,7 @@ export async function handle({ request, env, waitUntil }) {
       return json(await files.upload(env, request, parts[1]), 201);
     }
 
+    if (parts[0] === 'admin') return await admin.route({ d, env, request, user, parts, url, json, body });
     if (parts[0] === 'templates') return await templates.route({ d, env, request, user, parts, url, json, body });
 
     if (parts[0] !== 'churches') throw new HttpError(404, 'Not found.');
@@ -180,6 +184,7 @@ export async function handle({ request, env, waitUntil }) {
       if (!name) throw new HttpError(400, 'Give the church a name.');
       const id = await uniqueSlug(d, 'churches', b.id || name);
       await run(d, 'INSERT INTO churches (id, name, created_at) VALUES (?, ?, ?)', id, name, now());
+      await log('church.add', '', name, id);
       return json({ id, name }, 201);
     }
 
@@ -205,6 +210,7 @@ export async function handle({ request, env, waitUntil }) {
         const name = String(b.name || '').trim().slice(0, 80);
         if (!name) throw new HttpError(400, 'Give the church a name.');
         await run(d, 'UPDATE churches SET name = ? WHERE id = ?', name, churchId);
+        await log('church.rename', '', name, churchId);
         return json({ ok: true });
       }
       if (M === 'DELETE') {
@@ -222,6 +228,7 @@ export async function handle({ request, env, waitUntil }) {
           d.prepare('DELETE FROM shares WHERE church_id = ?').bind(churchId),
           d.prepare('DELETE FROM churches WHERE id = ?').bind(churchId),
         ]);
+        await log('church.delete', '', church.name, churchId);
         return json({ ok: true });
       }
     }
@@ -261,6 +268,7 @@ export async function handle({ request, env, waitUntil }) {
         if (!isEmail(email)) throw new HttpError(400, 'That doesn’t look like an email address.');
         const newRole = pickRole(b.role);
         await run(d, 'INSERT INTO members (church_id, email, role, added_at) VALUES (?, ?, ?, ?) ON CONFLICT (church_id, email) DO UPDATE SET role = excluded.role', churchId, email, newRole, now());
+        await log('member.add', email, newRole, churchId);
         const u = await one(d, 'SELECT pw_hash, google_sub FROM users WHERE email = ?', email);
         const fresh = !u || (!u.pw_hash && !u.google_sub);
         const link = fresh && (await mayMakeLink(d, env, role, churchId, email)) ? await auth.makeLink(d, request, email) : null;
@@ -271,16 +279,19 @@ export async function handle({ request, env, waitUntil }) {
       if (!m) throw new HttpError(404, 'That person is not in this church.');
       if (route('POST', 5) && parts[4] === 'link') {
         if (!(await mayMakeLink(d, env, role, churchId, email))) throw new HttpError(403, email + ' already has an account. Ask your DoorStep admin to reset their password.');
+        await log('person.link', email, '', churchId);
         return json({ link: await auth.makeLink(d, request, email) });
       }
       if (route('PATCH', 4)) {
         const b = await body(request);
         await run(d, 'UPDATE members SET role = ? WHERE church_id = ? AND email = ?', pickRole(b.role), churchId, email);
+        await log('member.role', email, pickRole(b.role), churchId);
         return json({ ok: true });
       }
       if (route('DELETE', 4)) {
         if (email === user.email && !user.admin) throw new HttpError(400, 'You can’t remove yourself. Ask another owner.');
         await run(d, 'DELETE FROM members WHERE church_id = ? AND email = ?', churchId, email);
+        await log('member.remove', email, '', churchId);
         // Sign them out if this was the last church they belonged to.
         if (!(await auth.mayUsePortal(d, env, email))) await run(d, 'DELETE FROM sessions WHERE email = ?', email);
         return json({ ok: true });
@@ -296,6 +307,7 @@ export async function handle({ request, env, waitUntil }) {
         if (!name) throw new HttpError(400, 'Give the page a name.');
         const id = await uniqueSlug(d, 'pages', name, churchId);
         await run(d, 'INSERT INTO pages (church_id, id, name, created_at) VALUES (?, ?, ?, ?)', churchId, id, name, now());
+        await log('page.add', id, name, churchId);
         // Start from one of the portal's templates (see templates.js).
         const fromTemplate = b.template ? await templates.projectFor(d, env, String(b.template)) : null;
         if (fromTemplate) {
@@ -340,6 +352,7 @@ export async function handle({ request, env, waitUntil }) {
         await run(d, 'DELETE FROM events WHERE church_id = ? AND page_id = ?', churchId, p.id);
         await run(d, 'DELETE FROM responses WHERE church_id = ? AND page_id = ?', churchId, p.id);
         await run(d, 'DELETE FROM page_settings WHERE church_id = ? AND page_id = ?', churchId, p.id);
+        await log('page.delete', p.id, p.name, churchId);
         return json({ ok: true });
       }
       if (route('PUT', 5) && parts[4] === 'draft') {
@@ -366,11 +379,13 @@ export async function handle({ request, env, waitUntil }) {
         title = title.slice(0, 120);
         await env.PAGES.put('live:' + key, html, { metadata: { at, title: encodeURIComponent(title) } }); // metadata must stay ASCII
         await run(d, 'UPDATE pages SET published_at = ?, published_by = ? WHERE church_id = ? AND id = ?', at, user.email, churchId, p.id);
+        await log('page.publish', p.id, p.name, churchId);
         return json({ ok: true, publishedAt: at });
       }
       if (route('POST', 5) && parts[4] === 'unpublish') {
         await env.PAGES.delete('live:' + key);
         await run(d, 'UPDATE pages SET published_at = NULL, published_by = NULL WHERE church_id = ? AND id = ?', churchId, p.id);
+        await log('page.unpublish', p.id, p.name, churchId);
         return json({ ok: true });
       }
     }

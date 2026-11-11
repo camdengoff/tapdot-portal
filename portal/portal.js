@@ -142,6 +142,7 @@
     acct.textContent = me.name || me.email;
     acct.onclick = account;
     $('#tplBtn').hidden = !me.admin;
+    $('#adminBtn').hidden = !me.admin;
     draw();
   }
   function churchPicker(current) {
@@ -157,7 +158,9 @@
   async function draw() {
     const id = route();
     $('#tplBtn').classList.toggle('on', id === 'templates');
+    $('#adminBtn').classList.toggle('on', /^admin(\/|$)/.test(id));
     if (id === 'templates' && me.admin) { churchPicker(''); return drawTemplates(); }
+    if (/^admin(\/|$)/.test(id) && me.admin) { churchPicker(''); return drawAdmin(id.slice(6)); }
     if (!id) {
       if (!me.admin && me.churches.length) { location.replace('#' + me.churches[0].id); return; }
       churchPicker('');
@@ -328,7 +331,7 @@
     const roleName = { owner: 'Owner', editor: 'Editor', viewer: 'Stats only' };
     const personRow = (m) => h('div', { class: 'person' },
       h('div', { class: 'who' },
-        h('b', null, m.name || m.email),
+        me.admin ? h('a', { href: '#admin/person/' + enc(m.email), title: 'Open in Admin' }, h('b', null, m.name || m.email)) : h('b', null, m.name || m.email),
         h('span', { class: 'muted small' }, (m.name ? m.email + ' · ' : '') +
           ([m.hasPassword ? 'password' : null, m.hasGoogle ? 'Google' : null].filter(Boolean).join(' + ') || 'hasn’t signed in yet'))),
       manage ? h('select', { class: 'sm', onchange: act(async (e) => {
@@ -746,6 +749,291 @@
       h('div', { class: 'head' }, h('h2', null, pages.length === 1 ? 'Your page' : 'Your pages')),
       per.length ? h('div', { class: 'grid' }, per.map(card)) : h('div', { class: 'card center muted' }, 'No pages are live yet.'),
       h('p', { class: 'muted small foot' }, 'A visit counts once per person every 30 minutes. No cookies are used and nothing about visitors is stored. Bookmark this page to come back to it.'));
+  }
+
+  // ── Admin screen (#admin…): every account, church and change across DoorStep ──
+  // #admin = people, #admin/person/<email>, #admin/churches, #admin/activity. See server/admin.js.
+  const ROLE_NAME = { owner: 'Owner', editor: 'Editor', viewer: 'Stats only' };
+  const ROLE_OPTS = [['editor', 'Editor: edits and publishes pages'], ['owner', 'Owner: also adds and removes people'], ['viewer', 'Stats only: sees visits and taps, can’t edit']];
+  const ago = (iso) => {
+    if (!iso) return '';
+    const s = (Date.now() - new Date(iso)) / 1000;
+    if (s < 90) return 'just now';
+    if (s < 3600) return Math.round(s / 60) + ' min ago';
+    if (s < 86400) return Math.round(s / 3600) + ' h ago';
+    if (s < 86400 * 30) return Math.round(s / 86400) + ' d ago';
+    return new Date(iso).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+  const howName = { password: 'password', google: 'Google', link: 'a password link', setup: 'the setup key' };
+  const methods = (p) => [p.hasPassword ? 'Password' : null, p.hasGoogle ? 'Google' : null].filter(Boolean).join(' + ');
+  const personPills = (p) => [
+    p.admin === 'main' ? h('span', { class: 'pill ok', title: 'Set in ADMIN_EMAILS' }, 'Main admin') : p.admin ? h('span', { class: 'pill ok' }, 'Admin') : null,
+    p.disabled ? h('span', { class: 'pill bad' }, 'Turned off') : null,
+    !p.lastLoginAt && !p.hasPassword && !p.hasGoogle && !p.disabled ? h('span', { class: 'pill' }, 'Invited') : null];
+  let adminCache = null; // { overview, churches } for church names and the tiles
+
+  async function drawAdmin(rest) {
+    const main = $('#main');
+    document.title = 'Admin · DoorStep';
+    const [tab, arg] = [rest.split('/')[0] || 'people', rest.split('/').slice(1).join('/')];
+    try {
+      const [overview, ch] = await Promise.all([api('/admin/overview'), api('/admin/churches')]);
+      adminCache = { overview, churches: ch.churches };
+    } catch (e) { fill(main, h('div', { class: 'card center' }, h('p', null, e.message), h('a', { href: '#' }, 'Back'))); return; }
+    const o = adminCache.overview;
+    const tabs = [['people', 'People'], ['churches', 'Churches'], ['activity', 'Activity']];
+    const body = h('div', { class: 'adminbody' }, h('p', { class: 'muted' }, 'Loading…'));
+    fill(main,
+      h('div', { class: 'head' }, h('div', null, h('h1', null, 'Admin'),
+        h('p', { class: 'muted sub' }, 'Every account, church and change across DoorStep.' + (o.you.main ? '' : ' You’re an admin; only a main admin can make or remove admins.')))),
+      h('div', { class: 'statbig admintiles' },
+        h('div', null, h('b', null, o.people.toLocaleString()), h('span', { class: 'muted small' }, 'people')),
+        h('div', null, h('b', null, o.active30.toLocaleString()), h('span', { class: 'muted small' }, 'signed in, last 30 days')),
+        h('div', null, h('b', null, o.churches.toLocaleString()), h('span', { class: 'muted small' }, o.churches === 1 ? 'church' : 'churches')),
+        h('div', null, h('b', null, o.livePages + ' / ' + o.pages), h('span', { class: 'muted small' }, 'pages live')),
+        h('div', null, h('b', null, o.admins.toLocaleString()), h('span', { class: 'muted small' }, o.admins === 1 ? 'admin' : 'admins'))),
+      h('nav', { class: 'tabs' }, tabs.map(([k, l]) => h('a', { href: '#admin' + (k === 'people' ? '' : '/' + k), class: (tab === k || (tab === 'person' && k === 'people')) ? 'on' : '' }, l))),
+      body);
+    if (tab === 'person') return adminPerson(body, arg);
+    if (tab === 'churches') return adminChurches(body);
+    if (tab === 'activity') return adminActivity(body);
+    return adminPeople(body);
+  }
+  const stillOn = (r) => route() === r;
+
+  async function addPersonDialog(church) {
+    const cs = adminCache.churches;
+    const fields = [
+      { k: 'email', l: 'Email', type: 'email', placeholder: 'name@church.org' },
+      { k: 'name', l: 'Name', required: false, max: 80, placeholder: 'Optional' },
+      { k: 'church', l: 'Church', value: church || (cs[0] && cs[0].id) || '', options: [['', 'No church (admins only)']].concat(cs.map((c) => [c.id, c.name])) },
+      { k: 'role', l: 'Role in that church', value: 'editor', options: ROLE_OPTS },
+    ];
+    if (adminCache.overview.you.main) fields.push({ k: 'admin', l: 'DoorStep admin', value: '', options: [['', 'No'], ['1', 'Yes: can manage every church and account']] });
+    const v = await ask('Add a person', fields, 'Add');
+    if (!v) return;
+    const r = await api('/admin/people', { method: 'POST', body: { email: v.email, name: v.name, church: v.church, role: v.role, admin: !!v.admin } });
+    if (r.link) showLink(r.email, r.link); else toast(r.email + ' already has an account and can sign in now.');
+    return r.email;
+  }
+
+  async function adminPeople(body) {
+    const r0 = route();
+    let list;
+    try { list = (await api('/admin/people')).people; } catch (e) { fill(body, h('p', null, e.message)); return; }
+    if (!stillOn(r0)) return;
+    const q = h('input', { type: 'search', placeholder: 'Search name, email or church', 'aria-label': 'Search people', class: 'grow' });
+    const filt = h('select', { class: 'auto', 'aria-label': 'Show' },
+      [['', 'Everyone'], ['admin', 'Admins'], ['owner', 'Church owners'], ['none', 'In no church'], ['never', 'Never signed in'], ['off', 'Turned off']].map(([v, l]) => h('option', { value: v }, l)));
+    const table = h('div', { class: 'atable' });
+    const draw = () => {
+      const s = q.value.trim().toLowerCase();
+      const f = filt.value;
+      const rows = list.filter((p) => (!s || (p.email + ' ' + p.name + ' ' + p.churches.map((c) => c.name).join(' ')).toLowerCase().includes(s)) &&
+        (!f || (f === 'admin' && p.admin) || (f === 'owner' && p.churches.some((c) => c.role === 'owner')) || (f === 'none' && !p.churches.length) ||
+          (f === 'never' && !p.lastLoginAt) || (f === 'off' && p.disabled)));
+      fill(table,
+        h('div', { class: 'arow ahead' }, h('span', null, 'Person'), h('span', null, 'Churches'), h('span', null, 'Signs in with'), h('span', null, 'Last sign-in')),
+        rows.length ? rows.map((p) => h('a', { class: 'arow' + (p.disabled ? ' off' : ''), href: '#admin/person/' + enc(p.email) },
+          h('span', { class: 'who' }, h('b', null, p.name || p.email, ' ', personPills(p)), p.name ? h('span', { class: 'muted small' }, p.email) : null),
+          h('span', { class: 'chips' }, p.churches.length ? p.churches.map((c) => h('span', { class: 'chip' }, c.name, h('small', null, ROLE_NAME[c.role] || c.role))) : h('span', { class: 'muted small' }, p.admin ? 'All (admin)' : 'None')),
+          h('span', { class: 'small' }, methods(p) || h('span', { class: 'muted' }, 'Not set up')),
+          h('span', { class: 'small muted', title: p.lastLoginAt ? when(p.lastLoginAt) : '' }, p.lastLoginAt ? ago(p.lastLoginAt) : 'Never')))
+          : h('p', { class: 'muted pad' }, 'Nobody matches.'));
+    };
+    q.oninput = draw; filt.onchange = draw;
+    fill(body,
+      h('div', { class: 'row wrap toolbar' }, q, filt,
+        h('button', { class: 'primary', onclick: act(async () => { const e = await addPersonDialog(); if (e) location.hash = 'admin/person/' + enc(e); }) }, '+ Add person')),
+      h('div', { class: 'card flush' }, table));
+    draw();
+    q.focus();
+  }
+
+  async function adminPerson(body, emailIn) {
+    const r0 = route();
+    let data;
+    try { data = await api('/admin/people/' + enc(emailIn)); } catch (e) { fill(body, h('div', { class: 'card center' }, h('p', null, e.message), h('a', { href: '#admin' }, '← People'))); return; }
+    if (!stillOn(r0)) return;
+    const p = data.person;
+    const you = data.you;
+    const self = p.email === you.email;
+    // What the server will allow (it checks again): nobody changes a main admin here, only a main admin changes another admin.
+    const locked = p.admin === 'main' || (p.admin === 'admin' && !you.main);
+    const lockNote = p.admin === 'main' ? 'Main admins (ADMIN_EMAILS) manage their own account from the Account menu.' : 'Only a main admin can change another admin’s account.';
+    const U = '/admin/people/' + enc(p.email);
+    const reload = () => adminPerson(body, p.email);
+    const done = (msg) => { toast(msg); reload(); };
+    document.title = (p.name || p.email) + ' · Admin · DoorStep';
+
+    const nameIn = h('input', { type: 'text', value: p.name, maxlength: 80, placeholder: 'Name' });
+    const emailNew = h('input', { type: 'email', value: p.email, maxlength: 200 });
+    const lastLine = p.lastLoginAt ? 'Last signed in ' + when(p.lastLoginAt) + (howName[p.lastLoginHow] ? ' with ' + howName[p.lastLoginHow] : '') + '.' : 'Hasn’t signed in yet.';
+
+    const inChurches = new Set(p.churches.map((c) => c.id));
+    const addSel = h('select', { class: 'auto', 'aria-label': 'Church' }, adminCache.churches.filter((c) => !inChurches.has(c.id)).map((c) => h('option', { value: c.id }, c.name)));
+    const addRole = h('select', { class: 'auto', 'aria-label': 'Role' }, Object.keys(ROLE_NAME).map((r) => h('option', { value: r, selected: r === 'editor' }, ROLE_NAME[r])));
+    const churchRow = (c) => h('div', { class: 'person' },
+      h('div', { class: 'who' }, h('a', { href: '#' + c.id }, h('b', null, c.name)), h('span', { class: 'muted small' }, 'Added ' + when(c.addedAt))),
+      h('select', { class: 'sm', 'aria-label': 'Role in ' + c.name, onchange: act(async (e) => { await api(U + '/churches/' + enc(c.id), { method: 'PUT', body: { role: e.target.value } }); toast('Role changed'); }) },
+        Object.keys(ROLE_NAME).map((r) => h('option', { value: r, selected: r === c.role }, ROLE_NAME[r]))),
+      h('button', { class: 'ghost sm danger', onclick: act(async () => {
+        if (!confirm('Remove ' + p.email + ' from ' + c.name + '?')) return;
+        await api(U + '/churches/' + enc(c.id), { method: 'DELETE' }); done('Removed from ' + c.name);
+      }) }, 'Remove'));
+
+    const adminBox = h('input', { type: 'checkbox', checked: !!p.admin, disabled: !you.main || p.admin === 'main' || self, onchange: act(async () => {
+      const on = adminBox.checked;
+      if (!confirm(on ? 'Make ' + p.email + ' a DoorStep admin? They’ll see and manage every church, page and account (except other admins).' : 'Remove admin from ' + p.email + '?')) { adminBox.checked = !on; return; }
+      await api(U + '/admin', { method: 'PUT', body: { admin: on } }); done(on ? 'Now an admin' : 'No longer an admin');
+    }) });
+
+    const actBtn = (label, title, fn, cls) => h('button', { class: 'ghost' + (cls ? ' ' + cls : ''), title, disabled: locked && !(self && label === 'Sign out everywhere'), onclick: act(fn) }, label);
+
+    fill(body,
+      h('a', { class: 'crumb', href: '#admin' }, '← People'),
+      h('div', { class: 'head personhead' },
+        h('div', null, h('h2', null, p.name || p.email, ' ', personPills(p)), h('p', { class: 'muted sub' }, p.name ? p.email : '', p.createdAt ? (p.name ? ' · ' : '') + 'Account since ' + new Date(p.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : ''))),
+      locked ? h('p', { class: 'note' }, '🔒 ' + lockNote) : null,
+      p.disabled ? h('p', { class: 'note bad' }, 'This account is turned off' + (p.disabledBy ? ' (by ' + p.disabledBy + ', ' + when(p.disabledAt) + ')' : '') + '. They can’t sign in until you turn it back on. Their churches and roles are kept.') : null,
+      h('div', { class: 'admingrid' },
+        h('section', { class: 'card' },
+          h('h3', null, 'Sign-in'),
+          h('p', { class: 'small' }, methods(p) ? 'Signs in with ' + methods(p).replace(' + ', ' or ') + '.' : 'No password or Google yet.', ' ', lastLine, ' ',
+            p.sessions ? plural(p.sessions, 'device', 'devices') + ' signed in now.' : 'Not signed in anywhere.'),
+          h('div', { class: 'row wrap' },
+            actBtn('Password link', 'A one-time link (7 days) to set a new password. Their old password keeps working until they use it.', async () => { const r = await api(U + '/link', { method: 'POST' }); showLink(p.email, r.link); }),
+            actBtn('Sign out everywhere', 'Ends every session on every device. They can sign in again.', async () => { if (!confirm('Sign ' + (self ? 'yourself' : p.email) + ' out on every device?')) return; await api(U + '/signout', { method: 'POST' }); if (self) location.replace('/app/login.html'); else done('Signed out everywhere'); }),
+            p.hasPassword ? actBtn('Remove password', 'Their password stops working and they’re signed out. Google sign-in or a new password link still work.', async () => { if (!confirm('Remove ' + p.email + '’s password and sign them out?')) return; await api(U + '/remove-password', { method: 'POST' }); done('Password removed'); }, 'danger') : null,
+            p.hasGoogle ? actBtn('Unlink Google', 'Forget which Google account they used, so a different Google account with this email can sign in next time.', async () => { if (!confirm('Unlink ' + p.email + '’s Google account?')) return; await api(U + '/unlink-google', { method: 'POST' }); done('Google unlinked'); }) : null)),
+        h('section', { class: 'card' },
+          h('h3', null, 'Name and email'),
+          h('form', { class: 'row', onsubmit: act(async (ev) => { ev.preventDefault(); await api(U, { method: 'PATCH', body: { name: nameIn.value } }); done('Name saved'); }) },
+            nameIn, h('button', { class: 'ghost', type: 'submit', disabled: locked && !self }, 'Save')),
+          h('form', { class: 'row', onsubmit: act(async (ev) => {
+            ev.preventDefault();
+            const to = emailNew.value.trim().toLowerCase();
+            if (to === p.email) return;
+            if (!confirm('Change ' + p.email + ' to ' + to + '? Their churches and roles move over. They’ll be signed out, and need Google with the new address or a new password link if they had no password.')) return;
+            const r = await api(U, { method: 'PATCH', body: { email: to } });
+            toast('Email changed'); location.hash = 'admin/person/' + enc(r.email);
+          }) }, emailNew, h('button', { class: 'ghost', type: 'submit', disabled: locked || self }, 'Change'))),
+        h('section', { class: 'card wide2' },
+          h('h3', null, 'Churches'),
+          p.admin ? h('p', { class: 'muted small' }, 'As an admin they can already open every church. Roles below matter only if they stop being an admin.') : null,
+          h('div', { class: 'list flushlist' }, p.churches.length ? p.churches.map(churchRow) : h('p', { class: 'muted small' }, 'Not in any church' + (p.admin ? '.' : ', so they can’t sign in.'))),
+          addSel.options.length ? h('div', { class: 'row wrap addrow' }, addSel, addRole, h('button', { class: 'ghost', onclick: act(async () => {
+            await api(U + '/churches/' + enc(addSel.value), { method: 'PUT', body: { role: addRole.value } }); done('Added to ' + addSel.selectedOptions[0].textContent);
+          }) }, '+ Add to church')) : null),
+        h('section', { class: 'card' },
+          h('h3', null, 'Admin'),
+          h('label', { class: 'check' }, adminBox, h('span', null, 'DoorStep admin',
+            h('span', { class: 'muted small' }, p.admin === 'main' ? 'Main admin: set in ADMIN_EMAILS in Cloudflare, so it can’t be changed here.'
+              : self ? 'You can’t change your own admin access.'
+              : !you.main ? 'Only a main admin can make or remove admins.'
+              : 'Sees and manages every church, page, template and account, except other admins.'))),
+          p.adminSince ? h('p', { class: 'muted small' }, 'Admin since ' + when(p.adminSince) + '.') : null),
+        h('section', { class: 'card' },
+          h('h3', null, 'Account'),
+          h('div', { class: 'row wrap' },
+            p.disabled
+              ? actBtn('Turn account back on', 'They can sign in again with the same churches and roles.', async () => { await api(U, { method: 'PATCH', body: { disabled: false } }); done('Account turned back on'); })
+              : actBtn('Turn account off', 'Signs them out and stops them signing in, without losing their churches and roles.', async () => {
+                if (!confirm('Turn off ' + p.email + '? They’re signed out now and can’t sign in until you turn it back on.')) return;
+                await api(U, { method: 'PATCH', body: { disabled: true } }); done('Account turned off');
+              }, 'danger'),
+            actBtn('Delete account', 'Removes the account, its password and Google link, and all church access. Pages they edited stay.', async () => {
+              const v = await ask('Delete ' + p.email + '?', [{ k: 'confirm', l: 'Type their email to confirm' }], 'Delete account', 'This removes the account and every church it belongs to. Pages they made stay. It can’t be undone; you can add them again later as a new person.');
+              if (!v || v.confirm.toLowerCase() !== p.email) return;
+              await api(U, { method: 'DELETE' }); toast('Account deleted'); location.hash = 'admin';
+            }, 'danger')),
+          self ? h('p', { class: 'muted small' }, 'This is you. You can’t turn off or delete your own account.') : null),
+        h('section', { class: 'card wide2' },
+          h('h3', null, 'Recent activity'),
+          data.activity.length ? h('div', { class: 'log' }, data.activity.map(logRow)) : h('p', { class: 'muted small' }, 'Nothing yet.'))));
+  }
+
+  // One line of the change log, in words.
+  function logRow(r) {
+    const cname = (id) => { const c = adminCache && adminCache.churches.find((x) => x.id === id); return c ? c.name : id; };
+    const C = r.church_id ? h('a', { href: '#' + r.church_id }, cname(r.church_id)) : null;
+    const P = (e) => h('a', { href: '#admin/person/' + enc(e) }, e);
+    const role = ROLE_NAME[r.detail] || r.detail;
+    const map = {
+      signin: () => ['signed in with ', howName[r.detail] || r.detail],
+      'person.add': () => ['added ', P(r.target)],
+      'person.rename': () => ['renamed ', P(r.target), ' to “', r.detail, '”'],
+      'person.email': () => ['changed the email ', r.detail.replace(/^was /, ''), ' to ', P(r.target)],
+      'person.disable': () => ['turned off ', P(r.target)],
+      'person.enable': () => ['turned ', P(r.target), ' back on'],
+      'person.delete': () => ['deleted the account ', r.target],
+      'person.link': () => ['made a password link for ', P(r.target)],
+      'person.signout': () => ['signed ', P(r.target), ' out everywhere'],
+      'person.nopassword': () => ['removed ', P(r.target), '’s password'],
+      'person.nogoogle': () => ['unlinked ', P(r.target), '’s Google account'],
+      'admin.add': () => ['made ', P(r.target), ' an admin'],
+      'admin.remove': () => ['removed admin from ', P(r.target)],
+      'member.add': () => ['added ', P(r.target), ' to ', C, ' as ', role],
+      'member.role': () => ['set ', P(r.target), ' to ', role, ' in ', C],
+      'member.remove': () => ['removed ', P(r.target), ' from ', C],
+      'church.add': () => ['added the church ', C || r.detail],
+      'church.rename': () => ['renamed ', C, ' to “', r.detail, '”'],
+      'church.delete': () => ['deleted the church ', r.detail],
+      'page.add': () => ['made the page “', r.detail, '” in ', C],
+      'page.delete': () => ['deleted the page “', r.detail, '” in ', C],
+      'page.publish': () => ['published “', r.detail, '” in ', C],
+      'page.unpublish': () => ['unpublished “', r.detail, '” in ', C],
+    };
+    const words = map[r.action] ? map[r.action]() : [r.action, ' ', r.target, ' ', r.detail];
+    return h('div', { class: 'logrow' },
+      h('span', { class: 'logtime', title: when(r.at) }, ago(r.at)),
+      h('span', { class: 'logwhat' }, h('span', null, r.actor ? (r.action === 'signin' ? P(r.actor) : h('b', null, r.actor)) : 'Someone', ' ', words)));
+  }
+
+  async function adminChurches(body) {
+    const cs = adminCache.churches;
+    const date = (iso) => iso ? h('span', { title: when(iso) }, ago(iso)) : h('span', { class: 'muted' }, '—');
+    fill(body,
+      h('div', { class: 'row wrap toolbar' }, h('div', { class: 'grow' }),
+        h('button', { class: 'primary', onclick: act(async () => {
+          const v = await ask('Add a church', [{ k: 'name', l: 'Church name', placeholder: 'Bethany First Church', max: 80 }], 'Add church');
+          if (!v) return;
+          const c = await api('/churches', { method: 'POST', body: { name: v.name } });
+          me = await api('/me'); location.hash = c.id;
+        }) }, '+ Add church')),
+      h('div', { class: 'card flush' }, h('div', { class: 'atable churches' },
+        h('div', { class: 'arow ahead' }, h('span', null, 'Church'), h('span', null, 'Pages live'), h('span', null, 'People'), h('span', null, 'Last edit'), h('span', null, 'Last publish')),
+        cs.length ? cs.map((c) => h('a', { class: 'arow', href: '#' + c.id },
+          h('span', { class: 'who' }, h('b', null, c.name), h('span', { class: 'muted small' }, c.id + ' · since ' + new Date(c.createdAt).toLocaleDateString([], { month: 'short', year: 'numeric' }))),
+          h('span', { class: 'small', 'data-l': 'Pages live' }, c.livePages + ' of ' + c.pages),
+          h('span', { class: 'small', 'data-l': 'People' }, plural(c.people, 'person', 'people'), c.people && !c.owners ? h('span', { class: 'pill warn', title: 'Nobody here can add or remove people except admins' }, 'No owner') : null),
+          h('span', { class: 'small', 'data-l': 'Last edit' }, date(c.lastEdit)),
+          h('span', { class: 'small', 'data-l': 'Last publish' }, date(c.lastPublish))))
+          : h('p', { class: 'muted pad' }, 'No churches yet.'))));
+  }
+
+  async function adminActivity(body) {
+    const r0 = route();
+    const q = h('input', { type: 'search', placeholder: 'Filter by email, church id or action', 'aria-label': 'Filter activity', class: 'grow' });
+    const box = h('div', { class: 'log biglog' });
+    const more = h('button', { class: 'ghost', hidden: true }, 'Load more');
+    let last = 0, t;
+    const load = async (reset) => {
+      if (reset) { last = 0; fill(box); }
+      const r = await api('/admin/activity?before=' + last + '&q=' + enc(q.value.trim()));
+      if (!stillOn(r0)) return;
+      if (!r.items.length && !last) box.append(h('p', { class: 'muted pad' }, 'Nothing yet. Sign-ins and changes to people, churches and pages show up here.'));
+      r.items.forEach((x) => box.append(logRow(x)));
+      if (r.items.length) last = r.items[r.items.length - 1].id;
+      more.hidden = !r.more;
+    };
+    q.oninput = () => { clearTimeout(t); t = setTimeout(() => load(true).catch((e) => toast(e.message)), 300); };
+    more.onclick = act(() => load(false));
+    fill(body,
+      h('div', { class: 'row wrap toolbar' }, q),
+      h('p', { class: 'muted small' }, 'Sign-ins and every change to people, roles, churches and pages, newest first. Kept for a year. (Page edits aren’t listed; each page card shows who edited last.)'),
+      box, h('div', { class: 'foot' }, more));
+    try { await load(true); } catch (e) { fill(box, h('p', { class: 'pad' }, e.message)); }
   }
 
   // ── Account: name, password, sign out ────────────────────────────────

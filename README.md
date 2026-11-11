@@ -20,8 +20,18 @@ every Publish updates the live page.
 - **Sign-in:** email and password, or Sign in with Google. Nobody can sign up on their own: an admin or a
   church owner adds their email, then copies them a one-time password link (also used for resets). Google
   sign-in works for anyone who has been added, with no link.
-- **Roles:** admins (`ADMIN_EMAILS`) manage every church. In a church, owners add and remove people;
-  editors create, edit and publish pages.
+- **Roles:** admins manage every church. Main admins are set in `ADMIN_EMAILS`; a main admin can make
+  more admins on the Admin screen (D1 `admins`), who can do everything except manage admins or change
+  another admin's account. In a church, owners add and remove people; editors create, edit and publish
+  pages; Stats only members see tap stats.
+- **Admin screen (admins):** 🛡 Admin in the portal's top bar (`/app/#admin`, API in `server/admin.js`).
+  People: every account with its churches, roles, sign-in methods and last sign-in; search and filter;
+  add a person (to a church and/or as admin, with a password link); per person: password link (reset),
+  sign out everywhere, remove password, unlink Google, rename, change email, add to / remove from
+  churches and change roles, make or remove admin, turn the account off (can't sign in, access kept) or
+  delete it. Churches: counts of pages, live pages, people, last edit and publish. Activity: sign-ins and
+  every change to people, roles, churches and pages (D1 `audit`, kept a year). Main admins can't be
+  turned off or changed from here, so nobody gets locked out.
 - **Pages:** the editor opens at `/app/editor?church=…&page=…` and autosaves to the account. Visitors see
   only what was last published. If two people edit at once, the second save asks whose version to keep.
 - **Live pages:** `/p/<church>/<page>` is the published HTML the code block loads (via `/embed.js`), and

@@ -33,13 +33,34 @@ export function checkPasswordRules(pw) {
   if (pw.length > 200) throw new HttpError(400, 'That password is too long.');
 }
 
+// Main admins are set in ADMIN_EMAILS and can't be changed from the portal. Main admins can make
+// more admins from the Admin screen (the `admins` table); those can do everything except manage admins.
 export const adminEmails = (env) => String(env.ADMIN_EMAILS || '').split(',').map(normEmail).filter(Boolean);
-export const isAdmin = (env, email) => adminEmails(env).includes(normEmail(email));
+export const isMainAdmin = (env, email) => adminEmails(env).includes(normEmail(email));
+export async function isAdmin(d, env, email) {
+  if (isMainAdmin(env, email)) return true;
+  return !!(await one(d, 'SELECT 1 FROM admins WHERE email = ?', normEmail(email)));
+}
+export async function isDisabled(d, email) {
+  return !!(await one(d, 'SELECT 1 FROM account_info WHERE email = ? AND disabled_at IS NOT NULL', normEmail(email)));
+}
 
-// Someone may sign in if they are an admin or belong to at least one church.
+// Someone may sign in if they are an admin or belong to at least one church, and an admin hasn't
+// turned their account off. Main admins can never be turned off (so nobody gets locked out).
 export async function mayUsePortal(d, env, email) {
-  if (isAdmin(env, email)) return true;
+  if (isMainAdmin(env, email)) return true;
+  if (await isDisabled(d, email)) return false;
+  if (await isAdmin(d, env, email)) return true;
   return !!(await one(d, 'SELECT 1 FROM members WHERE email = ? LIMIT 1', email));
+}
+const OFF = 'This account has been turned off. Ask your DoorStep admin.';
+
+// Admin screen activity log: who changed what. See admin.js.
+export async function log(d, actor, action, target, detail, churchId) {
+  try {
+    await run(d, 'INSERT INTO audit (at, actor, action, target, church_id, detail) VALUES (?, ?, ?, ?, ?, ?)',
+      new Date().toISOString(), actor || '', action, target || '', churchId || '', detail ? String(detail).slice(0, 300) : '');
+  } catch (e) { console.error(e); } // the log must never break the action itself
 }
 
 // ── Sessions ───────────────────────────────────────────────────────────
@@ -56,10 +77,15 @@ export async function currentUser(d, env, request) {
   if (!(await mayUsePortal(d, env, s.email))) return null;
   const u = await one(d, 'SELECT email, name, pw_hash, google_sub FROM users WHERE email = ?', s.email);
   if (!u) return null;
-  return { email: u.email, name: u.name, hasPassword: !!u.pw_hash, hasGoogle: !!u.google_sub, admin: isAdmin(env, u.email) };
+  return { email: u.email, name: u.name, hasPassword: !!u.pw_hash, hasGoogle: !!u.google_sub, admin: await isAdmin(d, env, u.email), mainAdmin: isMainAdmin(env, u.email) };
 }
-export async function startSession(d, email) {
+// `how` (password, google, link, setup) marks a real sign-in: it's shown on the Admin screen.
+export async function startSession(d, email, how) {
   const token = randomHex(32);
+  if (how) {
+    await run(d, 'INSERT INTO account_info (email, last_login_at, last_login_how) VALUES (?, ?, ?) ON CONFLICT (email) DO UPDATE SET last_login_at = excluded.last_login_at, last_login_how = excluded.last_login_how', email, new Date().toISOString(), how);
+    await log(d, email, 'signin', email, how);
+  }
   const expires = Date.now() + SESSION_DAYS * 864e5;
   await run(d, 'DELETE FROM sessions WHERE expires_at < ?', Date.now());
   await run(d, 'INSERT INTO sessions (id, email, expires_at) VALUES (?, ?, ?)', await sha256(token), email, expires);
@@ -86,13 +112,14 @@ export async function passwordLogin(d, env, emailIn, password) {
   if (fails && fails.n >= MAX_FAILS) throw new HttpError(429, 'Too many tries. Wait 15 minutes, or ask for a new password link.');
   const u = await one(d, 'SELECT email, pw_hash, pw_salt FROM users WHERE email = ?', email);
   const ok = u && u.pw_hash && sameString((await hashPassword(password, u.pw_salt)).hash, u.pw_hash);
+  if (ok && !isMainAdmin(env, email) && (await isDisabled(d, email))) throw new HttpError(403, OFF);
   if (!ok || !(await mayUsePortal(d, env, email))) {
     await run(d, 'INSERT INTO login_fails (email, at) VALUES (?, ?)', email, Date.now());
     if (u && !u.pw_hash) throw new HttpError(401, 'This account has no password yet. Use Sign in with Google, or ask for a password link.');
     throw wrong;
   }
   await run(d, 'DELETE FROM login_fails WHERE email = ?', email);
-  return startSession(d, email);
+  return startSession(d, email, 'password');
 }
 export async function setPassword(d, email, password) {
   checkPasswordRules(password);
@@ -122,11 +149,12 @@ export async function readLink(d, token) {
 export async function useLink(d, env, token, password, name) {
   const email = await readLink(d, token);
   if (!email) throw new HttpError(400, 'This link has expired or was already used. Ask for a new one.');
+  if (!isMainAdmin(env, email) && (await isDisabled(d, email))) throw new HttpError(403, OFF);
   if (!(await mayUsePortal(d, env, email))) throw new HttpError(403, 'This email no longer has access to any church.');
   await setPassword(d, email, password);
   if (name) await run(d, 'UPDATE users SET name = ? WHERE email = ?', String(name).slice(0, 80), email);
   await run(d, 'DELETE FROM links WHERE email = ?', email);
-  return startSession(d, email);
+  return startSession(d, email, 'link');
 }
 
 // ── Sign in with Google (OpenID Connect, authorization code flow) ──────
@@ -175,12 +203,13 @@ export async function googleCallback(d, env, request) {
   if (claims.aud !== env.GOOGLE_CLIENT_ID || !/^(https:\/\/)?accounts\.google\.com$/.test(claims.iss) || claims.exp * 1000 < Date.now()) return back('Google sign-in failed. Please try again.');
   if (!claims.email || claims.email_verified !== true) return back('Your Google account’s email is not verified.');
   const email = normEmail(claims.email);
+  if (!isMainAdmin(env, email) && (await isDisabled(d, email))) return back(OFF);
   if (!(await mayUsePortal(d, env, email))) return back(email + ' hasn’t been added to a church yet. Ask whoever runs your church’s pages to add you.');
   const u = await one(d, 'SELECT google_sub FROM users WHERE email = ?', email);
   if (u && u.google_sub && u.google_sub !== claims.sub) return back('A different Google account is linked to ' + email + '.');
   await ensureUser(d, email);
   await run(d, "UPDATE users SET google_sub = ?, name = CASE WHEN name = '' THEN ? ELSE name END WHERE email = ?", claims.sub, String(claims.name || '').slice(0, 80), email);
-  const cookie = await startSession(d, email);
+  const cookie = await startSession(d, email, 'google');
   const h = new Headers({ Location: '/app/' });
   h.append('Set-Cookie', cookie);
   h.append('Set-Cookie', 'td_gstate=; Path=/api/auth/google; Max-Age=0');

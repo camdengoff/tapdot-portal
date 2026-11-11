@@ -115,6 +115,32 @@ const SCHEMA = [
     data TEXT NOT NULL DEFAULT '{}',
     PRIMARY KEY (church_id, page_id)
   )`,
+  // More admins, made by a main admin (ADMIN_EMAILS) on the Admin screen. See admin.js.
+  `CREATE TABLE IF NOT EXISTS admins (
+    email TEXT PRIMARY KEY,
+    added_at TEXT NOT NULL,
+    added_by TEXT
+  )`,
+  // Per-account details for the Admin screen: last sign-in, and whether an admin turned it off.
+  `CREATE TABLE IF NOT EXISTS account_info (
+    email TEXT PRIMARY KEY,
+    last_login_at TEXT,
+    last_login_how TEXT,
+    disabled_at TEXT,
+    disabled_by TEXT
+  )`,
+  // Who changed what: accounts, roles, churches, pages, sign-ins (kept 1 year). See admin.js.
+  `CREATE TABLE IF NOT EXISTS audit (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    at TEXT NOT NULL,
+    actor TEXT NOT NULL DEFAULT '',
+    action TEXT NOT NULL,
+    target TEXT NOT NULL DEFAULT '',
+    church_id TEXT NOT NULL DEFAULT '',
+    detail TEXT NOT NULL DEFAULT ''
+  )`,
+  'CREATE INDEX IF NOT EXISTS audit_at ON audit (at)',
+  'CREATE INDEX IF NOT EXISTS audit_target ON audit (target, at)',
   'CREATE INDEX IF NOT EXISTS events_page ON events (church_id, page_id, at)',
   'CREATE INDEX IF NOT EXISTS members_email ON members (email)',
   'CREATE INDEX IF NOT EXISTS sessions_email ON sessions (email)',
