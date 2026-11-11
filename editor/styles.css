@@ -435,3 +435,6 @@ details.more > .form { padding-bottom: 16px; }
   .panel-body { padding: 16px 16px 80px; }
   .stage-bar { padding: 10px 16px; }
 }
+/* Help center link (portal only). */
+#helpBtn { color: inherit; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; font-weight: 600; }
+#helpBtn[hidden] { display: none; }

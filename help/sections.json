@@ -1,0 +1,8 @@
+[
+  { "id": "start", "name": "Getting started", "icon": "👋", "blurb": "Sign in, find your way around and make your first page." },
+  { "id": "editor", "name": "Building your page", "icon": "🧱", "blurb": "Blocks, buttons, text, colors and photos." },
+  { "id": "publishing", "name": "Publishing", "icon": "🚀", "blurb": "Put your page on your website and keep it up to date." },
+  { "id": "features", "name": "Feature guides", "icon": "🧩", "blurb": "Connect cards, live lists, the photo and PDF viewer, and more." },
+  { "id": "stats", "name": "Stats and your team", "icon": "📊", "blurb": "See what people tap, share the numbers and add your staff." },
+  { "id": "help", "name": "Troubleshooting", "icon": "🛟", "blurb": "Fixes for the things that most often go wrong." }
+]

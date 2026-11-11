@@ -1,0 +1,40 @@
+<!--
+title: Fix blank pop-ups
+summary: Some websites won’t show inside a pop-up sheet. Set up your own free pop-up worker on Cloudflare to fix it.
+section: publishing
+order: 4
+-->
+<p>A <a href="/help/button-actions#pop-up-sheets">pop-up sheet</a> shows another web page, like your prayer form, over your DoorStep page. Many websites, including most Squarespace sites, block being shown inside another page for security reasons. In a pop-up they appear blank.</p>
+<p>The fix is a <b>pop-up worker</b>: a tiny free program on your own Cloudflare account that passes those pages through so they can show in a sheet.</p>
+
+<h2>What happens without one</h2>
+<p>New pages start with no worker. Until you add one, pop-up links simply <b>open in a new tab</b> instead, so they always work. You only need a worker if you want those pages to open in a sheet.</p>
+
+<h2>Set up your worker</h2>
+<p>This takes about ten minutes, once. You’ll need a free Cloudflare account.</p>
+<ol class="steps">
+<li><b>Copy the worker code</b>In the editor, open the <span class="ui">Publish</span> tab → <b>Pop-up proxy</b> → <b>Set up your own worker</b>, then click <span class="ui">📋 Copy worker code</span>.</li>
+<li><b>Sign in to Cloudflare</b>Make a free account at <a href="https://dash.cloudflare.com/sign-up" target="_blank" rel="noopener">cloudflare.com</a> if you don’t have one.</li>
+<li><b>Make a worker</b>Go to <b>Workers &amp; Pages</b> → <b>Create</b> → <b>Start with Hello World</b>. Name it, for example <code>church-popups</code>, and click <b>Deploy</b>.</li>
+<li><b>Paste the code</b>Click <b>Edit code</b>, delete everything there, paste the worker code and click <b>Deploy</b>.</li>
+<li><b>Copy its address</b>Your worker’s address ends in <code>.workers.dev</code>. Paste it into <b>Worker address</b> in the editor’s Publish tab.</li>
+<li><b>Tick the sites that need it</b>A list of every site your pop-ups link to appears. Tick the ones that show up blank. Unticked sites load directly, as before.</li>
+<li><b>Update the worker</b>Ticking sites changes the worker code. Copy the code again, paste it over the old code in Cloudflare and deploy.</li>
+<li><b>Publish</b>Publish your DoorStep page so it uses the worker.</li>
+</ol>
+
+<div class="callout key"><b>Is it up to date?</b><p>Under the list of sites, the editor checks your worker. <b>“✓ Your worker is up to date”</b> means you’re done. If it names a site your worker doesn’t include yet, copy the code again and paste it into Cloudflare.</p></div>
+
+<h2>Good to know</h2>
+<ul>
+<li>The worker only passes through the sites you tick, so it can’t be used for anything else.</li>
+<li>Cloudflare’s free plan is far more than a church page needs.</li>
+<li>One worker can serve several pages: paste the same address into each one. The worker code only includes the sites ticked on the page you copied it from, so tick the same sites on each page. If one is missing, that page’s Publish tab will say so.</li>
+<li>To skip the worker for a single link, tick <b>Skip the pop-up proxy for this link</b> in that button’s settings.</li>
+</ul>
+
+<h2>Related guides</h2>
+<ul class="related">
+<li><a href="/help/button-actions">What a button can do</a></li>
+<li><a href="/help/pop-up-menus">Pop-up menus</a></li>
+</ul>

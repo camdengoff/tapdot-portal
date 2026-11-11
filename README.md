@@ -120,6 +120,22 @@ Run `node tools/build.js` after changing `portal/`, `public/` or the editor.
   Versions live in that browser; use Save project for a copy elsewhere.
 - Autosaves in the browser, plus Save project (`.json`), Open, undo/redo and drag-to-reorder.
 
+## Help center (tapdot.camdengoff.com/help/)
+
+Text tutorials for churches: getting started, the editor, publishing, each feature, stats and people,
+troubleshooting and an FAQ, with a search box. Linked from the homepage, the portal's top bar, the
+sign-in page and the editor (in the portal only).
+
+- Each article is an HTML fragment in `help/articles/<name>.html`, served at `/help/<name>`. A comment at
+  the top gives its `title`, `summary`, `section` (an id from `help/sections.json`) and `order`.
+- Handy markup: `<ol class="steps">` with `<li><b>Step title</b>text</li>`, `<div class="callout tip|warn|key">`
+  with a `<b>` label, `<span class="ui">Button</span>` for something on screen, and tables wrapped in
+  `<div class="tw">`.
+- `tools/build-help.js` (run by `tools/build.js`) wraps them in the shared layout, adds the article list
+  and "On this page", writes `dist/help/search.json` for the search box, and stops the build if a link to
+  `/help/<name>` or `/help/<name>#part` points at something that doesn't exist.
+- Admin-only tools (adding churches, the Templates panel) are left out on purpose, since churches read it.
+
 ## Files
 
 - `index.html`: editor shell
@@ -131,6 +147,7 @@ Run `node tools/build.js` after changing `portal/`, `public/` or the editor.
 - `tools/build.js`: builds `dist/` for Cloudflare Pages, including `dist/tapdot-editor.js`, the single-file editor
 - `portal/`: the client portal pages (copied to `dist/app/` by the build)
 - `public/embed.js`: the loader that the live-page code block uses
+- `help/` and `tools/build-help.js`: the help center (built into `dist/help/`)
 - `functions/` and `server/`: the portal API on Cloudflare Pages Functions (`server/api.js` routes,
   `server/auth.js` sign-in, `server/db.js` tables, `server/stats.js` tap stats, `server/forms.js` connect card answers, `server/templates.js` templates, `server/shares.js` stats links)
 

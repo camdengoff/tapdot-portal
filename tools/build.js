@@ -63,3 +63,6 @@ for (const f of ['schema.js', 'render.js']) fs.copyFileSync(path.join(root, 'edi
   }
 })(path.join(root, 'public'), path.join(root, 'dist'));
 console.log('dist/app/ (portal) and public/ files');
+
+// The help center (/help/), built from the articles in help/ (see tools/build-help.js).
+console.log('dist/help/: ' + require('./build-help.js')(path.join(root, 'dist/help')) + ' help articles');

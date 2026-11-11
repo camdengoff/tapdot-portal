@@ -270,7 +270,7 @@ dialog:has(.newpage) { width: min(1080px, calc(100vw - 24px)); }
   .main { padding: 24px 16px 56px; }
   .churchsel { flex: 1; max-width: none; min-width: 0; }
   .top .grow { display: none; }
-  #tplBtn .lbl { display: none; }
+  #tplBtn .lbl, #helpBtn .lbl { display: none; }
   .card { padding: 16px; }
 }
 

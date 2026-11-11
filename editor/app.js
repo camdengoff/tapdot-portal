@@ -132,7 +132,7 @@
     VERS.lastAuto = Date.now();
     addVersion('auto').catch(() => { /* history is best effort */ });
   }
-  const KIND = { saved: 'Saved', export: 'HTML copied', auto: 'Autosave', restore: 'Before restoring' };
+  const KIND = { saved: 'Saved', export: CLOUD ? 'Published' : 'HTML copied', auto: 'Autosave', restore: 'Before restoring' };
   async function showHistory() {
     const list = $('#verList');
     const note = h('input', { type: 'text', maxlength: 200, placeholder: 'Note, e.g. Easter service times' });
@@ -148,8 +148,8 @@
     const when = (at) => new Date(at).toLocaleString([], { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
     fill(list, top,
       h('p', { class: 'hint pad' }, vers.length
-        ? 'Saved in this browser (the newest ' + VERS.max + '). A version is also kept each time you copy or download the HTML, and every 10 minutes while you edit. Use Save project to keep a copy elsewhere.'
-        : 'No versions yet. Save one now, or one is kept each time you copy or download the HTML.'),
+        ? 'Saved in this browser (the newest ' + VERS.max + '). A version is also kept each time you ' + (CLOUD ? 'publish' : 'copy or download the HTML') + ', and every 10 minutes while you edit. Use Save project to keep a copy elsewhere.'
+        : 'No versions yet. Save one now, or one is kept each time you ' + (CLOUD ? 'publish' : 'copy or download the HTML') + '.'),
       vers.map((v) => h('div', { class: 'verrow' },
         h('div', { class: 'vermeta' },
           h('b', null, when(v.at)),
@@ -1788,6 +1788,7 @@
         $('#copyBtn').after(pub);
       }
       $('#copyBtn').remove();
+      if ($('#helpBtn')) $('#helpBtn').hidden = false;
       const expTab = document.querySelector('.tabs [data-tab=export]');
       if (expTab) expTab.textContent = CLOUD.isTemplate ? 'Settings' : 'Publish';
       // Leaving with unsaved edits: start saving now, and ask the browser to hold the page until it's done.
@@ -1843,7 +1844,8 @@
       const mod = e.metaKey || e.ctrlKey;
       if (mod && e.key.toLowerCase() === 'z' && !/INPUT|TEXTAREA/.test(document.activeElement.tagName)) { e.preventDefault(); travel(e.shiftKey ? 1 : -1); }
       if (mod && e.key.toLowerCase() === 'y' && !/INPUT|TEXTAREA/.test(document.activeElement.tagName)) { e.preventDefault(); travel(1); }
-      if (mod && e.key.toLowerCase() === 's') { e.preventDefault(); $('#saveBtn').click(); }
+      // In the portal, Ctrl/Cmd+S saves to the account (set up in boot) instead of downloading the project file.
+      if (mod && e.key.toLowerCase() === 's' && !CLOUD) { e.preventDefault(); $('#saveBtn').click(); }
     });
     drawPanel(); snapshot(true); refresh();
   }
