@@ -706,6 +706,9 @@ fieldset.td-bad legend,.td-f-check.td-bad span{color:#ef4444}
 .td-feed-scroll .td-feed-items::-webkit-scrollbar{display:none}
 .td-feed-scroll .td-fd{flex:none;width:72%;max-width:280px;scroll-snap-align:start}
 .td-feed-scroll .td-fd-img{aspect-ratio:var(--fd-ar,4/3)}
+.td-feed-scroll .td-feed-more{flex:none;width:118px;margin:0;align-self:stretch;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;border-radius:var(--td-radius);background:var(--td-card);border:0;scroll-snap-align:start}
+.td-feed-scroll .td-feed-more[hidden]{display:none}
+.td-feed-more-arrow{display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;background:var(--td-accent);color:var(--td-accent-text);font-size:18px}
 .td-feed-arauto .td-fd-img{aspect-ratio:auto;height:auto}
 .td-feed-scroll.td-feed-arauto .td-feed-items{align-items:flex-start}
 .td-fd-body .td-fd-more{display:block;background:transparent;color:var(--td-accent);border:1.5px solid var(--td-accent);text-align:center;padding:12px;border-radius:10px;font-weight:700;font-size:14px;text-decoration:none;margin-top:8px}
@@ -1443,7 +1446,9 @@ fieldset.td-bad legend,.td-f-check.td-bad span{color:#ef4444}
         // Show the first few (of the chosen category); "Show more" reveals the next set.
         var more = D.createElement('button'); more.type = 'button'; more.className = 'td-feed-more'; more.textContent = g('more');
         more.addEventListener('click', function () { shown += step; apply(); });
-        wrap.appendChild(more);
+        // Side-scrolling cards: Show more is the last card in the row, right after the populated ones.
+        if (/td-feed-scroll/.test(box.className)) { more.innerHTML = '<span class="td-feed-more-arrow">→</span><span></span>'; more.lastChild.textContent = g('more'); list.appendChild(more); }
+        else wrap.appendChild(more);
         function apply() {
           var n = 0;
           rows.forEach(function (x) { var ok = !cat || x.cats.indexOf(cat) >= 0; x.el.hidden = !ok || n >= shown; if (ok) n++; });
