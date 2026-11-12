@@ -220,6 +220,8 @@
       const r = d && (d.getElementById('td-root') || d.scrollingElement);
       if (r) scroll = r.scrollTop;
     } catch (e) { scroll = previewScroll; /* sandboxed preview: use the position it last reported */ }
+    // The "Preview: time tab / what's live" picker only matters once the page has time tabs.
+    document.body.classList.toggle('has-times', state.times.length > 0);
     const html = TD.render(state, { preview: true, noAnim: !firstRender, forceTime: previewLive ? '' : timeTab });
     firstRender = false;
     frame.onload = () => {
@@ -1779,7 +1781,7 @@
         e.preventDefault();
         await cloudSaveNow();
         if (!CLOUD.dirty) location.href = CLOUD.back;
-      } }, '←'), h('span', { class: 'dot' }), CLOUD.name);
+      } }, '←'), h('span', { class: 'dot' }), h('span', { class: 'bname' }, CLOUD.name));
       document.addEventListener('keydown', (e) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') { e.preventDefault(); cloudSaveNow(); } });
       // In the portal, pages go live only through Publish and the one-time install code, never pasted HTML.
       if (!CLOUD.isTemplate) {
@@ -1830,6 +1832,29 @@
       inp.click();
     };
     $('#histBtn').onclick = showHistory;
+    // Phones: the top bar keeps back, the page name, undo/redo, Publish and one ☰ menu with the rest.
+    // Each entry clicks the real button, which wider screens show.
+    (function topMenu() {
+      const det = $('#topMenu'), list = $('#topMenuList');
+      if (!det) return;
+      const item = (icon, label, sub, sel) => {
+        const b = $(sel);
+        if (!b || b.hidden) return null;
+        return h('button', { type: 'button', onclick: () => { det.open = false; b.click(); } }, h('span', { class: 'mi' }, icon), h('span', { class: 'ml' }, label, sub ? h('small', null, sub) : null));
+      };
+      const draw = () => {
+        const theme = document.documentElement.getAttribute('data-theme');
+        fill(list,
+          item('🕘', 'History', 'Saved versions of this page', '#histBtn'),
+          item('✦', CLOUD ? 'Start over from a template' : 'New', 'Replaces this page (Undo brings it back)', '#newBtn'),
+          item('📂', 'Open', 'A .json project or an exported .html', '#openBtn'),
+          item('⬇', 'Save project', 'Download the project file', '#saveBtn'),
+          item('?', 'Help center', 'Step-by-step guides', '#helpBtn'),
+          item(theme === 'dark' ? '☾' : theme === 'light' ? '☀' : '◐', 'Theme: ' + (theme === 'dark' ? 'Dark' : theme === 'light' ? 'Light' : 'Auto'), 'Tap to switch', '#themeBtn'));
+      };
+      det.addEventListener('toggle', () => { if (det.open) draw(); });
+      document.addEventListener('click', (e) => { if (det.open && !det.contains(e.target)) det.open = false; });
+    })();
     $('#saveBtn').onclick = () => { download(slug() + '.tapdot.json', JSON.stringify(state, null, 1), 'application/json'); toast('Project file saved'); };
     if ($('#copyBtn')) $('#copyBtn').onclick = copyExport;
     $('#pickBtn').onclick = () => { setPick(!picking); if (picking) document.body.classList.add('show-preview'); };

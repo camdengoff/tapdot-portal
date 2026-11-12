@@ -438,3 +438,52 @@ details.more > .form { padding-bottom: 16px; }
 /* Help center link (portal only). */
 #helpBtn { color: inherit; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; font-weight: 600; }
 #helpBtn[hidden] { display: none; }
+
+/* ── Phones (≤600px): one tidy top bar ────────────────────────────────
+   Visible: back, page name, undo/redo, Publish (or Copy HTML) and a ☰ menu holding
+   History, New/template, Open, Save project, Help and the theme. The menu opens as a bottom sheet. */
+.topmenu { display: none; position: relative; }
+.topmenu > summary { list-style: none; display: inline-flex; align-items: center; justify-content: center; }
+.topmenu > summary::-webkit-details-marker { display: none; }
+.topmenu .menu { display: flex; flex-direction: column; }
+.topmenu .menu button { display: flex; align-items: center; gap: 12px; background: none; border: 0; text-align: left; padding: 13px 14px; font-size: 16px; color: var(--text); }
+.topmenu .menu button + button { border-top: 1px solid var(--line); }
+.topmenu .menu button:hover { background: var(--hover); }
+.topmenu .mi { width: 22px; text-align: center; flex: none; }
+.topmenu .ml { display: flex; flex-direction: column; min-width: 0; }
+.topmenu .ml small { color: var(--muted); font-size: 12.5px; }
+@media (max-width: 600px) {
+  .top { flex-wrap: nowrap; gap: 8px; padding: 8px 12px; }
+  .brand { flex: 1; min-width: 0; font-size: 15px; }
+  .brand > a.back { flex: none; }
+  .brand .bname { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .brand .dot { flex: none; }
+  .actions { flex-wrap: nowrap; gap: 6px; flex: none; }
+  .actions > #newBtn, .actions > #openBtn, .actions > #saveBtn, .actions > #histBtn, .actions > #themeBtn, .actions > #helpBtn { display: none; }
+  .actions .icon { padding: 6px 10px; min-height: 40px; }
+  .actions .primary { min-height: 40px; padding: 8px 12px; white-space: nowrap; }
+  .topmenu { display: block; }
+  .topmenu > summary { width: 40px; height: 40px; padding: 0; }
+  .topmenu[open] > summary::before { content: ''; position: fixed; inset: 0; background: rgba(38, 38, 38, .45); z-index: 60; cursor: default; }
+  .topmenu .menu { position: fixed; left: 8px; right: 8px; bottom: 8px; z-index: 61; background: var(--panel); border: 1px solid var(--line2); border-radius: 6px;
+    padding: 6px 6px calc(6px + env(safe-area-inset-bottom)); max-height: 75vh; overflow-y: auto; box-shadow: 0 -8px 40px rgba(0, 0, 0, .18); animation: sheetUp .22s var(--ease); }
+  /* The device picker does nothing at phone width (the preview fills the screen anyway). */
+  .stage-bar .seg { display: none; }
+  .stage-bar { gap: 8px; padding: 8px 12px; }
+  body:not(.has-times) .stage-bar { display: contents; }
+  body:not(.has-times) .sched { display: none; }
+  .sched select { flex: 1; }
+  .sched { flex: 1; }
+  /* Tap to edit floats bottom-left, opposite the Edit button, where a thumb reaches it. */
+  #pickBtn { position: fixed; left: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 50; border-radius: 99px; padding: 12px 18px; min-height: 0; font-size: 14px; font-weight: 600; background: var(--panel); box-shadow: 0 8px 24px rgba(0,0,0,.15); }
+  #pickBtn.on { background: var(--btn); color: #fff; }
+  .tabs button { padding: 13px 4px 11px; }
+  .view-toggle { bottom: calc(16px + env(safe-area-inset-bottom)); }
+}
+@keyframes sheetUp { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+/* Touch screens: a block's ↑ ↓ ⧉ ✕ tools show once it's opened, so closed blocks have room for their names.
+   (A hidden block keeps its 👁 so it's clear it's hidden.) */
+@media (hover: none) and (max-width: 600px) {
+  .block:not(.open) > .bhead .tools button:not(.eye.off), .li:not(.open) > .li-head .tools button { display: none; }
+  .bhead { padding: 14px; }
+}

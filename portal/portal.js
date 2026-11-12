@@ -19,7 +19,12 @@
   const enc = encodeURIComponent;
   let toastT;
   function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600); }
-  const when = (iso) => iso ? new Date(iso).toLocaleString([], { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
+  // Dates leave out the year when it's this year ("Nov 12, 1:20 PM").
+  const when = (iso) => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return d.toLocaleString([], Object.assign({ month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }, d.getFullYear() === new Date().getFullYear() ? {} : { year: 'numeric' }));
+  };
 
   // ── Tap stats helpers ────────────────────────────────────────────────
   // Days are the visitor's local dates (YYYY-MM-DD), newest last.
@@ -143,8 +148,37 @@
     acct.onclick = account;
     $('#tplBtn').hidden = !me.admin;
     $('#adminBtn').hidden = !me.admin;
+    topMenu();
     draw();
   }
+
+  // Phones: the top bar keeps the logo, the church picker and one ☰ menu with everything else
+  // (Admin, Templates, Help, theme, account). Each entry clicks the real button, which wider screens show.
+  function topMenu() {
+    const det = $('#topMenu'), list = $('#topMenuList');
+    if (!det) return;
+    det.hidden = false;
+    const item = (icon, label, sub, run) => h('button', { type: 'button', onclick: () => { det.open = false; run(); } },
+      h('span', { class: 'mi' }, icon), h('span', { class: 'ml' }, label, sub ? h('small', null, sub) : null));
+    const draw = () => {
+      const theme = document.documentElement.getAttribute('data-theme');
+      fill(list,
+        item('👤', me.name || 'Account', me.email, account),
+        me.admin ? item('🛡', 'Admin', 'Every account, church and change', () => { location.hash = 'admin'; }) : null,
+        me.admin ? item('🧩', 'Templates', 'Starting points for new pages', () => { location.hash = 'templates'; }) : null,
+        item('?', 'Help center', 'Step-by-step guides', () => window.open('/help/', '_blank', 'noopener')),
+        item(theme === 'dark' ? '☾' : theme === 'light' ? '☀' : '◐', 'Theme: ' + (theme === 'dark' ? 'Dark' : theme === 'light' ? 'Light' : 'Auto'), 'Tap to switch', () => { $('#themeBtn').click(); }));
+    };
+    det.addEventListener('toggle', () => { if (det.open) draw(); });
+    draw();
+  }
+  // Pop-up menus (•••, ☰) close after picking an item, or when tapping anywhere else.
+  document.addEventListener('click', (e) => {
+    const inMenu = e.target.closest && e.target.closest('details.more');
+    document.querySelectorAll('details.more[open]').forEach((d) => {
+      if (d !== inMenu || (e.target.closest('.menu button, .menu a'))) d.open = false;
+    });
+  });
   function churchPicker(current) {
     const sel = $('#churchSel');
     sel.hidden = me.churches.length < 2 && !me.admin;
@@ -281,10 +315,13 @@
         viewer ? (p.publishedAt ? h('div', { class: 'row wrap' }, h('a', { class: 'ghost btn', href: live, target: '_blank', rel: 'noopener' }, '↗ Live page')) : null) : h('div', { class: 'row wrap' },
           h('a', { class: 'primary btn', href: 'editor.html?church=' + enc(church.id) + '&page=' + enc(p.id) }, '✎ Edit'),
           p.publishedAt ? h('a', { class: 'ghost btn', href: live, target: '_blank', rel: 'noopener' }, '↗ Live page') : null,
-          h('button', { class: 'ghost', title: 'Paste this into your website once. After that, Publish updates it.', onclick: () => copy(code, 'Install code copied. Paste it into your site once.') }, '📋 Install code'),
-          h('a', { class: 'ghost btn icon', href: '#' + church.id + '/' + p.id, title: 'Settings', 'aria-label': 'Settings' }, '⚙'),
-          h('details', { class: 'more' }, h('summary', { class: 'ghost' }, '•••'),
+          h('button', { class: 'ghost wideonly', title: 'Paste this into your website once. After that, Publish updates it.', onclick: () => copy(code, 'Install code copied. Paste it into your site once.') }, '📋 Install code'),
+          h('a', { class: 'ghost btn icon wideonly', href: '#' + church.id + '/' + p.id, title: 'Settings', 'aria-label': 'Settings' }, '⚙'),
+          h('details', { class: 'more' }, h('summary', { class: 'ghost', 'aria-label': 'More for ' + p.name }, '•••'),
             h('div', { class: 'menu' },
+              h('div', { class: 'menuhead' }, p.name),
+              h('button', { class: 'phoneonly', onclick: () => copy(code, 'Install code copied. Paste it into your site once.') }, '📋 Copy install code'),
+              h('button', { class: 'phoneonly', onclick: () => { location.hash = church.id + '/' + p.id; } }, '⚙ Settings'),
               h('button', { onclick: () => copy(live, 'Link copied. Use it for QR codes and tap tags.') }, 'Copy live link'),
               h('button', { onclick: act(async () => {
                 const v = await ask('Rename page', [{ k: 'name', l: 'Page name', value: p.name, max: 80 }], 'Rename', 'The page’s link stays the same.');
@@ -328,6 +365,11 @@
         bars(days, two.views));
     }
 
+    const renameChurch = act(async () => {
+      const v = await ask('Rename church', [{ k: 'name', l: 'Church name', value: church.name, max: 80 }], 'Rename');
+      if (!v) return;
+      await api('/churches/' + enc(church.id), { method: 'PATCH', body: { name: v.name } }); me = await api('/me'); draw();
+    });
     const roleName = { owner: 'Owner', editor: 'Editor', viewer: 'Stats only' };
     const personRow = (m) => h('div', { class: 'person' },
       h('div', { class: 'who' },
@@ -349,14 +391,15 @@
     fill(main,
       h('div', { class: 'head' },
         h('h1', null, church.name),
-        manage ? h('button', { class: 'ghost sm', onclick: act(async () => {
-          const v = await ask('Rename church', [{ k: 'name', l: 'Church name', value: church.name, max: 80 }], 'Rename');
-          if (!v) return;
-          await api('/churches/' + enc(church.id), { method: 'PATCH', body: { name: v.name } }); me = await api('/me'); draw();
-        }) }, 'Rename') : null,
+        manage ? h('button', { class: 'ghost sm wideonly', onclick: renameChurch }, 'Rename') : null,
         h('div', { class: 'grow' }),
-        manage ? h('button', { class: 'ghost', title: 'A read-only page of this church’s tap stats, for people who don’t edit', onclick: () => shareDialog(church) }, '📊 Share stats') : null,
-        viewer ? h('span', { class: 'pill' }, 'Stats only') : h('button', { class: 'primary', onclick: () => newPage(church) }, '+ New page')),
+        manage ? h('button', { class: 'ghost wideonly', title: 'A read-only page of this church’s tap stats, for people who don’t edit', onclick: () => shareDialog(church) }, '📊 Share stats') : null,
+        viewer ? h('span', { class: 'pill' }, 'Stats only') : h('button', { class: 'primary newpage', onclick: () => newPage(church) }, '+ New page'),
+        manage ? h('details', { class: 'more phoneonly' }, h('summary', { class: 'ghost', 'aria-label': 'More for ' + church.name }, '•••'),
+          h('div', { class: 'menu' },
+            h('div', { class: 'menuhead' }, church.name),
+            h('button', { onclick: () => shareDialog(church) }, '📊 Share stats'),
+            h('button', { onclick: renameChurch }, 'Rename church'))) : null),
       pages.length ? h('div', { class: 'grid' }, pages.map(pageCard))
         : h('div', { class: 'card center muted' }, viewer ? 'No pages yet.' : 'No pages yet. Create one to start editing.'),
       viewer ? null : h('div', { class: 'head' }, h('h2', null, 'People'),
