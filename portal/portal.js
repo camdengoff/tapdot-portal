@@ -191,6 +191,9 @@
 
   async function draw() {
     const id = route();
+    const gp = $('#glassPanel'); if (gp) gp.remove();
+    // The glass look (soft brand-colored backdrop, see-through panels) is for the church screens.
+    document.body.classList.toggle('glassy', !!id && id !== 'templates' && !/^admin(\/|$)/.test(id) && !id.includes('/'));
     $('#tplBtn').classList.toggle('on', id === 'templates');
     $('#adminBtn').classList.toggle('on', /^admin(\/|$)/.test(id));
     if (id === 'templates' && me.admin) { churchPicker(''); return drawTemplates(); }
@@ -285,7 +288,7 @@
     let data;
     let allStats = null;
     try {
-      [data, allStats] = await Promise.all([api('/churches/' + enc(id)), api('/churches/' + enc(id) + '/stats?days=14').catch(() => null)]);
+      [data, allStats] = await Promise.all([api('/churches/' + enc(id)), api('/churches/' + enc(id) + '/stats?days=180').catch(() => null)]);
     }
     catch (e) { fill(main, h('div', { class: 'card center' }, h('p', null, e.message), h('a', { href: '#' }, 'Back'))); return; }
     if (route() !== id) return; // moved on while loading
@@ -388,8 +391,7 @@
         await api('/churches/' + enc(church.id) + '/members/' + enc(m.email), { method: 'DELETE' }); reload();
       }) }, 'Remove') : null);
 
-    fill(main,
-      h('div', { class: 'head' },
+    const headBar = h('div', { class: 'head' },
         h('h1', null, church.name),
         manage ? h('button', { class: 'ghost sm wideonly', onclick: renameChurch }, 'Rename') : null,
         h('div', { class: 'grow' }),
@@ -399,10 +401,12 @@
           h('div', { class: 'menu' },
             h('div', { class: 'menuhead' }, church.name),
             h('button', { onclick: () => shareDialog(church) }, '📊 Share stats'),
-            h('button', { onclick: renameChurch }, 'Rename church'))) : null),
+            h('button', { onclick: renameChurch }, 'Rename church'))) : null);
+    const pagesView = () => [
       pages.length ? h('div', { class: 'grid' }, pages.map(pageCard))
-        : h('div', { class: 'card center muted' }, viewer ? 'No pages yet.' : 'No pages yet. Create one to start editing.'),
-      viewer ? null : h('div', { class: 'head' }, h('h2', null, 'People'),
+        : h('div', { class: 'card center muted' }, viewer ? 'No pages yet.' : 'No pages yet. Create one to start editing.')];
+    const peopleView = () => [
+      h('div', { class: 'head flat' }, h('h2', null, 'People'),
         h('div', { class: 'grow' }),
         manage ? h('button', { class: 'ghost', onclick: act(async () => {
           const v = await ask('Add a person', [
@@ -414,14 +418,199 @@
           await reload();
           if (r.link) showLink(r.email, r.link); else toast(r.email + ' already has an account and can sign in now.');
         }) }, '+ Add person') : null),
-      viewer ? null : h('div', { class: 'card list' }, members.length ? members.map(personRow) : h('p', { class: 'muted' }, 'Nobody yet.')),
+      h('div', { class: 'card list' }, members.length ? members.map(personRow) : h('p', { class: 'muted' }, 'Nobody yet.')),
       me.admin ? h('div', { class: 'dangerzone' }, h('button', { class: 'ghost sm danger', onclick: act(async () => {
         const v = await ask('Delete ' + church.name + '?', [{ k: 'confirm', l: 'Type the church’s id (' + church.id + ') to confirm' }], 'Delete church',
           'This deletes every page (taking them off the site) and removes everyone’s access. It can’t be undone.');
         if (!v || v.confirm !== church.id) return;
         await api('/churches/' + enc(church.id), { method: 'DELETE' });
         me = await api('/me'); location.hash = '';
-      }) }, 'Delete church')) : null);
+      }) }, 'Delete church')) : null];
+
+    // Overview / Pages / People, switched by the glass dock at the bottom. The last one picked is remembered.
+    const tabs = [['overview', 'Overview', '◎'], ['pages', 'Pages', '▤'], viewer ? null : ['people', 'People', '☺']].filter(Boolean);
+    let tab = store.get('doorstep-church-tab');
+    if (!tabs.some((t) => t[0] === tab)) tab = 'overview';
+    const view = h('div', { class: 'gview' });
+    const dock = h('nav', { class: 'dock glass', 'aria-label': 'Church views' });
+    const showTab = (t) => {
+      tab = t; store.set('doorstep-church-tab', t);
+      fill(view, t === 'pages' ? pagesView() : t === 'people' ? peopleView() : overview(church, pages, allStats, { viewer, responses, reload, go: showTab }));
+      view.querySelectorAll(':scope > *, .ovgrid > *').forEach((el, i) => { el.classList.add('reveal'); el.style.setProperty('--i', i); });
+      dock.querySelectorAll('button[data-tab]').forEach((b) => b.setAttribute('aria-current', b.dataset.tab === t ? 'page' : 'false'));
+    };
+    fill(dock,
+      tabs.map(([k, label, icon], i) => h('button', { type: 'button', 'data-tab': k, onclick: () => showTab(k), onkeydown: (e) => {
+        if (!['ArrowLeft', 'ArrowRight'].includes(e.key)) return;
+        e.preventDefault();
+        const next = (i + (e.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length;
+        showTab(tabs[next][0]); dock.children[next].focus();
+      } }, h('span', { class: 'di', 'aria-hidden': 'true' }, icon), h('span', null, label))),
+      h('span', { class: 'dsep' }),
+      h('button', { type: 'button', class: 'dglass', title: 'Adjust glass', 'aria-label': 'Adjust glass', onclick: glassPanel }, h('span', { class: 'di', 'aria-hidden': 'true' }, '◧')));
+    fill(main, headBar, view, dock);
+    showTab(tab);
+  }
+
+  // ── Glass dashboard: church Overview, line chart, and the Adjust glass panel ──
+  // Remembered in this browser only; private windows and blocked storage just use the defaults.
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* not remembered */ } },
+    del(k) { try { localStorage.removeItem(k); } catch (e) { /* nothing to forget */ } },
+  };
+  const GLASS0 = { blur: 22, opacity: 55, edge: 60 };
+  const GLASS_PRESETS = [['Clear', { blur: 10, opacity: 25, edge: 80 }], ['Frosted', GLASS0], ['Solid', { blur: 32, opacity: 88, edge: 35 }]];
+  const clampN = (v, lo, hi, d) => (v !== '' && v != null && Number.isFinite(+v) ? Math.min(hi, Math.max(lo, Math.round(+v))) : d);
+  function glassGet() {
+    let g = {};
+    try { g = JSON.parse(store.get('doorstep-glass') || '{}') || {}; } catch (e) { g = {}; }
+    return { blur: clampN(g.blur, 0, 40, GLASS0.blur), opacity: clampN(g.opacity, 10, 95, GLASS0.opacity), edge: clampN(g.edge, 0, 100, GLASS0.edge) };
+  }
+  function glassApply(g) {
+    const r = document.documentElement.style;
+    r.setProperty('--gl-blur', g.blur + 'px');
+    r.setProperty('--gl-op', g.opacity + '%');
+    r.setProperty('--gl-edge', g.edge + '%');
+  }
+  glassApply(glassGet());
+  document.addEventListener('animationend', (e) => { if (e.animationName === 'gIn' && e.target.classList.contains('reveal')) e.target.classList.remove('reveal'); });
+
+  function glassPanel() {
+    const old = $('#glassPanel');
+    if (old) { old.remove(); return; }
+    let g = glassGet();
+    const save = (patch) => { g = Object.assign({}, g, patch); store.set('doorstep-glass', JSON.stringify(g)); glassApply(g); sync(); };
+    const rows = [['blur', 'Blur', 0, 40, 'px'], ['opacity', 'Opacity', 10, 95, '%'], ['edge', 'Edge light', 0, 100, '%']].map(([k, label, lo, hi, unit]) => {
+      const range = h('input', { type: 'range', min: lo, max: hi, step: 1, 'aria-label': label, oninput: () => save({ [k]: +range.value }) });
+      const num = h('input', { type: 'number', min: lo, max: hi, step: 1, class: 'num', 'aria-label': label + ' (' + unit + ')', onchange: () => save({ [k]: clampN(num.value, lo, hi, g[k]) }) });
+      return { k, range, num, el: h('label', { class: 'grange' }, h('span', { class: 'row' }, h('span', { class: 'grow' }, label), num, h('span', { class: 'muted small unit' }, unit)), range) };
+    });
+    const sync = () => rows.forEach((r) => { r.range.value = g[r.k]; if (document.activeElement !== r.num) r.num.value = g[r.k]; });
+    const close = () => { panel.remove(); document.removeEventListener('keydown', esc); const b = $('.dglass'); if (b) b.focus(); };
+    const esc = (e) => { if (e.key === 'Escape') close(); };
+    const panel = h('aside', { id: 'glassPanel', class: 'glasspanel glass', 'aria-label': 'Glass appearance' },
+      h('div', { class: 'row' }, h('h3', { class: 'grow' }, 'Glass appearance'), h('button', { class: 'ghost sm icon', type: 'button', 'aria-label': 'Close', onclick: close }, '✕')),
+      h('p', { class: 'muted small' }, 'How see-through the panels are. Only changes how the portal looks in this browser.'),
+      h('div', { class: 'gsample', 'aria-hidden': 'true' }, h('span', { class: 'dot' }), 'Live preview'),
+      h('div', { class: 'gpresets' }, GLASS_PRESETS.map(([name, v]) => h('button', { type: 'button', class: 'ghost sm', onclick: () => save(v) }, name))),
+      rows.map((r) => r.el),
+      h('button', { type: 'button', class: 'ghost sm wide', onclick: () => { store.del('doorstep-glass'); g = Object.assign({}, GLASS0); glassApply(g); sync(); } }, 'Reset'));
+    document.body.append(panel);
+    document.addEventListener('keydown', esc);
+    sync();
+    panel.querySelector('.gpresets button').focus();
+  }
+
+  // Visits (orange, with a soft fill) and taps (grey) per day as two lines; hover a day for its numbers.
+  function lineChart(days, visits, taps) {
+    const NS = 'http://www.w3.org/2000/svg';
+    const max = Math.max(1, ...visits, ...taps);
+    const n = days.length;
+    const X = (i) => (n === 1 ? 300 : (i * 600) / (n - 1));
+    const Y = (v) => 180 - (v / max) * 160;
+    const el = (tag, at) => { const e = document.createElementNS(NS, tag); for (const k in at) e.setAttribute(k, at[k]); return e; };
+    const svg = el('svg', { viewBox: '0 0 600 185', preserveAspectRatio: 'none', class: 'lchart', role: 'img',
+      'aria-label': 'Visits and taps per day: ' + visits.reduce((a, b) => a + b, 0) + ' visits, ' + taps.reduce((a, b) => a + b, 0) + ' taps.' });
+    const gid = 'lg' + Math.random().toString(36).slice(2, 8);
+    const defs = el('defs', {});
+    const grad = el('linearGradient', { id: gid, x1: 0, x2: 0, y1: 0, y2: 1 });
+    grad.append(el('stop', { offset: 0, 'stop-color': 'var(--accent)', 'stop-opacity': '.28' }), el('stop', { offset: 1, 'stop-color': 'var(--accent)', 'stop-opacity': 0 }));
+    defs.append(grad); svg.append(defs);
+    [20, 100, 180].forEach((y) => svg.append(el('path', { d: 'M0 ' + y + ' H600', class: 'lgrid' })));
+    const pts = (a) => a.map((v, i) => X(i) + ',' + Y(v)).join(' ');
+    svg.append(el('path', { d: 'M' + X(0) + ' 185 ' + visits.map((v, i) => 'L' + X(i) + ' ' + Y(v)).join(' ') + ' L' + X(n - 1) + ' 185 Z', fill: 'url(#' + gid + ')' }));
+    svg.append(el('polyline', { points: pts(taps), class: 'ltaps' }));
+    svg.append(el('polyline', { points: pts(visits), class: 'lvisits' }));
+    // One invisible column per day carries the tooltip.
+    days.forEach((day, i) => {
+      const w = 600 / n;
+      const r = el('rect', { x: Math.max(0, X(i) - w / 2), y: 0, width: w, height: 185, class: 'lhit' });
+      const t = el('title', {}); t.textContent = shortDay(day) + ': ' + plural(visits[i], 'visit', 'visits') + ', ' + plural(taps[i], 'tap', 'taps');
+      r.append(t); svg.append(r);
+    });
+    const marks = Array.from(new Set(Array.from({ length: Math.min(n, 6) }, (_, i) => (n <= 6 ? i : Math.round((i * (n - 1)) / 5)))));
+    return h('div', { class: 'lwrap' },
+      h('div', { class: 'lyax' }, h('span', null, max.toLocaleString()), h('span', null, Math.round(max / 2).toLocaleString()), h('span', null, '0')),
+      svg,
+      h('div', { class: 'lxax' }, marks.map((i) => h('span', { style: 'left:' + (X(i) / 6) + '%;transform:' + (i === 0 && n > 1 ? 'none' : i === n - 1 && n > 1 ? 'translateX(-100%)' : 'translateX(-50%)') }, i === n - 1 ? 'Today' : shortDay(days[i])))));
+  }
+
+  let ovDays = +store.get('doorstep-ov-days') || 30;
+  // The church at a glance: visits with the change from the period before, a visits-and-taps chart,
+  // the pages ranked by visits, and the most-tapped buttons across all pages.
+  function overview(church, pages, allStats, o) {
+    if (![7, 30, 90].includes(ovDays)) ovDays = 30;
+    const wrap = h('div', { class: 'overview' });
+    const draw = () => {
+      const all = lastDays(ovDays * 2);
+      const days = all.slice(ovDays), before = all.slice(0, ovDays);
+      const per = pages.map((p) => ({ p, now: sumStats(allStats && allStats.pages[p.id], days), was: sumStats(allStats && allStats.pages[p.id], before) }));
+      const visits = days.map((_, i) => per.reduce((a, x) => a + x.now.views[i], 0));
+      const taps = days.map((_, i) => per.reduce((a, x) => a + x.now.taps[i], 0));
+      const tv = visits.reduce((a, b) => a + b, 0), tt = taps.reduce((a, b) => a + b, 0);
+      const was = per.reduce((a, x) => a + x.was.totalViews, 0);
+      const change = was ? Math.round(((tv - was) / was) * 100) : null;
+      const span = { 7: 'last 7 days', 30: 'last 30 days', 90: 'last 3 months' }[ovDays];
+      const ranked = per.slice().sort((a, b) => b.now.totalViews - a.now.totalViews || (b.p.publishedAt ? 1 : 0) - (a.p.publishedAt ? 1 : 0));
+      const best = ranked[0] && ranked[0].now.totalViews ? ranked[0] : null;
+      const btns = [];
+      per.forEach((x) => x.now.buttons.forEach(([label, c]) => btns.push({ label, c, p: x.p })));
+      btns.sort((a, b) => b.c - a.c);
+      const topB = btns.slice(0, 5);
+      const unseen = pages.filter((p) => o.responses[p.id] && o.responses[p.id].unseen);
+      const seg = h('div', { class: 'seg', role: 'group', 'aria-label': 'Time span' },
+        [[7, 'Week'], [30, 'Month'], [90, '3 months']].map(([v, l]) => h('button', { type: 'button', 'aria-pressed': String(v === ovDays), onclick: () => { ovDays = v; store.set('doorstep-ov-days', v); draw(); } }, l)));
+      const statusPill = (p) => {
+        const pending = p.draftAt && (!p.publishedAt || p.draftAt > p.publishedAt);
+        return p.publishedAt ? h('span', { class: 'pill ' + (pending ? 'warn' : 'ok') }, pending ? 'Unpublished edits' : 'Live') : h('span', { class: 'pill' }, 'Not published');
+      };
+      fill(wrap,
+        unseen.length ? h('div', { class: 'ovnote glass' }, h('span', { 'aria-hidden': 'true' }, '📥'),
+          h('span', { class: 'grow' }, h('b', null, plural(unseen.reduce((a, p) => a + o.responses[p.id].unseen, 0), 'new connect card answer', 'new connect card answers')), ' on ', unseen.map((p) => p.name).join(', ')),
+          unseen.length === 1 ? h('button', { class: 'ghost sm', onclick: () => showResponses(church, unseen[0], o.reload) }, 'Read') : h('button', { class: 'ghost sm', onclick: () => o.go('pages') }, 'See pages')) : null,
+        h('div', { class: 'ovgrid ovtop' },
+          h('section', { class: 'card ovcard ovbig' },
+            h('div', { class: 'ovtitle' }, h('span', null, 'Visits · ' + span), h('span', { class: 'ovicon', 'aria-hidden': 'true' }, '◎')),
+            h('b', { class: 'bignum' }, tv.toLocaleString()),
+            h('p', { class: 'muted small' }, change == null ? (tv ? 'No visits in the ' + ovDays + ' days before to compare.' : 'No visits yet in this time.')
+              : [h('span', { class: change >= 0 ? 'up' : 'down' }, (change > 0 ? '+' : '') + change + '%'), ' compared with the ' + ovDays + ' days before']),
+            h('div', { class: 'ovmini' },
+              h('div', null, h('b', null, tt.toLocaleString()), h('span', { class: 'muted small' }, tt === 1 ? 'button tap' : 'button taps')),
+              h('div', null, h('b', null, tv ? (Math.round((tt / tv) * 10) / 10).toLocaleString() : '0'), h('span', { class: 'muted small' }, 'taps per visit')),
+              h('div', null, h('b', null, pages.filter((p) => p.publishedAt).length + ' of ' + pages.length), h('span', { class: 'muted small' }, 'pages live'))),
+            best ? h('button', { class: 'ovbest', type: 'button', title: 'See tap stats', onclick: () => showStats(church, best.p) },
+              h('span', { class: 'ovicon', 'aria-hidden': 'true' }, '★'),
+              h('span', { class: 'grow ovname' }, h('b', null, best.p.name), h('span', { class: 'muted small' }, 'Most visited · ' + plural(best.now.totalViews, 'visit', 'visits'))),
+              h('span', { class: 'arrow', 'aria-hidden': 'true' }, '↗')) : null),
+          h('section', { class: 'card ovcard ovchart' },
+            h('div', { class: 'ovtitle' }, h('h2', null, 'Visits and taps'), seg),
+            h('div', { class: 'ovlegend' },
+              h('div', null, h('span', null, h('i', { class: 'kv' }), 'Visits'), h('b', null, tv.toLocaleString())),
+              h('div', null, h('span', null, h('i', { class: 'kt' }), 'Taps'), h('b', null, tt.toLocaleString()))),
+            tv || tt ? lineChart(days, visits, taps) : h('div', { class: 'ovempty' }, h('b', null, 'No visits yet'), h('span', { class: 'muted small' }, 'Once a page is published and people open it, visits and taps show up here.')))),
+        h('div', { class: 'ovgrid ovlow' },
+          h('section', { class: 'card ovcard' },
+            h('div', { class: 'ovtitle' }, h('h2', null, 'Pages'), h('button', { class: 'textbtn', type: 'button', onclick: () => o.go('pages') }, 'View all →')),
+            ranked.length ? h('div', { class: 'ovrows' }, ranked.slice(0, 5).map((x) => h('div', { class: 'ovrow' },
+              h('span', { class: 'ovicon' + (x.p.publishedAt ? ' live' : ''), 'aria-hidden': 'true' }, x.p.publishedAt ? '●' : '○'),
+              h('span', { class: 'grow ovname' }, h('b', null, x.p.name), h('span', { class: 'muted small' }, x.p.draftAt ? 'Edited ' + when(x.p.draftAt) : 'Not edited yet')),
+              statusPill(x.p),
+              h('button', { class: 'ovcount', type: 'button', title: 'See tap stats', onclick: () => showStats(church, x.p) }, h('b', null, x.now.totalViews.toLocaleString()), h('span', { class: 'muted small' }, x.now.totalViews === 1 ? 'visit' : 'visits')),
+              o.viewer ? null : h('a', { class: 'ghost sm btn', href: 'editor.html?church=' + enc(church.id) + '&page=' + enc(x.p.id) }, '✎ Edit'))))
+              : h('div', { class: 'ovempty' }, h('b', null, 'No pages yet'), o.viewer ? null : h('button', { class: 'primary sm', onclick: () => newPage(church) }, '+ New page'))),
+          h('section', { class: 'card ovcard' },
+            h('div', { class: 'ovtitle' }, h('h2', null, 'Most-tapped buttons'), h('span', { class: 'muted small' }, plural(tt, 'tap', 'taps') + ' · ' + span)),
+            topB.length ? h('div', { class: 'ovbtns' }, topB.map((b) => h('button', { type: 'button', class: 'ovbtn', title: 'See tap stats for ' + b.p.name, onclick: () => showStats(church, b.p) },
+              h('span', { class: 'row' }, h('b', { class: 'grow ovlabel' }, b.label), h('span', null, Math.round((b.c / Math.max(1, tt)) * 100) + '%')),
+              h('span', { class: 'ovtrack' }, h('i', { style: 'width:' + Math.max(3, (b.c / topB[0].c) * 100) + '%' })),
+              h('span', { class: 'muted small' }, plural(b.c, 'tap', 'taps') + ' · ' + b.p.name))))
+              : h('div', { class: 'ovempty' }, h('b', null, 'No taps yet'), h('span', { class: 'muted small' }, 'Buttons people tap on your pages are ranked here.')))),
+        h('p', { class: 'ovfoot' }, h('span', null, h('i'), 'A visit counts once per person every 30 minutes. No cookies, and nothing about visitors is stored.')));
+      wrap.querySelectorAll('.ovgrid > *').forEach((el, i) => { el.classList.add('reveal'); el.style.setProperty('--i', i); });
+    };
+    draw();
+    return wrap;
   }
 
   // ── New page: pick a template (previews side by side) or start from scratch ──
