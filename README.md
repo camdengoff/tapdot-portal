@@ -44,6 +44,12 @@ every Publish updates the live page.
   only what was last published. If two people edit at once, the second save asks whose version to keep.
 - **Live pages:** `/p/<church>/<page>` is the published HTML the code block loads (via `/embed.js`), and
   `/view/<church>/<page>` is the same page on its own, handy for QR codes and tap tags.
+- **QR codes:** ⊞ QR codes in a church's bottom bar (or a page's ••• → QR code) makes static QR codes in the
+  browser: a page's live link, any web address, email, phone or text, with hex colors, dot/corner shapes, border,
+  an optional center logo (switches to error correction H) and a built-in scan check (jsQR from jsDelivr). Downloads
+  PNG (any size) or SVG, or copies the picture. Nothing is stored on the server; the look is remembered per church in
+  the browser (localStorage `doorstep-qr-<church>`). Encoder: `portal/qrcode-lib.js` (qrcode-generator 1.4.4, MIT),
+  drawing in `portal/qr.js`.
 - **Templates (admins):** 🧩 Templates in the portal's top bar lists the starting points churches see on
   + New page. Edit one in the editor (`/app/editor?tpl=<id>`, no publishing), rename it, add a description,
   hide or show it, reorder, duplicate, delete, or make a new one (blank, a copy, or any church page via

@@ -589,3 +589,61 @@ body.glassy::before { content: ''; position: fixed; inset: 0; z-index: -1; point
   .glasspanel { left: 8px; right: 8px; top: auto; bottom: calc(8px + env(safe-area-inset-bottom)); width: auto; }
 }
 @media (prefers-reduced-motion: reduce) { .reveal, .glasspanel { animation: none; } }
+
+/* QR codes view (portal.js qrMaker) */
+.qrhead { gap: 6px 14px; margin-bottom: 16px; }
+.qrgrid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 400px); gap: 16px; align-items: start; }
+.qrside { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.qrsec { display: flex; flex-direction: column; gap: 14px; }
+.qrsec h2 { font-size: 17px; }
+.qrsec .seg { align-self: flex-start; flex-wrap: wrap; border-radius: 18px; }
+.qrsec textarea { font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 9px 12px; width: 100%; resize: vertical; }
+.qrsec .check { font-size: 14px; color: var(--text); }
+.qrsec .check input { width: 16px; height: 16px; padding: 0; flex: none; }
+.qrwhat { display: flex; flex-direction: column; gap: 10px; }
+.qrwhat p { margin: 0; }
+.qrlabel { font-weight: 600; font-size: 13px; color: var(--label); }
+.qrcolors { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
+.qrcolor { display: flex; flex-direction: column; gap: 6px; }
+.qrcolor .row { gap: 8px; }
+.qrcolor input[type=color] { width: 40px; height: 38px; padding: 3px; flex: none; cursor: pointer; }
+.qrcolor .hexbox { width: 110px; text-transform: uppercase; font-size: 13px; }
+.qrcolor .hexbox.bad { border-color: var(--danger); }
+.qrcolor.off { opacity: .45; }
+.qreye[hidden] { display: none; }
+.qrthemes { display: flex; flex-wrap: wrap; gap: 6px; }
+.qrsw { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--line); background: color-mix(in srgb, var(--panel2) 60%, transparent); border-radius: 999px; padding: 4px 12px 4px 5px; font-size: 12.5px; font-weight: 600; }
+.qrsw:hover { border-color: var(--line2); }
+.qrsw i { width: 18px; height: 18px; border-radius: 50%; background: var(--c); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .25); }
+.qrshape { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.qrshape .qrlabel { width: 60px; }
+.qrlogo { display: flex; flex-direction: column; gap: 12px; }
+.qrlogo p { margin: 0; }
+.qrlogothumb { width: 40px; height: 40px; object-fit: contain; border-radius: var(--r); border: 1px solid var(--line); background: #fff; padding: 3px; }
+.qrreset { align-self: flex-start; }
+.qrprev { position: sticky; top: 80px; display: flex; flex-direction: column; gap: 12px; }
+.qrart { aspect-ratio: 1; border-radius: var(--r); overflow: hidden; display: grid; place-items: center; background: #fff; border: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
+.qrart.clear { background: repeating-conic-gradient(var(--checker) 0 25%, transparent 0 50%) 0 0 / 16px 16px, var(--panel); }
+.qrart svg { display: block; width: 100%; height: 100%; }
+.qrempty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 24px; text-align: center; color: #6b6b6b; font-size: 13px; }
+.qrempty b { font-size: 40px; line-height: 1; font-weight: 400; }
+.qrstatus:empty, .qrmeta:empty { display: none; }
+.qrstatus .pill { display: inline-block; white-space: normal; }
+.qrmeta { display: flex; flex-direction: column; gap: 8px; }
+.qrtext { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+.qrnote { margin: 0; font-size: 12.5px; padding: 8px 10px; border-radius: var(--r); border: 1px solid var(--line); }
+.qrnote.warn { background: var(--warn-bg); color: var(--warn-ink); border-color: var(--warn-line); }
+.qrdl { display: flex; gap: 8px; }
+.qrdl > * { flex: 1; justify-content: center; }
+.qrpx { flex-direction: row; align-items: center; gap: 8px; font-weight: 500; }
+.qrpx .num { width: 84px; padding: 6px 8px; text-align: right; }
+.qrfoot { margin: 0; }
+@media (max-width: 860px) {
+  .qrgrid { grid-template-columns: minmax(0, 1fr); }
+  .qrprev { position: static; order: -1; }
+  .qrart { max-width: 340px; width: 100%; margin: 0 auto; }
+}
+@media (max-width: 600px) {
+  .dock button span:not(.di) { display: none; }
+  .dock button[aria-current="page"] span:not(.di) { display: inline; white-space: nowrap; }
+}

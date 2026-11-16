@@ -315,7 +315,8 @@
         responses[p.id] ? h('button', { class: 'answers' + (responses[p.id].unseen ? ' new' : ''), onclick: () => showResponses(church, p, reload) },
           '📥 ', plural(responses[p.id].total, 'connect card answer', 'connect card answers'),
           responses[p.id].unseen ? h('span', { class: 'pill ok' }, responses[p.id].unseen + ' new') : null) : null,
-        viewer ? (p.publishedAt ? h('div', { class: 'row wrap' }, h('a', { class: 'ghost btn', href: live, target: '_blank', rel: 'noopener' }, '↗ Live page')) : null) : h('div', { class: 'row wrap' },
+        viewer ? (p.publishedAt ? h('div', { class: 'row wrap' }, h('a', { class: 'ghost btn', href: live, target: '_blank', rel: 'noopener' }, '↗ Live page'),
+          h('button', { class: 'ghost', onclick: () => openQr(p) }, '▦ QR code')) : null) : h('div', { class: 'row wrap' },
           h('a', { class: 'primary btn', href: 'editor.html?church=' + enc(church.id) + '&page=' + enc(p.id) }, '✎ Edit'),
           p.publishedAt ? h('a', { class: 'ghost btn', href: live, target: '_blank', rel: 'noopener' }, '↗ Live page') : null,
           h('button', { class: 'ghost wideonly', title: 'Paste this into your website once. After that, Publish updates it.', onclick: () => copy(code, 'Install code copied. Paste it into your site once.') }, '📋 Install code'),
@@ -326,6 +327,7 @@
               h('button', { class: 'phoneonly', onclick: () => copy(code, 'Install code copied. Paste it into your site once.') }, '📋 Copy install code'),
               h('button', { class: 'phoneonly', onclick: () => { location.hash = church.id + '/' + p.id; } }, '⚙ Settings'),
               h('button', { onclick: () => copy(live, 'Link copied. Use it for QR codes and tap tags.') }, 'Copy live link'),
+              h('button', { onclick: () => openQr(p) }, '▦ QR code'),
               h('button', { onclick: act(async () => {
                 const v = await ask('Rename page', [{ k: 'name', l: 'Page name', value: p.name, max: 80 }], 'Rename', 'The page’s link stays the same.');
                 if (!v) return;
@@ -428,14 +430,16 @@
       }) }, 'Delete church')) : null];
 
     // Overview / Pages / People, switched by the glass dock at the bottom. The last one picked is remembered.
-    const tabs = [['overview', 'Overview', '◎'], ['pages', 'Pages', '▤'], viewer ? null : ['people', 'People', '☺']].filter(Boolean);
+    const tabs = [['overview', 'Overview', '◎'], ['pages', 'Pages', '▤'], ['qr', 'QR codes', '⊞'], viewer ? null : ['people', 'People', '☺']].filter(Boolean);
+    // A page's ••• → QR code opens the QR codes view set to that page.
+    const openQr = (p) => { qrWhat[church.id] = Object.assign(qrWhat[church.id] || { url: '', email: '', subject: '', phone: '', text: '' }, { kind: 'page', page: p.id }); showTab('qr'); window.scrollTo(0, 0); };
     let tab = store.get('doorstep-church-tab');
     if (!tabs.some((t) => t[0] === tab)) tab = 'overview';
     const view = h('div', { class: 'gview' });
     const dock = h('nav', { class: 'dock glass', 'aria-label': 'Church views' });
     const showTab = (t) => {
       tab = t; store.set('doorstep-church-tab', t);
-      fill(view, t === 'pages' ? pagesView() : t === 'people' ? peopleView() : overview(church, pages, allStats, { viewer, responses, reload, go: showTab }));
+      fill(view, t === 'pages' ? pagesView() : t === 'people' ? peopleView() : t === 'qr' ? qrMaker(church, pages) : overview(church, pages, allStats, { viewer, responses, reload, go: showTab }));
       view.querySelectorAll(':scope > *, .ovgrid > *').forEach((el, i) => { el.classList.add('reveal'); el.style.setProperty('--i', i); });
       dock.querySelectorAll('button[data-tab]').forEach((b) => b.setAttribute('aria-current', b.dataset.tab === t ? 'page' : 'false'));
     };
@@ -611,6 +615,230 @@
     };
     draw();
     return wrap;
+  }
+
+  // ── QR codes: static codes for a page or any link, made in this browser ──
+  // The link itself goes in the code (nothing in between), so a printed code keeps working whatever happens
+  // to DoorStep. The look is remembered per church in this browser; what it opens is kept while the portal is open.
+  const QR0 = { fg: '#111111', bg: '#ffffff', eye: '#111111', eyeSame: true, clear: false, dots: 'square', corners: 'square', margin: 4, logo: null, logoSize: 22, logoBack: true, px: 1200 };
+  const QR_THEMES = [['Classic', '#111111'], ['Orange', '#cc4410'], ['Green', '#15784f'], ['Navy', '#1e2a4a'], ['Plum', '#5b2a6e']];
+  const qrWhat = {}; // per church: { kind, page, url, email, subject, phone, text }
+  const slug = (s) => String(s || 'qr-code').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 50) || 'qr-code';
+  function download(blob, name) {
+    const a = h('a', { href: URL.createObjectURL(blob), download: name });
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  }
+  // A logo picked from the computer, shrunk to at most 600px (SVG logos stay as they are if small).
+  function readLogo(file) {
+    return new Promise((resolve, reject) => {
+      if (!file || !/^image\//.test(file.type)) return reject(new Error('Pick a picture file (PNG, JPG or SVG).'));
+      const fr = new FileReader();
+      fr.onerror = () => reject(new Error('Could not read that file.'));
+      fr.onload = () => {
+        const img = new Image();
+        img.onerror = () => reject(new Error('Could not open that picture.'));
+        img.onload = () => {
+          const w = img.naturalWidth || 300, hh = img.naturalHeight || 300;
+          if (file.type === 'image/svg+xml' && fr.result.length < 150000) return resolve({ src: fr.result, w, h: hh });
+          const k = Math.min(1, 600 / Math.max(w, hh));
+          const cv = h('canvas', { width: Math.round(w * k), height: Math.round(hh * k) });
+          cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+          resolve({ src: cv.toDataURL('image/png'), w: cv.width, h: cv.height });
+        };
+        img.src = fr.result;
+      };
+      fr.readAsDataURL(file);
+    });
+  }
+
+  function qrMaker(church, pages) {
+    const KEY = 'doorstep-qr-' + church.id;
+    let st;
+    try { st = Object.assign({}, QR0, JSON.parse(store.get(KEY) || '{}')); } catch (e) { st = Object.assign({}, QR0); }
+    const live = pages.filter((p) => p.publishedAt);
+    const w = qrWhat[church.id] || (qrWhat[church.id] = { kind: 'page', page: (live[0] || pages[0] || {}).id || '', url: '', email: '', subject: '', phone: '', text: '' });
+    if (w.kind === 'page' && !pages.length) w.kind = 'url';
+    const pageUrl = (id) => location.origin + '/view/' + church.id + '/' + id;
+    const save = () => { const keep = Object.assign({}, st); try { localStorage.setItem(KEY, JSON.stringify(keep)); } catch (e) { delete keep.logo; store.set(KEY, JSON.stringify(keep)); } };
+
+    // What the code opens, as the text that goes in it.
+    function content() {
+      if (w.kind === 'page') return w.page ? pageUrl(w.page) : '';
+      if (w.kind === 'url') { const u = w.url.trim(); return !u ? '' : /^[a-z][a-z0-9+.-]*:/i.test(u) ? u : 'https://' + u; }
+      if (w.kind === 'email') return w.email.trim() ? 'mailto:' + w.email.trim() + (w.subject.trim() ? '?subject=' + enc(w.subject.trim()) : '') : '';
+      if (w.kind === 'phone') { const p = w.phone.replace(/[^\d+]/g, ''); return p ? 'tel:' + p : ''; }
+      return w.text;
+    }
+    function fileName() {
+      const p = pages.find((x) => x.id === w.page);
+      if (w.kind === 'page' && p) return 'qr-' + slug(p.name);
+      if (w.kind === 'url') return 'qr-' + slug(w.url.replace(/^https?:\/\/(www\.)?/i, ''));
+      return 'qr-' + slug(church.name + ' ' + w.kind);
+    }
+    const opts = () => ({ text: content(), fg: st.fg, bg: st.clear ? null : st.bg, eye: st.eyeSame ? st.fg : st.eye, dots: st.dots, corners: st.corners, margin: st.margin,
+      logo: st.logo, logoSize: st.logoSize / 100, logoBack: st.logoBack });
+
+    // ── Inputs ──
+    const seg = (choices, cur, pick, label) => {
+      const g = h('div', { class: 'seg', role: 'group', 'aria-label': label });
+      const sync = (v) => g.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === v)));
+      choices.forEach(([v, l]) => g.append(h('button', { type: 'button', 'data-v': v, onclick: () => { sync(v); pick(v); } }, l)));
+      sync(cur);
+      return g;
+    };
+    const colorField = (label, key, after) => {
+      const pick = h('input', { type: 'color', value: st[key], 'aria-label': label + ' (picker)' });
+      const txt = h('input', { type: 'text', class: 'mono hexbox', value: st[key].toUpperCase(), maxlength: 7, spellcheck: false, 'aria-label': label + ' (hex)' });
+      const set = (v) => { st[key] = v; pick.value = v; if (document.activeElement !== txt) txt.value = v.toUpperCase(); if (after) after(); changed(); };
+      pick.oninput = () => set(pick.value);
+      txt.oninput = () => { const v = DSQR.hex(txt.value); txt.classList.toggle('bad', !v); if (v) set(v); };
+      txt.onblur = () => { txt.value = st[key].toUpperCase(); txt.classList.remove('bad'); };
+      const el = h('div', { class: 'qrcolor' }, h('span', { class: 'qrlabel' }, label), h('span', { class: 'row' }, pick, txt));
+      el.setValue = (v) => { st[key] = v; pick.value = v; txt.value = v.toUpperCase(); };
+      return el;
+    };
+    const numRange = (label, key, lo, hi, unit) => {
+      const range = h('input', { type: 'range', min: lo, max: hi, step: 1, value: st[key], 'aria-label': label });
+      const num = h('input', { type: 'number', min: lo, max: hi, step: 1, class: 'num', value: st[key], 'aria-label': label + ' (' + unit + ')' });
+      range.oninput = () => { st[key] = +range.value; num.value = range.value; changed(); };
+      num.onchange = () => { st[key] = clampN(num.value, lo, hi, st[key]); num.value = range.value = st[key]; changed(); };
+      return h('label', { class: 'grange' }, h('span', { class: 'row' }, h('span', { class: 'grow' }, label), num, h('span', { class: 'muted small unit' }, unit)), range);
+    };
+    const field = (label, key, attrs) => h('label', null, label, h('input', Object.assign({ value: w[key], oninput: (e) => { w[key] = e.target.value; changed(); } }, attrs)));
+
+    const whatBox = h('div', { class: 'qrwhat' });
+    const kinds = [pages.length ? ['page', 'Your page'] : null, ['url', 'Web address'], ['email', 'Email'], ['phone', 'Phone'], ['text', 'Text']].filter(Boolean);
+    function drawWhat() {
+      const p = pages.find((x) => x.id === w.page);
+      fill(whatBox,
+        w.kind === 'page' ? [
+          h('label', null, 'Page', h('select', { onchange: (e) => { w.page = e.target.value; drawWhat(); changed(); } },
+            pages.map((x) => h('option', { value: x.id, selected: x.id === w.page }, x.name + (x.publishedAt ? '' : ' (not published yet)'))))),
+          p && !p.publishedAt ? h('p', { class: 'qrnote warn' }, 'This page isn’t published yet. The code will open it once you publish.') : null,
+          h('p', { class: 'muted small' }, 'Opens the page’s live link. If the page is on your website, you can use that address instead under ', h('button', { type: 'button', class: 'textbtn', onclick: () => { w.kind = 'url'; drawAll(); } }, 'Web address'), '.')]
+        : w.kind === 'url' ? field('Web address', 'url', { type: 'url', placeholder: 'yourchurch.org/welcome', autocomplete: 'off', spellcheck: false })
+        : w.kind === 'email' ? [field('Email address', 'email', { type: 'email', placeholder: 'office@yourchurch.org' }), field('Subject (optional)', 'subject', { placeholder: 'Prayer request' })]
+        : w.kind === 'phone' ? field('Phone number', 'phone', { type: 'tel', placeholder: '+1 555 123 4567' })
+        : h('label', null, 'Text', h('textarea', { rows: 3, maxlength: 1000, oninput: (e) => { w.text = e.target.value; changed(); } }, w.text)));
+    }
+
+    const eyeField = colorField('Corner squares', 'eye');
+    const fgField = colorField('Dots', 'fg', () => { if (st.eyeSame) eyeField.setValue(st.fg); });
+    const bgField = colorField('Background', 'bg');
+    const eyeRow = h('div', { class: 'qreye' }, eyeField);
+    const syncEye = () => { eyeRow.hidden = st.eyeSame; bgField.classList.toggle('off', st.clear); };
+    const themes = h('div', { class: 'qrthemes' }, QR_THEMES.map(([name, c]) => h('button', { type: 'button', class: 'qrsw', title: name, 'aria-label': name + ' (' + c + ')', style: '--c:' + c,
+      onclick: () => { st.fg = c; fgField.setValue(c); if (st.eyeSame) eyeField.setValue(c); changed(); } }, h('i'), name)));
+
+    const logoIn = h('input', { type: 'file', accept: 'image/png,image/jpeg,image/svg+xml,image/webp,image/gif', hidden: true, onchange: act(async () => {
+      const f = logoIn.files[0]; logoIn.value = '';
+      if (!f) return;
+      st.logo = await readLogo(f); drawLogo(); changed();
+    }) });
+    const logoBox = h('div', { class: 'qrlogo' });
+    function drawLogo() {
+      fill(logoBox,
+        h('div', { class: 'row wrap' },
+          st.logo ? h('img', { class: 'qrlogothumb', src: st.logo.src, alt: 'Logo' }) : null,
+          h('button', { type: 'button', class: 'ghost sm', onclick: () => logoIn.click() }, st.logo ? 'Change logo' : '+ Add a logo'),
+          st.logo ? h('button', { type: 'button', class: 'ghost sm danger', onclick: () => { st.logo = null; drawLogo(); changed(); } }, 'Remove') : null),
+        st.logo ? [numRange('Logo size', 'logoSize', 10, 30, '%'),
+          h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: st.logoBack, onchange: (e) => { st.logoBack = e.target.checked; changed(); } }), 'Clear the dots behind the logo')]
+          : h('p', { class: 'muted small' }, 'Goes in the middle. Codes with a logo use extra error correction so they still scan.'),
+        logoIn);
+    }
+
+    const settings = h('div', { class: 'qrside' },
+      h('section', { class: 'card qrsec' },
+        h('h2', null, 'What it opens'),
+        seg(kinds, w.kind, (v) => { w.kind = v; drawWhat(); changed(); }, 'What the code opens'),
+        whatBox),
+      h('section', { class: 'card qrsec' },
+        h('h2', null, 'Colors'),
+        themes,
+        h('div', { class: 'qrcolors' }, fgField, bgField),
+        h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: st.clear, onchange: (e) => { st.clear = e.target.checked; syncEye(); changed(); } }), 'See-through background'),
+        h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !st.eyeSame, onchange: (e) => { st.eyeSame = !e.target.checked; if (st.eyeSame) eyeField.setValue(st.fg); syncEye(); changed(); } }), 'Different color for the corner squares'),
+        eyeRow),
+      h('section', { class: 'card qrsec' },
+        h('h2', null, 'Shape'),
+        h('div', { class: 'qrshape' }, h('span', { class: 'qrlabel' }, 'Dots'), seg([['square', 'Squares'], ['rounded', 'Rounded'], ['dots', 'Dots']], st.dots, (v) => { st.dots = v; changed(); }, 'Dot shape')),
+        h('div', { class: 'qrshape' }, h('span', { class: 'qrlabel' }, 'Corners'), seg([['square', 'Square'], ['rounded', 'Rounded'], ['round', 'Round']], st.corners, (v) => { st.corners = v; changed(); }, 'Corner shape')),
+        numRange('Border', 'margin', 0, 8, 'dots')),
+      h('section', { class: 'card qrsec' }, h('h2', null, 'Logo'), logoBox),
+      h('button', { type: 'button', class: 'textbtn qrreset', onclick: () => { const lg = st.logo; st = Object.assign({}, QR0, { logo: lg }); save(); drawAll(); } }, 'Reset colors and shape'));
+
+    // ── Preview and downloads ──
+    const art = h('div', { class: 'qrart' });
+    const meta = h('div', { class: 'qrmeta' });
+    const status = h('div', { class: 'qrstatus', role: 'status' });
+    const pxNum = h('input', { type: 'number', min: 200, max: 4000, step: 100, class: 'num', value: st.px, 'aria-label': 'PNG size in pixels',
+      onchange: () => { st.px = clampN(pxNum.value, 200, 4000, st.px); pxNum.value = st.px; save(); } });
+    let ok = false;
+    const need = () => { if (!ok) { toast('Fill in what the code opens first.'); return false; } return true; };
+    const dlPng = h('button', { type: 'button', class: 'primary', onclick: act(async () => { if (need()) download(await DSQR.png(opts(), st.px), fileName() + '.png'); }) }, '⬇ PNG');
+    const dlSvg = h('button', { type: 'button', class: 'ghost', title: 'Sharp at any size: best for printing', onclick: () => { if (need()) download(new Blob([DSQR.svg(opts(), st.px).svg], { type: 'image/svg+xml' }), fileName() + '.svg'); } }, '⬇ SVG');
+    const cpImg = window.ClipboardItem && navigator.clipboard && navigator.clipboard.write ? h('button', { type: 'button', class: 'ghost', title: 'Copy the picture to paste into a bulletin or slide', onclick: act(async () => {
+      if (!need()) return;
+      try { await navigator.clipboard.write([new ClipboardItem({ 'image/png': DSQR.png(opts(), st.px) })]); toast('QR code copied. Paste it into your bulletin or slides.'); }
+      catch (e) { toast('Your browser wouldn’t copy the picture. Download it instead.'); }
+    }) }, 'Copy') : null;
+    const preview = h('aside', { class: 'card qrprev' },
+      art, status, meta,
+      h('div', { class: 'qrdl' }, dlPng, dlSvg, cpImg),
+      h('label', { class: 'qrpx' }, h('span', { class: 'grow' }, 'PNG size'), pxNum, h('span', { class: 'muted small' }, 'px')),
+      h('p', { class: 'muted small qrfoot' }, 'Static code: the address is in the code itself, so it keeps working forever, with no account or subscription.'));
+
+    let t1, t2, gen = 0;
+    function changed() { save(); clearTimeout(t1); t1 = setTimeout(redraw, 60); }
+    function redraw() {
+      const o = opts();
+      const my = ++gen;
+      clearTimeout(t2);
+      art.classList.toggle('clear', st.clear);
+      if (!o.text) {
+        ok = false;
+        fill(art, h('div', { class: 'qrempty' }, h('b', { 'aria-hidden': 'true' }, '▦'), h('span', null, 'Fill in what the code opens to see it here.')));
+        fill(status); fill(meta);
+        return;
+      }
+      let r;
+      try { r = DSQR.svg(o); }
+      catch (e) {
+        ok = false;
+        fill(art, h('div', { class: 'qrempty' }, h('b', { 'aria-hidden': 'true' }, '!'), h('span', null, 'That’s too much to fit in a QR code. Try a shorter link or less text.')));
+        fill(status); fill(meta);
+        return;
+      }
+      ok = true;
+      art.innerHTML = r.svg;
+      // Things that make codes hard to scan, worst first.
+      const warn = [];
+      const bgc = st.clear ? '#ffffff' : st.bg;
+      const c1 = DSQR.contrast(st.fg, bgc), c2 = DSQR.contrast(o.eye, bgc);
+      if (DSQR.lum(st.fg) > DSQR.lum(bgc)) warn.push('The dots are lighter than the background. Many phones can’t read codes like that.');
+      else if (Math.min(c1, c2) < 3) warn.push('The colors are close together. Use darker dots or a lighter background.');
+      if (st.clear && DSQR.lum(st.fg) > 0.4) warn.push('See-through codes need dark dots and a light place to sit.');
+      if (st.margin < 2) warn.push('A border of at least 2 dots helps phones find the code.');
+      if (r.version > 10) warn.push('Lots of tiny dots. A shorter link makes a code that scans more easily from afar.');
+      fill(meta,
+        h('div', { class: 'mono qrtext', title: o.text }, o.text),
+        warn.map((x) => h('p', { class: 'qrnote warn' }, x)));
+      fill(status, h('span', { class: 'muted small' }, 'Checking it scans…'));
+      t2 = setTimeout(async () => {
+        const res = await DSQR.check(o).catch(() => null);
+        if (my !== gen) return;
+        fill(status, res === true ? h('span', { class: 'pill ok' }, '✓ Scans') : res === false ? h('span', { class: 'pill bad' }, '⚠ Didn’t scan in our check. Try a smaller logo or stronger colors.') : null);
+      }, 350);
+    }
+    function drawAll() {
+      const fresh = qrMaker(church, pages);
+      root.replaceWith(fresh);
+    }
+    const root = h('div', { class: 'qrmaker' }, h('div', { class: 'head flat qrhead' }, h('h2', null, 'QR codes'), h('span', { class: 'muted small' }, 'Make a code for a page or any link, then download it for print.')), h('div', { class: 'qrgrid' }, settings, preview));
+    drawWhat(); drawLogo(); syncEye(); redraw();
+    return root;
   }
 
   // ── New page: pick a template (previews side by side) or start from scratch ──
