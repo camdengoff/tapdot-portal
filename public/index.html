@@ -220,6 +220,65 @@ footer a { color: var(--muted); }
 
 @media (max-width: 560px) { .wrap { padding: 0 16px; } section { padding: 64px 0; } .step, .cell { padding: 20px; } }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+/* ── Glass look (matches the portal's church screens) ─────────────────
+   Soft orange and green circles sit behind the whole page; cards, the top bar and the stats
+   picture are see-through glass over them. Sections are transparent so the circles show. */
+:root { --gl-hi: #ffffff; --gl-shadow: rgba(60, 30, 10, .16); --gl-a: rgba(255, 94, 31, .34); --gl-b: rgba(21, 120, 79, .22); --gl-c: rgba(255, 170, 110, .32); --gl-op: 55%; --gl-blur: 22px; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --gl-hi: rgba(255,255,255,.26); --gl-shadow: rgba(0,0,0,.55); --gl-a: rgba(255, 94, 31, .26); --gl-b: rgba(79, 209, 151, .14); --gl-c: rgba(204, 68, 16, .26); } }
+:root[data-theme="dark"] { --gl-hi: rgba(255,255,255,.26); --gl-shadow: rgba(0,0,0,.55); --gl-a: rgba(255, 94, 31, .26); --gl-b: rgba(79, 209, 151, .14); --gl-c: rgba(204, 68, 16, .26); }
+body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(circle at 10% 18%, var(--gl-a) 0 16vmax, transparent 16.3vmax),
+    radial-gradient(circle at 38% 2%, var(--gl-b) 0 6vmax, transparent 6.2vmax),
+    radial-gradient(circle at 94% 38%, var(--gl-c) 0 12vmax, transparent 12.3vmax),
+    radial-gradient(circle at 74% 96%, var(--gl-b) 0 15vmax, transparent 15.3vmax),
+    radial-gradient(circle at 44% 64%, var(--gl-a) 0 4.5vmax, transparent 4.7vmax),
+    radial-gradient(var(--grid-dot) 1px, transparent 1.2px) 0 0 / 22px 22px; }
+.hero { background-image: none; }
+section { border-bottom-color: color-mix(in srgb, var(--line) 50%, transparent); }
+.glass, header, .step, .cell, .tag, .panel, .end .card {
+  background: color-mix(in srgb, var(--panel) var(--gl-op), transparent);
+  -webkit-backdrop-filter: blur(var(--gl-blur)) saturate(1.2); backdrop-filter: blur(var(--gl-blur)) saturate(1.2);
+  border: 1px solid color-mix(in srgb, var(--gl-hi) 30%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--gl-hi) 60%, transparent), 0 20px 52px -25px var(--gl-shadow); }
+header { border-width: 0 0 1px; border-bottom-color: color-mix(in srgb, var(--line) 60%, transparent); box-shadow: none; }
+.steps, .grid { gap: 16px; background: none; border: 0; border-radius: 0; overflow: visible; }
+.step, .cell { border-radius: var(--r); min-width: 0; }
+.code { background: color-mix(in srgb, var(--panel2) 60%, transparent); }
+.btn.ghost { background: color-mix(in srgb, var(--panel) 60%, transparent); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+.tabs button { background: color-mix(in srgb, var(--panel) 60%, transparent); }
+.end { background: none; }
+.end .card { max-width: 820px; margin: 0 auto; padding: 56px 32px; border-radius: 6px; }
+@media (max-width: 560px) { .end .card { padding: 40px 20px; } }
+.panel { box-shadow: inset 0 1px 0 color-mix(in srgb, var(--gl-hi) 60%, transparent), 0 40px 80px -30px rgba(0,0,0,.35), 0 12px 24px -12px rgba(0,0,0,.18); }
+.chrome { background: color-mix(in srgb, var(--panel2) 50%, transparent); border-bottom-color: color-mix(in srgb, var(--line) 60%, transparent); }
+.chrome span { background: color-mix(in srgb, var(--panel) 60%, transparent); }
+.panel-h { border-bottom-color: color-mix(in srgb, var(--line) 60%, transparent); }
+
+/* Stats picture: a small copy of the portal's Overview */
+.ov { display: grid; grid-template-columns: auto 1fr; gap: 6px 18px; align-items: end; }
+.ov small { color: var(--muted); font-size: 12px; display: block; }
+.ov .big { font-size: 40px; font-weight: 500; letter-spacing: -.05em; line-height: 1; }
+.ov .up { color: var(--ok); font-weight: 700; font-size: 12.5px; }
+.ov .leg { display: flex; gap: 16px; justify-content: flex-end; font-size: 12px; color: var(--muted); }
+.ov .leg i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); margin-right: 6px; }
+.ov .leg span + span i { background: var(--muted); opacity: .6; }
+.seg { display: inline-flex; padding: 3px; gap: 2px; border-radius: 99px; border: 1px solid color-mix(in srgb, var(--line) 70%, transparent); background: color-mix(in srgb, var(--panel2) 60%, transparent); font-size: 11px; font-weight: 600; color: var(--muted); }
+.seg span { padding: 3px 9px; border-radius: 99px; }
+.seg span.on { background: var(--panel); color: var(--text); box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+.lc { display: block; width: 100%; height: 120px; margin: 14px 0 4px; overflow: visible; }
+.lc .g { stroke: var(--text); opacity: .1; stroke-dasharray: 3 5; vector-effect: non-scaling-stroke; }
+.lc .v, .lc .t { fill: none; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.lc .v { stroke: var(--accent); stroke-width: 2.4; }
+.lc .t { stroke: var(--muted); stroke-opacity: .6; stroke-width: 1.8; }
+.lc stop { stop-color: var(--accent); }
+.otops { margin-top: 14px; display: grid; gap: 9px; font-size: 13px; }
+.otops div { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; }
+.otops b { font-weight: 600; }
+.otops em { font-style: normal; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.otops i { grid-column: 1 / -1; height: 5px; border-radius: 99px; background: color-mix(in srgb, var(--line) 80%, transparent); overflow: hidden; }
+.otops i::before { content: ''; display: block; height: 100%; width: var(--p); border-radius: inherit; background: linear-gradient(90deg, var(--green), color-mix(in srgb, var(--green) 60%, var(--accent))); }
 </style>
 <script>
 // iPhone and iPad browsers (all WebKit, Chrome included) leave a page inside an iframe blank when
@@ -305,7 +364,7 @@ if (/iP(hone|od|ad)/.test(navigator.userAgent) || (navigator.platform === 'MacIn
       <div>
         <span class="mono">Tap stats</span>
         <h2>Know what people actually tap.</h2>
-        <p class="lead">Every page shows its visits, taps and most-used buttons, with a chart for the last two weeks. You can tell which Sunday was busy and whether anyone found the giving button.</p>
+        <p class="lead">Your Overview shows visits and taps across all your pages, how they compare with the weeks before, and the buttons people use most. You can tell which Sunday was busy and whether anyone found the giving button.</p>
         <ul class="ticks">
           <li>No cookies and no tracking banners. A refresh within 30 minutes isn’t counted twice.</li>
           <li>Give your pastor or board a read-only stats link, with no sign-in needed.</li>
@@ -314,21 +373,27 @@ if (/iP(hone|od|ad)/.test(navigator.userAgent) || (navigator.platform === 'MacIn
       </div>
       <div class="vis">
         <div class="panel" role="img" aria-label="Example of DoorStep's stats: visits, taps and top buttons">
-          <div class="chrome" aria-hidden="true"><i></i><i></i><i></i><span>doorstep · stats</span></div>
-          <div class="panel-h">📊 Welcome page <span class="pill">Example</span></div>
+          <div class="chrome" aria-hidden="true"><i></i><i></i><i></i><span>doorstep · overview</span></div>
+          <div class="panel-h">◎ Overview <span class="pill">Example</span></div>
           <div class="panel-b">
-            <div class="nums">
-              <div class="num"><small>Visits</small><b>312</b></div>
-              <div class="num"><small>Taps</small><b>187</b></div>
-              <div class="num"><small>On Sundays</small><b>56%</b></div>
+            <div class="ov">
+              <div><small>Visits · last 14 days</small><span class="big">312</span></div>
+              <div class="leg"><span><i></i>Visits</span><span><i></i>Taps</span></div>
+              <span class="up">+18% <span style="color:var(--muted);font-weight:400">vs the 2 weeks before</span></span>
+              <div style="text-align:right"><span class="seg"><span>Week</span><span class="on">2 weeks</span><span>Month</span></span></div>
             </div>
-            <div class="bars" aria-hidden="true"><i style="height:14%"></i><i style="height:22%"></i><i style="height:10%"></i><i style="height:18%"></i><i style="height:12%"></i><i style="height:9%"></i><i class="sun" style="height:74%"></i><i style="height:16%"></i><i style="height:25%"></i><i style="height:13%"></i><i style="height:20%"></i><i style="height:11%"></i><i style="height:15%"></i><i class="sun" style="height:92%"></i></div>
+            <svg class="lc" viewBox="0 0 600 120" preserveAspectRatio="none" aria-hidden="true">
+              <defs><linearGradient id="lcg" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-opacity=".28"/><stop offset="1" stop-opacity="0"/></linearGradient></defs>
+              <path class="g" d="M0 10 H600"/><path class="g" d="M0 62 H600"/><path class="g" d="M0 115 H600"/>
+              <path d="M0 120 L0 100.3 L46 91.9 L92 104.5 L138 96.1 L185 102.4 L231 105.5 L277 37.3 L323 98.2 L369 88.8 L415 101.3 L462 94.0 L508 103.5 L554 99.2 L600 18.4 L600 120 Z" fill="url(#lcg)"/>
+              <polyline class="t" points="0,108.7 46,105.5 92,110.8 138,106.6 185,109.8 231,111.8 277,72.0 323,107.7 369,102.4 415,109.8 462,105.5 508,110.8 554,107.7 600,60.4"/>
+              <polyline class="v" points="0,100.3 46,91.9 92,104.5 138,96.1 185,102.4 231,105.5 277,37.3 323,98.2 369,88.8 415,101.3 462,94.0 508,103.5 554,99.2 600,18.4"/>
+            </svg>
             <div class="legend"><span>2 weeks ago</span><span>Today</span></div>
-            <div class="tops">
-              <div><span style="--p:100%">Plan a visit</span><em>34</em></div>
-              <div><span style="--p:71%">Connect card</span><em>24</em></div>
-              <div><span style="--p:53%">Give</span><em>18</em></div>
-              <div><span style="--p:35%">Invite a friend</span><em>12</em></div>
+            <div class="otops">
+              <div><b>Plan a visit</b><em>34</em><i style="--p:100%"></i></div>
+              <div><b>Connect card</b><em>24</em><i style="--p:71%"></i></div>
+              <div><b>Give</b><em>18</em><i style="--p:53%"></i></div>
             </div>
           </div>
         </div>
@@ -425,11 +490,13 @@ if (/iP(hone|od|ad)/.test(navigator.userAgent) || (navigator.platform === 'MacIn
 
 <section class="end">
   <div class="wrap">
+    <div class="card">
     <h2>Give every tag in your building somewhere good to go.</h2>
     <p class="lead">DoorStep is set up for each church by hand right now. If your church already has an account, sign in to build and publish your pages.</p>
     <div class="cta">
       <a class="btn primary" href="/app/">Sign in</a>
       <a class="btn ghost" href="#features">Back to features</a>
+    </div>
     </div>
   </div>
 </section>
