@@ -423,3 +423,7 @@ a.arow:hover { background: var(--tint); }
   .settings .row.wrap > * { flex: 1; justify-content: center; }
 }
 @keyframes sheetUp { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+a.note.block { display: block; text-decoration: none; color: var(--text); }
+.twostep { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 10px; }
+.twostep p { margin: 0; }
+.twostep .pill { margin-right: 6px; }

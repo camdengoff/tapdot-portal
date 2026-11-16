@@ -24,6 +24,14 @@ every Publish updates the live page.
   more admins on the Admin screen (D1 `admins`), who can do everything except manage admins or change
   another admin's account. In a church, owners add and remove people; editors create, edit and publish
   pages; Stats only members see tap stats.
+- **Admin sign-in (separate):** admin powers come only from the admin sign-in page at `/admin/` (not
+  linked from anywhere; `server/adminauth.js`). The regular sign-in never makes anyone an admin. Step 1 is
+  a password or Google; step 2 is a 6-digit code from an authenticator app (or a one-time recovery code).
+  Codes can't be reused; failed tries are limited (5 per email per 30 minutes, 10 per IP address per
+  hour) and listed on the Activity tab; admin sessions (cookie `td_admin`, SameSite=Strict) end after 30
+  idle minutes or 8 hours. Adding the authenticator the first time needs Google (main admins), the
+  `SETUP_KEY` secret (main admins), or a one-time setup code a main admin makes for that admin. Making or
+  removing admins and resetting someone's authenticator also need a fresh code.
 - **Admin screen (admins):** 🛡 Admin in the portal's top bar (`/app/#admin`, API in `server/admin.js`).
   People: every account with its churches, roles, sign-in methods and last sign-in; search and filter;
   add a person (to a church and/or as admin, with a password link); per person: password link (reset),
@@ -78,8 +86,8 @@ every Publish updates the live page.
 5. Pages project → Settings → Variables and secrets (Production):
    - `ADMIN_EMAILS`: your email (comma-separate several).
    - `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` (secrets): from Google, below.
-   - `SETUP_KEY` (secret, optional): lets an admin set a password before Google is set up, from
-     "First-time admin setup" on the sign-in page. Delete it once you have signed in.
+   - `SETUP_KEY` (secret, optional): on the admin sign-in page, lets a main admin set a password and add
+     their authenticator app (or replace a lost one). Delete it once you're set up.
 6. Pages project → Custom domains: add `doorstep.camdengoff.com`.
 7. Deployments → Retry the latest deployment so the settings take effect, then open
    `https://doorstep.camdengoff.com/app/`.

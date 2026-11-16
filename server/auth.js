@@ -45,13 +45,19 @@ export async function isDisabled(d, email) {
   return !!(await one(d, 'SELECT 1 FROM account_info WHERE email = ? AND disabled_at IS NOT NULL', normEmail(email)));
 }
 
-// Someone may sign in if they are an admin or belong to at least one church, and an admin hasn't
-// turned their account off. Main admins can never be turned off (so nobody gets locked out).
+// The regular sign-in (/app/login.html) is for church members only: being an admin never helps
+// there, and never gives admin powers. Admin powers come only from the separate admin sign-in
+// (adminauth.js: password or Google, plus a code from an authenticator app). An account an admin
+// turned off can't use either. Main admins can never be turned off (so nobody gets locked out).
 export async function mayUsePortal(d, env, email) {
+  if (!isMainAdmin(env, email) && (await isDisabled(d, email))) return false;
+  return !!(await one(d, 'SELECT 1 FROM members WHERE email = ? LIMIT 1', email));
+}
+// Has any way in at all: a church, or admin (through the admin sign-in).
+export async function hasAnyAccess(d, env, email) {
   if (isMainAdmin(env, email)) return true;
   if (await isDisabled(d, email)) return false;
-  if (await isAdmin(d, env, email)) return true;
-  return !!(await one(d, 'SELECT 1 FROM members WHERE email = ? LIMIT 1', email));
+  return (await isAdmin(d, env, email)) || !!(await one(d, 'SELECT 1 FROM members WHERE email = ? LIMIT 1', email));
 }
 const OFF = 'This account has been turned off. Ask your DoorStep admin.';
 
@@ -65,11 +71,17 @@ export async function log(d, actor, action, target, detail, churchId) {
 
 // ── Sessions ───────────────────────────────────────────────────────────
 // The cookie holds a random token; the database only keeps its hash.
-function readCookie(request, name) {
+export function readCookie(request, name) {
   const m = new RegExp('(?:^|;\\s*)' + name + '=([^;]+)').exec(request.headers.get('Cookie') || '');
   return m ? m[1] : '';
 }
 export async function currentUser(d, env, request) {
+  // An admin session (from the admin sign-in) comes first; see adminauth.js.
+  const adminEmail = await adminSessionEmail(d, env, request);
+  if (adminEmail) {
+    const u = await one(d, 'SELECT email, name, pw_hash, google_sub FROM users WHERE email = ?', adminEmail);
+    if (u) return { email: u.email, name: u.name, hasPassword: !!u.pw_hash, hasGoogle: !!u.google_sub, admin: true, mainAdmin: isMainAdmin(env, u.email) };
+  }
   const token = readCookie(request, COOKIE);
   if (!/^[0-9a-f]{64}$/.test(token)) return null;
   const s = await one(d, 'SELECT email, expires_at FROM sessions WHERE id = ?', await sha256(token));
@@ -77,8 +89,48 @@ export async function currentUser(d, env, request) {
   if (!(await mayUsePortal(d, env, s.email))) return null;
   const u = await one(d, 'SELECT email, name, pw_hash, google_sub FROM users WHERE email = ?', s.email);
   if (!u) return null;
-  return { email: u.email, name: u.name, hasPassword: !!u.pw_hash, hasGoogle: !!u.google_sub, admin: await isAdmin(d, env, u.email), mainAdmin: isMainAdmin(env, u.email) };
+  return { email: u.email, name: u.name, hasPassword: !!u.pw_hash, hasGoogle: !!u.google_sub, admin: false, mainAdmin: false };
 }
+
+// ── Admin sessions (cookie td_admin) ───────────────────────────────────
+// Short: 30 minutes without activity, 8 hours at most. SameSite=Strict, so other sites can't use it.
+export const ADMIN_COOKIE = 'td_admin';
+export const ADMIN_IDLE = 30 * 60 * 1000;
+export const ADMIN_MAX = 8 * 3600 * 1000;
+async function adminSessionEmail(d, env, request) {
+  const token = readCookie(request, ADMIN_COOKIE);
+  if (!/^[0-9a-f]{64}$/.test(token)) return null;
+  const id = await sha256(token);
+  const s = await one(d, 'SELECT email, expires_at, last_seen FROM admin_sessions WHERE id = ?', id);
+  const t = Date.now();
+  if (!s || s.expires_at < t || s.last_seen + ADMIN_IDLE < t) {
+    if (s) await run(d, 'DELETE FROM admin_sessions WHERE id = ?', id);
+    return null;
+  }
+  // Still an admin, still has two-step sign-in, and not turned off?
+  if (!(await isAdmin(d, env, s.email)) || (!isMainAdmin(env, s.email) && (await isDisabled(d, s.email))) ||
+      !(await one(d, 'SELECT 1 FROM admin_2fa WHERE email = ?', s.email))) {
+    await run(d, 'DELETE FROM admin_sessions WHERE id = ?', id);
+    return null;
+  }
+  if (t - s.last_seen > 60000) await run(d, 'UPDATE admin_sessions SET last_seen = ? WHERE id = ?', t, id);
+  return s.email;
+}
+export async function startAdminSession(d, email, how) {
+  const token = randomHex(32);
+  const t = Date.now();
+  await run(d, 'DELETE FROM admin_sessions WHERE expires_at < ? OR last_seen < ?', t, t - ADMIN_IDLE);
+  await run(d, 'INSERT INTO admin_sessions (id, email, created_at, last_seen, expires_at) VALUES (?, ?, ?, ?, ?)', await sha256(token), email, t, t, t + ADMIN_MAX);
+  await run(d, 'INSERT INTO account_info (email, last_login_at, last_login_how) VALUES (?, ?, ?) ON CONFLICT (email) DO UPDATE SET last_login_at = excluded.last_login_at, last_login_how = excluded.last_login_how', email, new Date(t).toISOString(), 'admin');
+  await log(d, email, 'admin.signin', email, how);
+  return ADMIN_COOKIE + '=' + token + '; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=' + ADMIN_MAX / 1000;
+}
+export async function endAdminSession(d, request) {
+  const token = readCookie(request, ADMIN_COOKIE);
+  if (token) await run(d, 'DELETE FROM admin_sessions WHERE id = ?', await sha256(token));
+  return ADMIN_COOKIE + '=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0';
+}
+export { sha256, randomHex };
 // `how` (password, google, link, setup) marks a real sign-in: it's shown on the Admin screen.
 export async function startSession(d, email, how) {
   const token = randomHex(32);
@@ -128,6 +180,7 @@ export async function setPassword(d, email, password) {
   await run(d, 'UPDATE users SET pw_hash = ?, pw_salt = ? WHERE email = ?', hash, salt, email);
   // Signing out everywhere else is the safe default after a password change.
   await run(d, 'DELETE FROM sessions WHERE email = ?', email);
+  await run(d, 'DELETE FROM admin_sessions WHERE email = ?', email);
 }
 export async function verifyPassword(d, email, password) {
   const u = await one(d, 'SELECT pw_hash, pw_salt FROM users WHERE email = ?', email);
@@ -150,10 +203,12 @@ export async function useLink(d, env, token, password, name) {
   const email = await readLink(d, token);
   if (!email) throw new HttpError(400, 'This link has expired or was already used. Ask for a new one.');
   if (!isMainAdmin(env, email) && (await isDisabled(d, email))) throw new HttpError(403, OFF);
-  if (!(await mayUsePortal(d, env, email))) throw new HttpError(403, 'This email no longer has access to any church.');
+  if (!(await hasAnyAccess(d, env, email))) throw new HttpError(403, 'This email no longer has access to any church.');
   await setPassword(d, email, password);
   if (name) await run(d, 'UPDATE users SET name = ? WHERE email = ?', String(name).slice(0, 80), email);
   await run(d, 'DELETE FROM links WHERE email = ?', email);
+  // An admin with no church has nothing at the regular sign-in: they go on to the admin sign-in.
+  if (!(await mayUsePortal(d, env, email))) return null;
   return startSession(d, email, 'link');
 }
 
@@ -161,9 +216,11 @@ export async function useLink(d, env, token, password, name) {
 export const googleEnabled = (env) => !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
 const googleRedirect = (request) => new URL('/api/auth/google/callback', request.url).href;
 
-export function googleStart(env, request) {
+// `admin` = the admin sign-in page's Google button: the state starts with 'a', and the callback hands
+// the verified email to the admin sign-in (adminauth.js) instead of starting a regular session.
+export function googleStart(env, request, admin) {
   if (!googleEnabled(env)) throw new HttpError(404, 'Google sign-in is not set up.');
-  const state = randomHex(16);
+  const state = (admin ? 'a' : 'u') + randomHex(16);
   const u = new URL('https://accounts.google.com/o/oauth2/v2/auth');
   u.search = new URLSearchParams({
     client_id: env.GOOGLE_CLIENT_ID, redirect_uri: googleRedirect(request), response_type: 'code',
@@ -175,10 +232,10 @@ export function googleStart(env, request) {
   } });
 }
 
-export async function googleCallback(d, env, request) {
+export async function googleCallback(d, env, request, onAdmin) {
   const url = new URL(request.url);
   const back = (msg) => new Response(null, { status: 302, headers: {
-    Location: '/app/login.html#error=' + encodeURIComponent(msg),
+    Location: ((url.searchParams.get('state') || '')[0] === 'a' ? '/admin/#error=' : '/app/login.html#error=') + encodeURIComponent(msg),
     'Set-Cookie': 'td_gstate=; Path=/api/auth/google; Max-Age=0',
   } });
   if (!googleEnabled(env)) return back('Google sign-in is not set up.');
@@ -203,6 +260,13 @@ export async function googleCallback(d, env, request) {
   if (claims.aud !== env.GOOGLE_CLIENT_ID || !/^(https:\/\/)?accounts\.google\.com$/.test(claims.iss) || claims.exp * 1000 < Date.now()) return back('Google sign-in failed. Please try again.');
   if (!claims.email || claims.email_verified !== true) return back('Your Google account’s email is not verified.');
   const email = normEmail(claims.email);
+  if (state[0] === 'a') {
+    const u = await one(d, 'SELECT google_sub FROM users WHERE email = ?', email);
+    const sameGoogle = !(u && u.google_sub && u.google_sub !== claims.sub);
+    const res = await onAdmin(request, email, sameGoogle);
+    res.headers.append('Set-Cookie', 'td_gstate=; Path=/api/auth/google; Max-Age=0');
+    return res;
+  }
   if (!isMainAdmin(env, email) && (await isDisabled(d, email))) return back(OFF);
   if (!(await mayUsePortal(d, env, email))) return back(email + ' hasn’t been added to a church yet. Ask whoever runs your church’s pages to add you.');
   const u = await one(d, 'SELECT google_sub FROM users WHERE email = ?', email);

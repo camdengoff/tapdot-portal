@@ -16,13 +16,19 @@
 //   POST   people/<email>/signout         sign them out everywhere
 //   POST   people/<email>/remove-password the password stops working (Google or a new link still do)
 //   POST   people/<email>/unlink-google   a different Google account with this email can link next time
-//   PUT    people/<email>/admin           {admin: true|false} (main admins only)
+//   PUT    people/<email>/admin           {admin: true|false, code} (main admins only)
+//   POST   people/<email>/setup-code      {code} one-time code for an admin to set up their authenticator
+//   POST   people/<email>/reset-2fa       {code} turn an admin's authenticator off (+ a new setup code)
+//   POST   people/<email>/recovery        {code} new recovery codes (yourself only)
+// ({code} = a fresh code from the signed-in admin's own authenticator app.)
+// Signing in as an admin is separate: see adminauth.js.
 //   PUT    people/<email>/churches/<id>   {role} add to a church or change role
 //   DELETE people/<email>/churches/<id>   remove from a church
 //   GET    churches                       every church with page, people and publish counts
 //   GET    activity?before=<id>&q=<text>  the change log, newest first, 100 at a time
 import { HttpError, now, all, one, run, normEmail, isEmail, isSlug } from './db.js';
 import * as auth from './auth.js';
+import * as adminauth from './adminauth.js';
 
 const ROLES = ['owner', 'editor', 'viewer'];
 const KEEP_LOG_DAYS = 365;
@@ -88,21 +94,27 @@ export async function route({ d, env, request, user, parts, url, json, body }) {
   const M = request.method;
   const n = parts.length;
   const log = (action, target, detail, churchId) => auth.log(d, user.email, action, target, detail, churchId);
+  // The riskiest changes (who is an admin, their authenticator) also need a fresh code from the
+  // signed-in admin's own authenticator app, so a hijacked admin session alone can't make them.
+  const stepUp = async (b) => {
+    if (!(await adminauth.checkCode(d, user.email, b && b.code))) throw new HttpError(403, 'That code didn’t work. Enter the current code from your authenticator app.');
+  };
 
   if (M === 'GET' && n === 2 && parts[1] === 'overview') {
     const day30 = new Date(Date.now() - 30 * 864e5).toISOString();
-    const [c, p, live, active, off, ad] = await Promise.all([
+    const [c, p, live, active, off, ad, fails] = await Promise.all([
       one(d, 'SELECT COUNT(*) AS n FROM churches'),
       one(d, 'SELECT COUNT(*) AS n FROM pages'),
       one(d, 'SELECT COUNT(*) AS n FROM pages WHERE published_at IS NOT NULL'),
       one(d, 'SELECT COUNT(*) AS n FROM account_info WHERE last_login_at > ?', day30),
       one(d, 'SELECT COUNT(*) AS n FROM account_info WHERE disabled_at IS NOT NULL'),
       one(d, 'SELECT COUNT(*) AS n FROM admins'),
+      one(d, "SELECT COUNT(*) AS n FROM audit WHERE action = 'admin.signin.fail' AND at > ?", new Date(Date.now() - 864e5).toISOString()),
     ]);
     const all_ = await knownEmails(d, env);
     return json({
       churches: c.n, pages: p.n, livePages: live.n, people: all_.length, active30: active.n, disabled: off.n,
-      admins: ad.n + auth.adminEmails(env).length, you: { email: user.email, main: !!user.mainAdmin },
+      admins: ad.n + auth.adminEmails(env).length, failedAdminSignins24h: fails.n, you: { email: user.email, main: !!user.mainAdmin },
     });
   }
 
@@ -141,6 +153,7 @@ export async function route({ d, env, request, user, parts, url, json, body }) {
     if (church && !(isSlug(church) && (await one(d, 'SELECT 1 FROM churches WHERE id = ?', church)))) throw new HttpError(400, 'Pick a church from the list.');
     if (!church && !b.admin) throw new HttpError(400, 'Add them to a church, or make them an admin, so they can sign in.');
     if (b.admin && !user.mainAdmin) throw new HttpError(403, 'Only a main admin can make someone an admin.');
+    if (b.admin) await stepUp(b);
     const existed = await one(d, 'SELECT pw_hash, google_sub FROM users WHERE email = ?', email);
     await run(d, 'INSERT OR IGNORE INTO users (email, created_at) VALUES (?, ?)', email, now());
     if (name) await run(d, "UPDATE users SET name = ? WHERE email = ? AND name = ''", name, email);
@@ -153,9 +166,10 @@ export async function route({ d, env, request, user, parts, url, json, body }) {
       await run(d, 'INSERT OR IGNORE INTO admins (email, added_at, added_by) VALUES (?, ?, ?)', email, now(), user.email);
       await log('admin.add', email);
     }
+    const setupCode = b.admin && !auth.isMainAdmin(env, email) ? await adminauth.makeSetupCode(d, email, user.email) : null;
     const fresh = !existed || (!existed.pw_hash && !existed.google_sub);
     const link = fresh && !auth.isMainAdmin(env, email) ? await auth.makeLink(d, request, email) : null;
-    return json({ email, link }, 201);
+    return json({ email, link, setupCode }, 201);
   }
 
   const email = normEmail(parts[2]);
@@ -165,6 +179,7 @@ export async function route({ d, env, request, user, parts, url, json, body }) {
     await mustKnow(d, env, email);
     const [p] = await people(d, env, email);
     const activity = await all(d, 'SELECT * FROM audit WHERE target = ? OR actor = ? ORDER BY id DESC LIMIT 50', email, email);
+    if (p.admin) p.twoStep = await adminauth.status(d, email);
     return json({ person: p, activity, you: { email: user.email, main: !!user.mainAdmin } });
   }
 
@@ -201,6 +216,10 @@ export async function route({ d, env, request, user, parts, url, json, body }) {
         d.prepare('UPDATE members SET email = ? WHERE email = ?').bind(to, email),
         d.prepare('UPDATE admins SET email = ? WHERE email = ?').bind(to, email),
         d.prepare('UPDATE account_info SET email = ? WHERE email = ?').bind(to, email),
+        // Admin sign-in starts over for the new address: new authenticator, new setup code.
+        d.prepare('DELETE FROM admin_2fa WHERE email = ?').bind(email),
+        d.prepare('DELETE FROM admin_sessions WHERE email = ?').bind(email),
+        d.prepare('DELETE FROM admin_setup_codes WHERE email = ?').bind(email),
         d.prepare('DELETE FROM sessions WHERE email = ?').bind(email),
         d.prepare('DELETE FROM links WHERE email = ?').bind(email),
         d.prepare('DELETE FROM login_fails WHERE email = ?').bind(email),
@@ -222,6 +241,9 @@ export async function route({ d, env, request, user, parts, url, json, body }) {
       d.prepare('DELETE FROM links WHERE email = ?').bind(email),
       d.prepare('DELETE FROM login_fails WHERE email = ?').bind(email),
       d.prepare('DELETE FROM account_info WHERE email = ?').bind(email),
+      d.prepare('DELETE FROM admin_2fa WHERE email = ?').bind(email),
+      d.prepare('DELETE FROM admin_sessions WHERE email = ?').bind(email),
+      d.prepare('DELETE FROM admin_setup_codes WHERE email = ?').bind(email),
       d.prepare('DELETE FROM users WHERE email = ?').bind(email),
     ]);
     await log('person.delete', email);
@@ -234,7 +256,7 @@ export async function route({ d, env, request, user, parts, url, json, body }) {
     if (what === 'link') {
       await guard(d, env, user, email, 'sent a password link');
       if (await auth.isDisabled(d, email)) throw new HttpError(400, 'Turn their account back on first.');
-      if (!(await auth.mayUsePortal(d, env, email))) throw new HttpError(400, 'Add them to a church first, so they have something to sign in to.');
+      if (!(await auth.hasAnyAccess(d, env, email))) throw new HttpError(400, 'Add them to a church first, so they have something to sign in to.');
       const link = await auth.makeLink(d, request, email);
       await log('person.link', email);
       return json({ link });
@@ -242,6 +264,7 @@ export async function route({ d, env, request, user, parts, url, json, body }) {
     if (what === 'signout') {
       if (email !== user.email) await guard(d, env, user, email, 'signed out');
       await run(d, 'DELETE FROM sessions WHERE email = ?', email);
+      await run(d, 'DELETE FROM admin_sessions WHERE email = ?', email);
       await log('person.signout', email);
       return json({ ok: true });
     }
@@ -251,6 +274,25 @@ export async function route({ d, env, request, user, parts, url, json, body }) {
       await run(d, 'DELETE FROM sessions WHERE email = ?', email);
       await log('person.nopassword', email);
       return json({ ok: true });
+    }
+    // Admin sign-in: a one-time setup code (24 h) for another admin to turn on their authenticator
+    // app, turning someone's authenticator off, or new recovery codes for yourself.
+    if (what === 'setup-code' || what === 'reset-2fa') {
+      if (!user.mainAdmin) throw new HttpError(403, 'Only a main admin can do this.');
+      if (email === user.email || auth.isMainAdmin(env, email)) throw new HttpError(400, 'Main admins use the SETUP_KEY secret or their recovery codes for this.');
+      if (!(await auth.isAdmin(d, env, email))) throw new HttpError(400, email + ' isn’t an admin.');
+      await stepUp(await body(request));
+      if (what === 'reset-2fa') { await adminauth.reset2fa(d, email); await log('admin.2fa.reset', email); }
+      const code = await adminauth.makeSetupCode(d, email, user.email);
+      await log('admin.setupcode', email);
+      return json({ setupCode: code });
+    }
+    if (what === 'recovery') {
+      if (email !== user.email) throw new HttpError(403, 'You can only make your own recovery codes.');
+      await stepUp(await body(request));
+      const codes = await adminauth.newRecovery(d, email);
+      await log('admin.recovery.new', email);
+      return json({ recovery: codes });
     }
     if (what === 'unlink-google') {
       await guard(d, env, user, email, 'changed');
@@ -266,15 +308,19 @@ export async function route({ d, env, request, user, parts, url, json, body }) {
     if (auth.isMainAdmin(env, email)) throw new HttpError(400, email + ' is a main admin. Change ADMIN_EMAILS in Cloudflare to change that.');
     await mustKnow(d, env, email);
     const b = await body(request);
+    await stepUp(b);
+    let setupCode = null;
     if (b.admin) {
       await run(d, 'INSERT OR IGNORE INTO users (email, created_at) VALUES (?, ?)', email, now());
       await run(d, 'INSERT OR IGNORE INTO admins (email, added_at, added_by) VALUES (?, ?, ?)', email, now(), user.email);
+      if (!(await one(d, 'SELECT 1 FROM admin_2fa WHERE email = ?', email))) setupCode = await adminauth.makeSetupCode(d, email, user.email);
     } else {
       await run(d, 'DELETE FROM admins WHERE email = ?', email);
-      if (!(await auth.mayUsePortal(d, env, email))) await run(d, 'DELETE FROM sessions WHERE email = ?', email);
+      await adminauth.reset2fa(d, email);
+      await run(d, 'DELETE FROM admin_setup_codes WHERE email = ?', email);
     }
     await log(b.admin ? 'admin.add' : 'admin.remove', email);
-    return json({ ok: true });
+    return json({ ok: true, setupCode });
   }
 
   if (n === 5 && parts[3] === 'churches') {

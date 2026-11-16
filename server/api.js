@@ -15,6 +15,7 @@ import * as templates from './templates.js';
 import * as files from './files.js';
 import * as shares from './shares.js';
 import * as admin from './admin.js';
+import * as adminauth from './adminauth.js';
 import { feedProxy } from './feed.js';
 
 const MAX_BODY = 20 * 1024 * 1024;
@@ -108,25 +109,22 @@ export async function handle({ request, env, waitUntil }) {
     const route = (method, n, first) => M === method && parts.length === n && (!first || parts[0] === first);
 
     // ── Signed-out routes ────────────────────────────────────────────
-    if (route('GET', 1, 'config')) return json({ google: auth.googleEnabled(env), setup: !!env.SETUP_KEY });
+    if (route('GET', 1, 'config')) return json({ google: auth.googleEnabled(env) });
+    // The admin sign-in (its own page at /admin/; see adminauth.js).
+    if (parts[0] === 'admin-auth') return await adminauth.route({ d, env, request, parts, json, body });
     if (parts[0] === 'auth') {
       if (route('POST', 2) && parts[1] === 'login') {
         const b = await body(request);
         return json({ ok: true }, 200, { 'Set-Cookie': await auth.passwordLogin(d, env, b.email, b.password) });
       }
-      if (route('POST', 2) && parts[1] === 'logout') return json({ ok: true }, 200, { 'Set-Cookie': await auth.endSession(d, request) });
-      // First-time setup: lets an admin set a password using the SETUP_KEY secret, for when
-      // Google sign-in isn't set up yet. Remove the secret afterwards to turn this off.
-      if (route('POST', 2) && parts[1] === 'setup') {
-        const b = await body(request);
-        const email = normEmail(b.email);
-        if (!env.SETUP_KEY) throw new HttpError(404, 'Setup is turned off.');
-        if (!auth.sameString(String(b.key || ''), env.SETUP_KEY) || !auth.isMainAdmin(env, email)) throw new HttpError(403, 'That setup key or admin email is not right.');
-        await auth.setPassword(d, email, b.password);
-        return json({ ok: true }, 200, { 'Set-Cookie': await auth.startSession(d, email, 'setup') });
+      if (route('POST', 2) && parts[1] === 'logout') {
+        const h = new Headers({ 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+        h.append('Set-Cookie', await auth.endSession(d, request));
+        h.append('Set-Cookie', await auth.endAdminSession(d, request));
+        return new Response(JSON.stringify({ ok: true }), { headers: h });
       }
       if (route('GET', 2) && parts[1] === 'google') return auth.googleStart(env, request);
-      if (route('GET', 3) && parts[1] === 'google' && parts[2] === 'callback') return auth.googleCallback(d, env, request);
+      if (route('GET', 3) && parts[1] === 'google' && parts[2] === 'callback') return auth.googleCallback(d, env, request, adminauth.googleDone(d, env));
       if (route('GET', 2) && parts[1] === 'link') {
         const email = await auth.readLink(d, url.searchParams.get('token'));
         if (!email) throw new HttpError(400, 'This link has expired or was already used. Ask for a new one.');
@@ -135,7 +133,9 @@ export async function handle({ request, env, waitUntil }) {
       }
       if (route('POST', 2) && parts[1] === 'link') {
         const b = await body(request);
-        return json({ ok: true }, 200, { 'Set-Cookie': await auth.useLink(d, env, b.token, b.password, b.name) });
+        const cookie = await auth.useLink(d, env, b.token, b.password, b.name);
+        // No cookie: an admin with no church, who goes on to the admin sign-in.
+        return cookie ? json({ ok: true }, 200, { 'Set-Cookie': cookie }) : json({ ok: true, admin: true });
       }
       throw new HttpError(404, 'Not found.');
     }
@@ -172,7 +172,10 @@ export async function handle({ request, env, waitUntil }) {
       return json(await files.upload(env, request, parts[1]), 201);
     }
 
-    if (parts[0] === 'admin') return await admin.route({ d, env, request, user, parts, url, json, body });
+    if (parts[0] === 'admin') {
+      if (M !== 'GET' && request.headers.get('Origin') !== url.origin) throw new HttpError(403, 'Requests from other sites are not allowed.');
+      return await admin.route({ d, env, request, user, parts, url, json, body });
+    }
     if (parts[0] === 'templates') return await templates.route({ d, env, request, user, parts, url, json, body });
 
     if (parts[0] !== 'churches') throw new HttpError(404, 'Not found.');

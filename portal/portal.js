@@ -807,13 +807,31 @@
     if (s < 86400 * 30) return Math.round(s / 86400) + ' d ago';
     return new Date(iso).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
   };
-  const howName = { password: 'password', google: 'Google', link: 'a password link', setup: 'the setup key' };
+  const howName = { password: 'password', google: 'Google', link: 'a password link', setup: 'the setup key', admin: 'the admin sign-in' };
   const methods = (p) => [p.hasPassword ? 'Password' : null, p.hasGoogle ? 'Google' : null].filter(Boolean).join(' + ');
   const personPills = (p) => [
     p.admin === 'main' ? h('span', { class: 'pill ok', title: 'Set in ADMIN_EMAILS' }, 'Main admin') : p.admin ? h('span', { class: 'pill ok' }, 'Admin') : null,
     p.disabled ? h('span', { class: 'pill bad' }, 'Turned off') : null,
     !p.lastLoginAt && !p.hasPassword && !p.hasGoogle && !p.disabled ? h('span', { class: 'pill' }, 'Invited') : null];
   let adminCache = null; // { overview, churches } for church names and the tiles
+  // The riskiest admin changes also ask for a fresh code from your own authenticator app.
+  async function askCode(why) {
+    const v = await ask('Confirm with your authenticator app', [{ k: 'code', l: '6-digit code', placeholder: '123456', max: 11, auto: 'one-time-code' }], 'Confirm', why);
+    return v && v.code ? v.code.replace(/\s+/g, '') : null;
+  }
+  function showSecret(title, value, note) {
+    const dlg = $('#dlg');
+    fill($('#dlgBody'), h('div', { class: 'dlgform' },
+      h('h2', null, title),
+      h('p', { class: 'muted' }, note),
+      h('input', { type: 'text', value, readOnly: true, onfocus: (e) => e.target.select(), class: 'mono' }),
+      h('div', { class: 'row end' },
+        h('button', { class: 'ghost', onclick: () => dlg.close() }, 'Done'),
+        h('button', { class: 'primary', onclick: () => copy(value, 'Copied') }, 'Copy'))));
+    dlg.onclose = null;
+    if (!dlg.open) dlg.showModal();
+  }
+  const SETUP_NOTE = 'They need this once, with their password or Google, to add DoorStep to an authenticator app on the admin sign-in page. It works for 24 hours. Send it separately from any password link, and send them the admin sign-in address yourself (it isn’t linked anywhere).';
 
   async function drawAdmin(rest) {
     const main = $('#main');
@@ -829,6 +847,7 @@
     fill(main,
       h('div', { class: 'head' }, h('div', null, h('h1', null, 'Admin'),
         h('p', { class: 'muted sub' }, 'Every account, church and change across DoorStep.' + (o.you.main ? '' : ' You’re an admin; only a main admin can make or remove admins.')))),
+      o.failedAdminSignins24h ? h('a', { class: 'note bad block', href: '#admin/activity' }, '⚠ ' + plural(o.failedAdminSignins24h, 'failed admin sign-in', 'failed admin sign-ins') + ' in the last 24 hours. Tap to see them in Activity.') : null,
       h('div', { class: 'statbig admintiles' },
         h('div', null, h('b', null, o.people.toLocaleString()), h('span', { class: 'muted small' }, 'people')),
         h('div', null, h('b', null, o.active30.toLocaleString()), h('span', { class: 'muted small' }, 'signed in, last 30 days')),
@@ -855,8 +874,12 @@
     if (adminCache.overview.you.main) fields.push({ k: 'admin', l: 'DoorStep admin', value: '', options: [['', 'No'], ['1', 'Yes: can manage every church and account']] });
     const v = await ask('Add a person', fields, 'Add');
     if (!v) return;
-    const r = await api('/admin/people', { method: 'POST', body: { email: v.email, name: v.name, church: v.church, role: v.role, admin: !!v.admin } });
-    if (r.link) showLink(r.email, r.link); else toast(r.email + ' already has an account and can sign in now.');
+    const code = v.admin ? await askCode('Making someone an admin needs a code from your own authenticator app.') : null;
+    if (v.admin && !code) return;
+    const r = await api('/admin/people', { method: 'POST', body: { email: v.email, name: v.name, church: v.church, role: v.role, admin: !!v.admin, code } });
+    if (r.setupCode) {
+      showSecret('Admin setup code for ' + r.email, r.setupCode, SETUP_NOTE + (r.link ? ' Their password link: ' + r.link : ''));
+    } else if (r.link) showLink(r.email, r.link); else toast(r.email + ' already has an account and can sign in now.');
     return r.email;
   }
 
@@ -927,8 +950,13 @@
 
     const adminBox = h('input', { type: 'checkbox', checked: !!p.admin, disabled: !you.main || p.admin === 'main' || self, onchange: act(async () => {
       const on = adminBox.checked;
-      if (!confirm(on ? 'Make ' + p.email + ' a DoorStep admin? They’ll see and manage every church, page and account (except other admins).' : 'Remove admin from ' + p.email + '?')) { adminBox.checked = !on; return; }
-      await api(U + '/admin', { method: 'PUT', body: { admin: on } }); done(on ? 'Now an admin' : 'No longer an admin');
+      const code = await askCode(on ? 'Make ' + p.email + ' a DoorStep admin? They’ll see and manage every church, page and account (except other admins).' : 'Remove admin from ' + p.email + '? Their authenticator app is forgotten too.');
+      if (!code) { adminBox.checked = !on; return; }
+      try {
+        const r = await api(U + '/admin', { method: 'PUT', body: { admin: on, code } });
+        reload();
+        if (r.setupCode) showSecret('Admin setup code for ' + p.email, r.setupCode, SETUP_NOTE); else toast(on ? 'Now an admin' : 'No longer an admin');
+      } catch (e) { adminBox.checked = !on; throw e; }
     }) });
 
     const actBtn = (label, title, fn, cls) => h('button', { class: 'ghost' + (cls ? ' ' + cls : ''), title, disabled: locked && !(self && label === 'Sign out everywhere'), onclick: act(fn) }, label);
@@ -975,7 +1003,30 @@
               : self ? 'You can’t change your own admin access.'
               : !you.main ? 'Only a main admin can make or remove admins.'
               : 'Sees and manages every church, page, template and account, except other admins.'))),
-          p.adminSince ? h('p', { class: 'muted small' }, 'Admin since ' + when(p.adminSince) + '.') : null),
+          p.adminSince ? h('p', { class: 'muted small' }, 'Admin since ' + when(p.adminSince) + '.') : null,
+          p.twoStep ? h('div', { class: 'twostep' },
+            h('p', { class: 'small' }, p.twoStep.on
+              ? h('span', null, h('span', { class: 'pill ok' }, 'Two-step on'), ' Authenticator app added ' + when(p.twoStep.since) + '. ' + plural(p.twoStep.recoveryLeft, 'recovery code', 'recovery codes') + ' left.')
+              : h('span', null, h('span', { class: 'pill warn' }, 'Two-step not set up'), ' They can’t use admin powers until they add an authenticator app' + (p.twoStep.setupCodeUntil ? ' (setup code valid until ' + when(p.twoStep.setupCodeUntil) + ').' : '.'))),
+            h('div', { class: 'row wrap' },
+              self && p.twoStep.on ? h('button', { class: 'ghost', onclick: act(async () => {
+                const code = await askCode('Your old recovery codes stop working and you get 10 new ones.');
+                if (!code) return;
+                const r = await api(U + '/recovery', { method: 'POST', body: { code } });
+                showSecret('Your new recovery codes', r.recovery.join('  '), 'Each signs you in once if you lose your phone. They won’t be shown again; save them in a password manager.');
+              }) }, 'New recovery codes') : null,
+              you.main && !self && p.admin === 'admin' ? h('button', { class: 'ghost', onclick: act(async () => {
+                const code = await askCode('Make a one-time setup code so ' + p.email + ' can add an authenticator app.');
+                if (!code) return;
+                const r = await api(U + '/setup-code', { method: 'POST', body: { code } });
+                reload(); showSecret('Admin setup code for ' + p.email, r.setupCode, SETUP_NOTE);
+              }) }, p.twoStep.on ? 'New setup code' : 'Make setup code') : null,
+              you.main && !self && p.admin === 'admin' && p.twoStep.on ? h('button', { class: 'ghost danger', onclick: act(async () => {
+                const code = await askCode('Reset ' + p.email + '’s two-step sign-in? Their authenticator app and recovery codes stop working and they’re signed out of admin. Use this if they lost their phone.');
+                if (!code) return;
+                const r = await api(U + '/reset-2fa', { method: 'POST', body: { code } });
+                reload(); showSecret('Admin setup code for ' + p.email, r.setupCode, SETUP_NOTE);
+              }) }, 'Reset two-step') : null)) : null),
         h('section', { class: 'card' },
           h('h3', null, 'Account'),
           h('div', { class: 'row wrap' },
@@ -1004,6 +1055,14 @@
     const role = ROLE_NAME[r.detail] || r.detail;
     const map = {
       signin: () => ['signed in with ', howName[r.detail] || r.detail],
+      'admin.signin': () => ['signed in to admin mode with ', howName[r.detail] || r.detail, ' + authenticator code'],
+      'admin.signin.fail': () => [h('b', { class: 'danger' }, 'Failed admin sign-in'), ' for ', r.target || '(no email)', ' at the ', r.detail.split(' · ')[0], ' step', r.detail.includes('IP') ? ' (' + r.detail.split(' · ')[1] + ')' : ''],
+      'admin.2fa.on': () => ['added an authenticator app for admin sign-in'],
+      'admin.2fa.reset': () => ['reset ', P(r.target), '’s two-step sign-in'],
+      'admin.setupcode': () => ['made an admin setup code for ', P(r.target)],
+      'admin.recovery': () => ['used a recovery code (', r.detail, ')'],
+      'admin.recovery.new': () => ['made new recovery codes'],
+      'admin.password': () => ['set their admin password with the setup key'],
       'person.add': () => ['added ', P(r.target)],
       'person.rename': () => ['renamed ', P(r.target), ' to “', r.detail, '”'],
       'person.email': () => ['changed the email ', r.detail.replace(/^was /, ''), ' to ', P(r.target)],
@@ -1030,7 +1089,7 @@
     const words = map[r.action] ? map[r.action]() : [r.action, ' ', r.target, ' ', r.detail];
     return h('div', { class: 'logrow' },
       h('span', { class: 'logtime', title: when(r.at) }, ago(r.at)),
-      h('span', { class: 'logwhat' }, h('span', null, r.actor ? (r.action === 'signin' ? P(r.actor) : h('b', null, r.actor)) : 'Someone', ' ', words)));
+      h('span', { class: 'logwhat' }, h('span', null, r.actor ? (r.action === 'signin' ? P(r.actor) : h('b', null, r.actor)) : (r.action === 'admin.signin.fail' ? '' : 'Someone'), r.actor ? ' ' : '', words)));
   }
 
   async function adminChurches(body) {
@@ -1084,7 +1143,7 @@
     const dlg = $('#dlg');
     fill($('#dlgBody'), h('div', { class: 'dlgform' },
       h('h2', null, me.name || me.email),
-      h('p', { class: 'muted' }, me.email + (me.admin ? ' · admin' : '')),
+      h('p', { class: 'muted' }, me.email + (me.admin ? ' · admin mode' : '')),
       h('p', { class: 'muted small' }, 'Signs in with ' + ([me.hasPassword ? 'a password' : null, me.hasGoogle ? 'Google' : null].filter(Boolean).join(' or ') || 'a link') + '.'),
       h('div', { class: 'row wrap' },
         h('button', { class: 'ghost', onclick: act(async () => {
@@ -1100,6 +1159,10 @@
           if (v.password !== v.again) { toast('The two passwords don’t match.'); return; }
           await api('/me', { method: 'PUT', body: { password: v.password, currentPassword: v.currentPassword } }); me.hasPassword = true; toast('Password saved');
         }) }, me.hasPassword ? 'Change password' : 'Set a password'),
+        me.admin ? h('button', { class: 'ghost', title: 'End admin mode on this device. Admin mode also ends after 30 minutes without activity.', onclick: act(async () => {
+          await fetch('/api/admin-auth/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}', credentials: 'same-origin' });
+          location.replace('/app/');
+        }) }, 'Leave admin mode') : null,
         h('button', { class: 'ghost danger', onclick: act(async () => {
           await api('/auth/logout', { method: 'POST' }); location.replace('/app/login.html');
         }) }, 'Sign out')),

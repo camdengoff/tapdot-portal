@@ -19,7 +19,6 @@
       const cfg = await (await fetch('/api/config')).json();
       $('#googleBtn').hidden = !cfg.google;
       $('#orLine').hidden = !cfg.google;
-      $('#setupLink').hidden = !cfg.setup;
     } catch (e) { /* Google stays hidden */ }
     $('#email').focus();
     $('#signin').onsubmit = async (e) => {
@@ -46,25 +45,17 @@
       e.preventDefault();
       if ($('#setPw').value !== $('#setPw2').value) { msg('The two passwords don’t match.'); return; }
       busy(e.target, true); msg('');
-      try { await post('/api/auth/link', { token, password: $('#setPw').value, name: $('#setName').value.trim() }); location.replace('/app/'); }
+      try {
+        const r = await post('/api/auth/link', { token, password: $('#setPw').value, name: $('#setName').value.trim() });
+        // Admins with no church sign in on their own admin sign-in page (not linked from here).
+        if (r.admin) { $('#setpw').hidden = true; msg('Password saved. Now sign in from your admin sign-in page.', true); return; }
+        location.replace('/app/');
+      }
       catch (x) { msg(x.message); busy(e.target, false); }
     };
   }
 
-  function showSetup() {
-    $('#signin').hidden = true;
-    $('#setup').hidden = false;
-    $('#suEmail').focus();
-    $('#setup').onsubmit = async (e) => {
-      e.preventDefault();
-      busy(e.target, true); msg('');
-      try { await post('/api/auth/setup', { email: $('#suEmail').value, key: $('#suKey').value, password: $('#suPw').value }); location.replace('/app/'); }
-      catch (x) { msg(x.message); busy(e.target, false); }
-    };
-  }
 
-  window.addEventListener('hashchange', () => { if (location.hash === '#setup') showSetup(); });
   if (hash.get('set')) showSetPassword(hash.get('set'));
-  else if (location.hash === '#setup') { showSignIn(); showSetup(); }
   else showSignIn();
 })();

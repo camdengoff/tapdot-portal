@@ -139,6 +139,42 @@ const SCHEMA = [
     church_id TEXT NOT NULL DEFAULT '',
     detail TEXT NOT NULL DEFAULT ''
   )`,
+  // Admin sign-in (see adminauth.js): sessions, authenticator-app secrets, half-finished sign-ins,
+  // one-time setup codes, and failed tries (by email and by a hash of the IP address).
+  `CREATE TABLE IF NOT EXISTS admin_sessions (
+    id TEXT PRIMARY KEY,
+    email TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    last_seen INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS admin_2fa (
+    email TEXT PRIMARY KEY,
+    secret TEXT NOT NULL,
+    last_step INTEGER NOT NULL DEFAULT 0,
+    recovery TEXT NOT NULL DEFAULT '[]',
+    created_at TEXT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS admin_challenges (
+    id TEXT PRIMARY KEY,
+    email TEXT NOT NULL,
+    via TEXT NOT NULL,
+    pending_secret TEXT,
+    tries INTEGER NOT NULL DEFAULT 0,
+    expires_at INTEGER NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS admin_setup_codes (
+    email TEXT PRIMARY KEY,
+    code_hash TEXT NOT NULL,
+    expires_at INTEGER NOT NULL,
+    created_by TEXT
+  )`,
+  `CREATE TABLE IF NOT EXISTS admin_fails (
+    k TEXT NOT NULL,
+    at INTEGER NOT NULL
+  )`,
+  'CREATE INDEX IF NOT EXISTS admin_fails_k ON admin_fails (k, at)',
+  'CREATE INDEX IF NOT EXISTS admin_sessions_email ON admin_sessions (email)',
   'CREATE INDEX IF NOT EXISTS audit_at ON audit (at)',
   'CREATE INDEX IF NOT EXISTS audit_target ON audit (target, at)',
   'CREATE INDEX IF NOT EXISTS events_page ON events (church_id, page_id, at)',
