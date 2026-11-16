@@ -576,14 +576,107 @@
             h('div', { class: 'row muted small' }, h('span', { class: 'grow' }, shortDay(days[0])), h('span', null, 'Today'))),
           h('h3', null, 'Buttons tapped'),
           t.buttons.length
-            ? h('div', { class: 'taplist' }, t.buttons.map(([label, c]) => h('div', { class: 'tapRow' },
-              h('span', { class: 'tapLabel', title: label }, label),
-              h('span', { class: 'tapBar' }, h('i', { style: 'width:' + Math.max(3, (c / maxB) * 100) + '%' })),
-              h('b', null, c.toLocaleString()))))
+            ? h('div', { class: 'taplist' }, t.buttons.map(([label, c]) => tapRow(church, p, label, c, maxB)))
             : h('p', { class: 'muted' }, 'No taps in this time yet.')),
         h('div', { class: 'statcol' }, activityLog(church, p))),
       h('p', { class: 'muted small' }, 'A visit counts once per person every 30 minutes. Visits are counted on the site’s code block and the live link. No cookies are used and nothing about visitors is stored.'),
       h('div', { class: 'row end' }, h('button', { class: 'ghost', onclick: () => dlg.close() }, 'Close')));
+  }
+
+  // One "Buttons tapped" row: name, bar, count, and a button that shows that button on the page.
+  function tapRow(church, p, label, c, maxB) {
+    return h('div', { class: 'tapRow' },
+      h('span', { class: 'tapLabel', title: label }, label),
+      h('span', { class: 'tapBar' }, h('i', { style: 'width:' + Math.max(3, (c / maxB) * 100) + '%' })),
+      h('b', null, c.toLocaleString()),
+      h('button', { type: 'button', class: 'ghost sm tapShow', title: 'Show “' + label + '” on the page', 'aria-label': 'Show “' + label + '” on the page', onclick: () => showButton(church, p, label, c) }, h('span', { 'aria-hidden': 'true' }, '◎'), h('span', { class: 'lbl' }, 'Show')));
+  }
+
+  // ── Show a tapped button on its page ────────────────────────────────
+  // Taps are counted by the button's text (public/embed.js tapLabel), so this loads the live page in
+  // a locked-down frame (scripts only, no access to the portal, no stats counted, taps do nothing)
+  // and circles every button with that name, opening its pop-up first if it lives in one.
+  let btnMsg = null;
+  async function showButton(church, p, label, count) {
+    let dlg = $('#btnDlg');
+    if (!dlg) { dlg = h('dialog', { id: 'btnDlg', class: 'btndlg' }); document.body.append(dlg); }
+    if (btnMsg) window.removeEventListener('message', btnMsg);
+    const status = h('p', { class: 'muted small btnStatus' }, 'Finding the button…');
+    const nav = h('div', { class: 'row btnNav', hidden: true });
+    const stage = h('div', { class: 'btnStage' });
+    fill(dlg, h('div', { class: 'dlgform' },
+      h('div', { class: 'row' },
+        h('div', { class: 'grow', style: 'min-width:0' },
+          h('h2', { class: 'btnTitle', title: label }, label),
+          h('p', { class: 'muted small' }, p.name + (count ? ' · ' + plural(count, 'tap', 'taps') + ' in this time' : ''))),
+        h('button', { type: 'button', class: 'ghost icon', 'aria-label': 'Close', onclick: () => dlg.close() }, '✕')),
+      h('div', { class: 'row' }, h('div', { class: 'grow' }, status), nav),
+      stage));
+    dlg.onclose = () => { if (btnMsg) window.removeEventListener('message', btnMsg); btnMsg = null; stage.replaceChildren(); };
+    if (!dlg.open) dlg.showModal();
+    if (!p.publishedAt) { status.textContent = 'This page isn’t live right now, so there’s no page to show the button on.'; return; }
+    let html;
+    try {
+      const r = await fetch('/p/' + enc(church.id) + '/' + enc(p.id), { cache: 'no-cache' });
+      if (!r.ok) throw new Error();
+      html = await r.text();
+    } catch (e) { status.textContent = 'The page couldn’t be loaded. Please try again.'; return; }
+    if (!dlg.open) return;
+    const frame = h('iframe', { class: 'btnFrame', title: 'Page preview', sandbox: 'allow-scripts', srcdoc: btnDoc(html, label) });
+    let found = 0, at = 0;
+    const go = (i) => { at = (i + found) % found; frame.contentWindow.postMessage({ dsShow: at }, '*'); drawNav(); };
+    function drawNav() {
+      nav.hidden = found < 2;
+      fill(nav, h('button', { type: 'button', class: 'ghost sm', 'aria-label': 'Previous one', onclick: () => go(at - 1) }, '‹'),
+        h('span', { class: 'muted small' }, (at + 1) + ' of ' + found),
+        h('button', { type: 'button', class: 'ghost sm', 'aria-label': 'Next one', onclick: () => go(at + 1) }, '›'));
+    }
+    btnMsg = (e) => {
+      if (e.source !== frame.contentWindow || !e.data || e.data.dsFound == null) return;
+      found = e.data.dsFound;
+      if (!found) status.textContent = 'This button isn’t on the page anymore. It may have been renamed or removed since these taps.';
+      else if (e.data.dsHidden) status.textContent = 'This button is on the page but hidden right now (for example in a closed section or another tab). Its spot is outlined.';
+      else if (found > 1) status.textContent = found + ' buttons on the page have this name, and their taps are counted together. Use the arrows to see each one.';
+      else status.textContent = e.data.dsSheet ? 'This button is inside a pop-up, so the pop-up is opened for you.' : 'Here it is, circled on the page.';
+      drawNav();
+    };
+    window.addEventListener('message', btnMsg);
+    stage.replaceChildren(frame);
+  }
+  // The live page as a standalone document, plus a script that finds and circles the button.
+  function btnDoc(html, label) {
+    const js = String.raw`(function(){
+var LABEL=` + JSON.stringify(label).replace(/</g, '\\u003c') + String.raw`,D=document,W=window,list=[],cur=-1,ring,allow=false;
+function firstLine(el){var t=(el.innerText||el.textContent||'').split('\n'),any='';for(var i=0;i<t.length;i++){var s=t[i].trim();if(s&&/[0-9A-Za-zÀ-￿]/.test(s.replace(/[ -⯿\uD800-\uDFFF️]/g,'')))return s;any=any||s;}return any;}
+function tapLabel(t){var l=firstLine(t)||t.getAttribute('aria-label')||t.getAttribute('title')||'';var row=t.classList.contains('td-copy-btn')&&t.closest('.td-copy-row');if(row){var w=row.querySelector('.td-tag')||row.querySelector('.td-copy-val');if(w)l+=': '+firstLine(w);}return l.replace(/\s+/g,' ').trim().slice(0,60)||'Button';}
+function counted(t){return t.classList.contains('td-tap')||!/^#/.test(t.getAttribute('href')||'#');}
+function shown(el){var r=el.getBoundingClientRect();return r.width>0&&r.height>0;}
+function find(){var out=[],h=D.documentElement;h.classList.add('ds-measure');D.querySelectorAll('.td-tap,a[href]').forEach(function(t){if(counted(t)&&tapLabel(t)===LABEL)out.push(t);});h.classList.remove('ds-measure');
+out.sort(function(a,b){return (shown(b)?1:0)-(shown(a)?1:0);});return out;}
+D.addEventListener('click',function(e){if(allow)return;if(e.target.closest('[data-td-close]'))return;e.preventDefault();e.stopPropagation();},true);
+D.addEventListener('submit',function(e){e.preventDefault();e.stopPropagation();},true);
+W.open=function(){return null;};
+function track(){if(!ring)return;var t=list[cur];if(t){var r=t.getBoundingClientRect();if(r.width||r.height){ring.style.display='block';ring.style.left=(r.left-6)+'px';ring.style.top=(r.top-6)+'px';ring.style.width=(r.width+12)+'px';ring.style.height=(r.height+12)+'px';}else ring.style.display='none';}requestAnimationFrame(track);}
+function show(i){cur=i;var t=list[i],sheet=false;if(!t)return;
+var d=t.parentElement;while(d){if(d.tagName==='DETAILS')d.open=true;d=d.parentElement;}
+var s=t.closest('.td-sheet');if(s&&!s.classList.contains('open')&&/^td-sheet-/.test(s.id)){var k=s.id.slice(9),o=D.querySelector('[data-td-act="sheet"][data-td-sheet="'+k.replace(/"/g,'')+'"]');allow=true;try{if(o)o.click();}finally{allow=false;}if(!s.classList.contains('open')){s.classList.add('open');var bd=D.getElementById('td-bd');if(bd)bd.classList.add('open');}sheet=true;}
+else if(!s){D.querySelectorAll('.td-sheet.open,.td-bd.open').forEach(function(e){e.classList.remove('open');});}
+if(!ring){ring=D.createElement('div');ring.id='ds-ring';D.body.appendChild(ring);requestAnimationFrame(track);}
+ring.classList.remove('ds-pulse');void ring.offsetWidth;ring.classList.add('ds-pulse');
+setTimeout(function(){t.scrollIntoView({block:'center',behavior:'smooth'});},sheet?380:30);
+return sheet;}
+function report(sheet){parent.postMessage({dsFound:list.length,dsHidden:list.length&&!shown(list[0])&&!sheet,dsSheet:!!sheet},'*');}
+function start(){var tries=0;(function look(){list=find();if(list.length||tries++>25){report(list.length?show(0):false);if(list.length&&!shown(list[0]))setTimeout(function(){report(false);},450);return;}setTimeout(look,200);})();}
+W.addEventListener('message',function(e){if(e.source===parent&&e.data&&typeof e.data.dsShow==='number'&&list[e.data.dsShow])report(show(e.data.dsShow));});
+if(D.readyState==='complete')setTimeout(start,150);else W.addEventListener('load',function(){setTimeout(start,150);});
+})();`;
+    const css = '#ds-ring{position:fixed;z-index:2147483647;pointer-events:none;border:3px solid #ff5e1f;border-radius:10px;box-shadow:0 0 0 4px rgba(255,94,31,.3),0 0 0 9999px rgba(20,20,20,.42);display:none;transition:left .25s,top .25s,width .25s,height .25s}' +
+      '#ds-ring.ds-pulse{animation:ds-pulse 1s ease-out 3}@keyframes ds-pulse{0%{box-shadow:0 0 0 0 rgba(255,94,31,.6),0 0 0 9999px rgba(20,20,20,.42)}100%{box-shadow:0 0 0 14px rgba(255,94,31,0),0 0 0 9999px rgba(20,20,20,.42)}}' +
+      '.ds-measure .td-sheet,.ds-measure .td-sheet *{visibility:visible!important}' + // closed pop-ups have no text to read otherwise
+      '@media (prefers-reduced-motion:reduce){#ds-ring{transition:none}#ds-ring.ds-pulse{animation:none}}';
+    return '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">' +
+      '<base href="' + location.origin + '/"><style>' + css + '</style></head><body style="margin:0"><div class="tapdot-page" data-loaded="1">' + html +
+      '</div><script>' + js.replace(/<\/script/gi, '<\\/script') + '</' + 'script></body></html>';
   }
 
   // ── Connect card answers for one page ────────────────────────────────
@@ -682,7 +775,7 @@
           h('span', { class: 'logtime' }, time(g.at)),
           h('div', { class: 'logwhat' },
             h('span', null, g.view ? 'Opened the page' : 'Came back'),
-            g.taps.length ? h('div', { class: 'logtaps' }, g.taps.map((t) => h('span', { class: 'logtap', title: 'Tapped at ' + time(t.at) }, t.label, h('small', null, time(t.at))))) : h('span', { class: 'muted small' }, 'No taps'))))));
+            g.taps.length ? h('div', { class: 'logtaps' }, g.taps.map((t) => h('button', { type: 'button', class: 'logtap', title: 'Tapped at ' + time(t.at) + '. Click to see this button on the page.', onclick: () => showButton(church, p, t.label) }, t.label, h('small', null, time(t.at))))) : h('span', { class: 'muted small' }, 'No taps'))))));
     }
     load();
     return wrap;
@@ -767,10 +860,7 @@
             h('span', null, h('b', null, t.totalViews.toLocaleString()), ' ', t.totalViews === 1 ? 'visit' : 'visits'),
             h('span', { class: 'muted small' }, t.totalTaps ? plural(t.totalTaps, 'button tap', 'button taps') : 'No taps yet')),
           bars(days, t.views)),
-        top.length ? h('div', { class: 'taplist' }, top.map(([label, c]) => h('div', { class: 'tapRow' },
-          h('span', { class: 'tapLabel', title: label }, label),
-          h('span', { class: 'tapBar' }, h('i', { style: 'width:' + Math.max(3, (c / maxB) * 100) + '%' })),
-          h('b', null, c.toLocaleString())))) : null,
+        top.length ? h('div', { class: 'taplist' }, top.map(([label, c]) => tapRow(church, p, label, c, maxB))) : null,
         info.answers && answers[p.id] ? h('button', { class: 'answers', onclick: () => showResponses(church, p, () => {}) },
           '📥 ', plural(answers[p.id].total, 'connect card answer', 'connect card answers')) : null,
         h('div', { class: 'row wrap' },
