@@ -224,16 +224,17 @@ footer a { color: var(--muted); }
 /* ── Glass look (matches the portal's church screens) ─────────────────
    Soft orange and green circles sit behind the whole page; cards, the top bar and the stats
    picture are see-through glass over them. Sections are transparent so the circles show. */
-:root { --gl-hi: #ffffff; --gl-shadow: rgba(60, 30, 10, .16); --gl-a: rgba(255, 94, 31, .34); --gl-b: rgba(21, 120, 79, .22); --gl-c: rgba(255, 170, 110, .32); --gl-op: 55%; --gl-blur: 22px; }
+:root { --gl-hi: #ffffff; --gl-shadow: rgba(60, 30, 10, .16); --gl-a: rgba(255, 94, 31, .34); --gl-b: rgba(21, 120, 79, .22); --gl-c: rgba(255, 170, 110, .32); --gl-op: 55%; --gl-blur: 36px; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --gl-hi: rgba(255,255,255,.26); --gl-shadow: rgba(0,0,0,.55); --gl-a: rgba(255, 94, 31, .26); --gl-b: rgba(79, 209, 151, .14); --gl-c: rgba(204, 68, 16, .26); } }
 :root[data-theme="dark"] { --gl-hi: rgba(255,255,255,.26); --gl-shadow: rgba(0,0,0,.55); --gl-a: rgba(255, 94, 31, .26); --gl-b: rgba(79, 209, 151, .14); --gl-c: rgba(204, 68, 16, .26); }
 body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  /* Soft-edged, out-of-focus circles (each fades out over its outer half) */
   background:
-    radial-gradient(circle at 10% 18%, var(--gl-a) 0 16vmax, transparent 16.3vmax),
-    radial-gradient(circle at 38% 2%, var(--gl-b) 0 6vmax, transparent 6.2vmax),
-    radial-gradient(circle at 94% 38%, var(--gl-c) 0 12vmax, transparent 12.3vmax),
-    radial-gradient(circle at 74% 96%, var(--gl-b) 0 15vmax, transparent 15.3vmax),
-    radial-gradient(circle at 44% 64%, var(--gl-a) 0 4.5vmax, transparent 4.7vmax),
+    radial-gradient(circle at 10% 18%, var(--gl-a) 0 6vmax, transparent 20vmax),
+    radial-gradient(circle at 38% 2%, var(--gl-b) 0 2vmax, transparent 10vmax),
+    radial-gradient(circle at 94% 38%, var(--gl-c) 0 4vmax, transparent 16vmax),
+    radial-gradient(circle at 74% 96%, var(--gl-b) 0 5vmax, transparent 19vmax),
+    radial-gradient(circle at 44% 64%, var(--gl-a) 0 1vmax, transparent 8vmax),
     radial-gradient(var(--grid-dot) 1px, transparent 1.2px) 0 0 / 22px 22px; }
 .hero { background-image: none; }
 section { border-bottom-color: color-mix(in srgb, var(--line) 50%, transparent); }
