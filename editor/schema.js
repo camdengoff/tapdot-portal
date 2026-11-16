@@ -421,45 +421,6 @@
       }),
       summary: (b) => b.title + ' · ' + b.items.length + ' questions',
     },
-    ask: {
-      name: 'Ask a question', icon: '💬', desc: 'Visitors type a question and get your answer, like service times or parking',
-      fields: [
-        { k: 'show', t: 'select', l: 'Show it', opts: [['page', 'On the page'], ['popup', 'In a pop-up, opened from a button']], hint: 'In a pop-up: on any button, banner or hero, choose When tapped → Open one of my pop-up menus or lists, then pick this.' },
-        { k: 'popIcon', t: 'text', l: 'Pop-up icon', ph: 'e.g. 💬', when: (b) => b.show === 'popup' },
-        { k: 'title', t: 'text', l: 'Title', rich: true },
-        { k: 'intro', t: 'textarea', l: 'First message', rich: true, hint: 'Shown as a chat bubble before anyone asks.' },
-        { k: 'ph', t: 'text', l: 'Typing box placeholder', ph: 'Ask about times, kids, parking…' },
-        { k: 'chips', t: 'range', l: 'Suggested questions', min: 0, max: 8, hint: 'How many of your questions show as tap-to-ask buttons. 0 hides them.' },
-        { k: 'items', t: 'list', l: 'Questions and answers', itemName: 'Question', itemLabel: (i) => i.q || 'Question',
-          hint: 'Visitors don’t need to type your exact words. DoorStep matches their question to the closest one here, so more questions and more “other ways to ask” means better answers.',
-          item: [
-            { k: 'q', t: 'text', l: 'Question', ph: 'What time are services?' },
-            { k: 'also', t: 'textarea', l: 'Other ways people ask (optional)', ph: 'When is church\nWhat time does it start', hint: 'One per line. Words people might use, like “mass”, “worship” or “starts”.' },
-            { k: 'a', t: 'textarea', l: 'Answer', rich: true },
-            { k: 'btnLabel', t: 'text', l: 'Button under the answer (optional)', ph: 'Get directions' },
-            { k: 'action', t: 'action', l: 'Button action', when: (i) => !!i.btnLabel },
-          ],
-          newItem: () => ({ q: 'Question?', also: '', a: 'Answer.', btnLabel: '', action: TD.newAction('link') }) },
-        { group: 'When there’s no answer', open: () => false, fields: [
-          { k: 'fallback', t: 'textarea', l: 'Message', rich: true, hint: 'Shown when a question doesn’t match anything in your list. Point people to a person who can help.' },
-          { k: 'fbBtnLabel', t: 'text', l: 'Button (optional)', ph: 'Email the office' },
-          { k: 'fbAction', t: 'action', l: 'Button action', when: (b) => !!b.fbBtnLabel },
-        ] },
-      ],
-      defaults: () => ({
-        show: 'page', popIcon: '💬', title: 'Got a question?', intro: 'Hi! Ask me anything about visiting, like service times, kids or parking.', ph: 'Type your question…', chips: 4,
-        items: [
-          { q: 'What time are services?', also: 'When is church\nWhat time does worship start\nSunday schedule', a: 'Sundays at **9:00** and **10:45 AM**. Come a few minutes early and say hi!', btnLabel: '', action: TD.newAction('link') },
-          { q: 'Is there something for my kids?', also: 'Nursery\nChildren’s church\nKids ministry\nWhat about my baby', a: 'Yes! Kids from birth through 5th grade have their own classes during both services. Check in at the kids desk in the lobby.', btnLabel: '', action: TD.newAction('link') },
-          { q: 'Where do I park?', also: 'Parking\nWhere can I park my car', a: 'Guest parking is right by the main entrance. Look for the orange signs.', btnLabel: '', action: TD.newAction('link') },
-          { q: 'What should I wear?', also: 'Dress code\nDo I need to dress up\nCasual', a: 'Come as you are! You’ll see everything from jeans to suits.', btnLabel: '', action: TD.newAction('link') },
-          { q: 'Where are you located?', also: 'Address\nDirections\nHow do I get there', a: '123 Main Street, Your Town.', btnLabel: 'Get directions', action: TD.newAction('link') },
-          { q: 'Can I watch online?', also: 'Livestream\nStream\nYouTube\nWatch from home', a: 'Yes, every Sunday at 10:45 on our YouTube channel.', btnLabel: '', action: TD.newAction('link') },
-        ],
-        fallback: 'I don’t know that one yet. Our team would love to help!', fbBtnLabel: 'Email us', fbAction: TD.newAction('email'),
-      }),
-      summary: (b) => b.items.length + ' questions · ' + b.items.map((i) => i.q).join(' · '),
-    },
     spacer: {
       name: 'Spacer / divider', icon: '➖', desc: 'Empty space or a thin line',
       fields: [
