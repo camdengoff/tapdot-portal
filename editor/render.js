@@ -337,6 +337,27 @@
       (ctx.feedSheets = ctx.feedSheets || []).push({ id: 'form-' + b.id, title: String(b.title || 'Connect card').replace(/==|\*\*|__/g, ''), icon: b.popIcon || '', html });
       return '';
     },
+    // Ask a question: visitors type a question and get the church's own answer. Matching happens in
+    // the visitor's browser (see the runtime), so it's free and works on any page, published or not.
+    // Each answer is a <template> so its buttons work like any other button once shown.
+    ask(b, ctx) {
+      const pop = b.show === 'popup';
+      const items = (b.items || []).filter((it) => it.q || it.a);
+      const chips = items.slice(0, Math.max(0, +b.chips || 0));
+      const answer = (txt, label, action, q) => md(txt || '', true) + (label ? tap('td-btn td-inline-btn td-ask-btn', action, esc(label), ctx, '', q) : '');
+      const html = '<div class="td-ask td-card" data-td-ask>' +
+        (b.title && !pop ? '<div class="td-ask-title td-head">' + md(b.title) + '</div>' : '') +
+        '<div class="td-ask-log" aria-live="polite">' + (b.intro ? '<div class="td-ask-msg td-ask-bot">' + md(b.intro, true) + '</div>' : '') + '</div>' +
+        (chips.length ? '<div class="td-ask-chips">' + chips.map((it) => '<button type="button" class="td-ask-chip" data-td-askq="' + esc(it.q) + '">' + esc(it.q) + '</button>').join('') + '</div>' : '') +
+        '<form class="td-ask-form" autocomplete="off"><input type="text" maxlength="200" enterkeyhint="send" aria-label="Your question" placeholder="' + esc(b.ph || 'Type your question…') + '" />' +
+        '<button type="submit" aria-label="Ask">↑</button></form>' +
+        items.map((it) => '<template data-q="' + esc(it.q) + '" data-k="' + esc((it.q || '') + '\n' + (it.also || '')) + '" data-a="' + esc(plain(it.a)) + '">' + answer(it.a, it.btnLabel, it.action, it.q) + '</template>').join('') +
+        '<template data-fb>' + answer(b.fallback || 'Sorry, I don’t know that one.', b.fbBtnLabel, b.fbAction, b.fbBtnLabel) + '</template>' +
+        '</div>';
+      if (!pop) return html;
+      (ctx.feedSheets = ctx.feedSheets || []).push({ id: 'ask-' + b.id, title: plain(b.title || 'Ask a question'), icon: b.popIcon || '', html });
+      return '';
+    },
     // Invite messages: ready-made invites people copy, or send through the phone's share sheet.
     copy(b) {
       const rows = b.items.map((it) =>
@@ -680,6 +701,34 @@ fieldset.td-bad legend,.td-f-check.td-bad span{color:#ef4444}
 .td-ev-detail{flex:1;min-width:0}
 .td-ev-name{font-size:14px;font-weight:600;line-height:1.3;margin-bottom:2px}
 .td-ev-meta{font-size:12px;color:var(--td-muted)}
+/* ask a question */
+.td-ask{padding:16px;display:flex;flex-direction:column;gap:12px}
+.td-ask-title{font-weight:700;font-size:17px}
+.td-ask-log{display:flex;flex-direction:column;gap:8px;max-height:440px;overflow-y:auto;overscroll-behavior:contain;margin:0 -4px;padding:0 4px}
+.td-sheet .td-ask-log{max-height:none;overflow:visible}
+.td-ask-log:empty{display:none}
+.td-ask-msg{max-width:86%;padding:10px 13px;border-radius:calc(var(--td-radius)*.9);font-size:15px;line-height:1.45;overflow-wrap:anywhere;animation:tdAskIn .25s ease-out}
+.td-ask-msg p{margin:0}
+.td-ask-msg p+p{margin-top:.5em}
+.td-ask-bot{align-self:flex-start;background:var(--td-card2);color:var(--td-text);border-bottom-left-radius:4px}
+.td-ask-me{align-self:flex-end;background:var(--td-accent);color:var(--td-accent-text);border-bottom-right-radius:4px}
+.td-ask-btn{margin-top:10px;display:flex;justify-content:center}
+.td-ask-dots{display:inline-flex;gap:4px;padding:4px 0}
+.td-ask-dots i{width:7px;height:7px;border-radius:50%;background:var(--td-muted);opacity:.5;animation:tdAskDot 1s infinite}
+.td-ask-dots i:nth-child(2){animation-delay:.15s}
+.td-ask-dots i:nth-child(3){animation-delay:.3s}
+@keyframes tdAskDot{0%,60%,100%{opacity:.25;transform:none}30%{opacity:.9;transform:translateY(-3px)}}
+@keyframes tdAskIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.td-ask-hint{font-size:12px;color:var(--td-muted);margin:2px 0 -4px}
+.td-ask-chips{display:flex;flex-wrap:wrap;gap:6px}
+.td-ask-chip{font:inherit;font-size:13px;font-weight:600;padding:7px 12px;border-radius:99px;border:1.5px solid rgba(128,128,128,.3);background:transparent;color:var(--td-text);cursor:pointer;text-align:left;-webkit-appearance:none}
+.td-ask-chip:active{background:var(--td-card2)}
+.td-ask-form{display:flex;gap:8px;align-items:center}
+.td-ask-form input{flex:1;min-width:0;font:inherit;font-size:16px;color:var(--td-text);background:rgba(128,128,128,.12);border:1.5px solid rgba(128,128,128,.25);border-radius:99px;padding:10px 15px;outline:none;-webkit-appearance:none;appearance:none}
+.td-ask-form input:focus{border-color:var(--td-accent)}
+.td-ask-form button{flex:none;width:42px;height:42px;border-radius:50%;border:0;background:var(--td-accent);color:var(--td-accent-text);font:inherit;font-size:19px;font-weight:700;cursor:pointer;-webkit-appearance:none}
+.td-ask-form button:active{filter:brightness(.9)}
+.td-sheet .td-ask{background:transparent;box-shadow:none;padding:0}
 /* rss feed */
 .td-feed-chips{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin:0 calc(var(--td-side,16px)*-1) 10px;padding:0 var(--td-side,16px)}
 .td-feed-chips::-webkit-scrollbar{display:none}
@@ -1082,6 +1131,154 @@ fieldset.td-bad legend,.td-f-check.td-bad span{color:#ef4444}
           .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok) throw { msg: j.error }; }); })
           .then(finish, function (x) { fail((x && x.msg) || 'Your answers could not be sent. Check your connection and try again.'); })
           .then(function () { btn.disabled = false; btn.textContent = label; });
+      });
+    });
+
+    // ask a question: match what the visitor typed to the church's own questions, in the browser.
+    // Words are boiled down (lowercase, simple stems, common synonyms like nursery → kid) and scored
+    // by how rare they are across the list, so "do you have a nursery?" finds the kids answer.
+    var ASK_STOP = ' a an the is are am was were be been do does did i im id ive my me we our ours you your youre us to of in on at for and or it its this that there here can could would should will how what whats which who whom why any some get got have has had with about from please just tell know want like need so if then than as by up out also really much many one ones thing things way church churchs yall guys theres they them their ';
+    var ASK_SYN = {};
+    [['time', 'when time times schedule start starts starting begin begins hour hours clock'],
+     ['place', 'where address location located directions direction map'],
+     ['kid', 'kid kids child children childrens nursery toddler toddlers baby babies infant infants preschool elementary'],
+     ['youth', 'youth teen teens teenager teenagers student students middle high'],
+     ['park', 'park parking car cars lot'],
+     ['wear', 'wear dress attire clothes clothing outfit casual dressy jeans'],
+     ['give', 'give giving tithe tithing donate donation donations offering money'],
+     ['online', 'online stream streaming livestream watch youtube facebook broadcast'],
+     ['servic', 'service services worship mass sunday sundays'],
+     ['pray', 'pray prayer prayers praying'],
+     ['baptism', 'baptism baptize baptized baptised baptizing'],
+     ['group', 'group groups smallgroup lifegroup lifegroups'],
+     ['contact', 'contact call phone email reach talk text'],
+     ['pastor', 'pastor pastors minister priest staff'],
+     ['access', 'wheelchair accessible accessibility handicap disability disabled elevator ramp'],
+     ['food', 'coffee food snack snacks breakfast eat donuts'],
+     ['restroom', 'bathroom bathrooms restroom restrooms toilet toilets'],
+     ['join', 'member members membership join belong'],
+     ['serve', 'serve serving volunteer volunteers volunteering'],
+     ['long', 'long length last lasts minutes'],
+     ['cost', 'cost costs price free pay'],
+     ['new', 'new first visit visiting visitor visitors guest guests']
+    ].forEach(function (g) { g[1].split(' ').forEach(function (w) { ASK_SYN[w] = g[0]; }); });
+    var ASK_SYN_KEYS = Object.keys(ASK_SYN);
+    function askStem(w) {
+      if (ASK_SYN[w]) return ASK_SYN[w];
+      if (w.length >= 5) for (var k = 0; k < ASK_SYN_KEYS.length; k++) if (askNear(w, ASK_SYN_KEYS[k])) return ASK_SYN[ASK_SYN_KEYS[k]];
+      return askRoot(w);
+    }
+    function askRoot(w) {
+      if (w.length > 5 && /ing$/.test(w)) w = w.slice(0, -3);
+      else if (w.length > 4 && /ed$/.test(w)) w = w.slice(0, -2);
+      else if (w.length > 5 && /ion$/.test(w)) w = w.slice(0, -3);
+      if (w.length > 3 && /s$/.test(w) && !/ss$/.test(w)) w = w.slice(0, -1);
+      if (w.length > 3 && /e$/.test(w)) w = w.slice(0, -1);
+      return w;
+    }
+    function askWords(s) {
+      var out = [];
+      String(s || '').toLowerCase().replace(/[’']/g, '').replace(/[^a-z0-9À-ɏ]+/g, ' ').split(' ').forEach(function (w) {
+        if (!w || ASK_STOP.indexOf(' ' + w + ' ') !== -1) return;
+        // A synonym keeps its own word too, so "address" counts a little more for the question that says "address".
+        [askStem(w), askRoot(w)].forEach(function (x) { if (x && out.indexOf(x) === -1) out.push(x); });
+      });
+      return out;
+    }
+    // One typo allowed in longer words ("parkng", "nursey").
+    function askNear(a, b) {
+      if (a === b) return true;
+      if (a.length < 5 || b.length < 5 || Math.abs(a.length - b.length) > 1) return false;
+      var i = 0, j = 0, miss = 0;
+      while (i < a.length && j < b.length) {
+        if (a[i] === b[j]) { i++; j++; continue; }
+        if (++miss > 1) return false;
+        if (a.length > b.length) i++; else if (b.length > a.length) j++; else { i++; j++; }
+      }
+      return miss + (a.length - i) + (b.length - j) <= 1;
+    }
+    function askHas(list, w) { for (var i = 0; i < list.length; i++) if (askNear(list[i], w)) return true; return false; }
+    $$('[data-td-ask]').forEach(function (box) {
+      var log = $('.td-ask-log', box), form = $('.td-ask-form', box), input = $('input', form);
+      var tpls = $$('template[data-q]', box), fb = $('template[data-fb]', box);
+      var items = tpls.map(function (t) {
+        return { q: t.getAttribute('data-q'), k: askWords(t.getAttribute('data-k')), a: askWords(t.getAttribute('data-a')), t: t };
+      });
+      function idf(w) {
+        var n = 0;
+        items.forEach(function (it) { if (askHas(it.k, w) || askHas(it.a, w)) n++; });
+        return n ? Math.log(1 + items.length / n) : 0;
+      }
+      function match(text) {
+        var q = askWords(text), plainQ = String(text).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+        var scored = items.map(function (it) {
+          var s = 0;
+          q.forEach(function (w) {
+            var f = idf(w);
+            if (askHas(it.k, w)) s += f; else if (askHas(it.a, w)) s += f * 0.4;
+          });
+          if (plainQ && it.q.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim() === plainQ) s += 10;
+          return { it: it, s: s };
+        }).sort(function (a, b) { return b.s - a.s; });
+        return { q: q, list: scored };
+      }
+      function bubble(cls, html) {
+        var m = D.createElement('div');
+        m.className = 'td-ask-msg ' + cls;
+        if (html != null) m.innerHTML = html;
+        log.appendChild(m);
+        return m;
+      }
+      function chipRow(label, qs) {
+        if (!qs.length) return;
+        var wrap = D.createElement('div');
+        wrap.className = 'td-ask-chips';
+        if (label) { var h = D.createElement('div'); h.className = 'td-ask-hint'; h.textContent = label; log.appendChild(h); }
+        qs.forEach(function (q) {
+          var c = D.createElement('button');
+          c.type = 'button'; c.className = 'td-ask-chip'; c.setAttribute('data-td-askq', q); c.textContent = q;
+          wrap.appendChild(c);
+        });
+        log.appendChild(wrap);
+      }
+      function scrollEnd(el) {
+        var sheet = box.closest('.td-sheet-body');
+        log.scrollTop = log.scrollHeight;
+        if (sheet) sheet.scrollTop = sheet.scrollHeight;
+        else try { form.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (x) {}
+      }
+      function ask(text) {
+        text = String(text || '').trim().slice(0, 200);
+        if (!text) return;
+        bubble('td-ask-me').textContent = text;
+        var wait = bubble('td-ask-bot', '<span class="td-ask-dots" aria-label="Typing"><i></i><i></i><i></i></span>');
+        scrollEnd(wait);
+        var r = match(text), best = r.list[0];
+        setTimeout(function () {
+          wait.parentNode.removeChild(wait);
+          var lower = text.toLowerCase(), m;
+          if (best && best.s >= 1) {
+            m = bubble('td-ask-bot');
+            m.appendChild(best.it.t.content.cloneNode(true));
+            chipRow('You might also ask', r.list.slice(1, 3).filter(function (x) { return x.s >= 1 && x.s >= best.s * 0.6; }).map(function (x) { return x.it.q; }));
+          } else if (/^\W*(thanks|thank you|thank u|thx|ty|ok thanks|great thanks|awesome|perfect|got it|ok|okay|cool)\W*$/.test(lower)) {
+            m = bubble('td-ask-bot'); m.textContent = 'You’re welcome! 😊';
+          } else if (/^\W*(hi|hello|hey|howdy|yo|good (morning|afternoon|evening))( there)?\W*$/.test(lower)) {
+            m = bubble('td-ask-bot'); m.textContent = 'Hi there! What would you like to know?';
+          } else {
+            m = bubble('td-ask-bot');
+            m.appendChild(fb.content.cloneNode(true));
+            if (!$(':scope > .td-ask-chips', box)) chipRow('Or try one of these', items.slice(0, 3).map(function (x) { return x.q; }));
+          }
+          scrollEnd(m);
+        }, 450 + Math.random() * 300);
+      }
+      form.addEventListener('submit', function (e) { e.preventDefault(); var v = input.value; input.value = ''; ask(v); });
+      box.addEventListener('click', function (e) {
+        var c = e.target.closest('[data-td-askq]');
+        if (!c) return;
+        e.preventDefault();
+        ask(c.getAttribute('data-td-askq'));
       });
     });
 

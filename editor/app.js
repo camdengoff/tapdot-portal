@@ -1014,7 +1014,9 @@
             // RSS feed blocks set to open in a pop-up can be opened from any button too.
             state.blocks.filter((b) => b.type === 'feed' && (b.show && b.show !== 'page')).map((b) => ['feed-' + b.id, '📰 ' + ((b.show !== 'popup' && b.sheetTitle) || b.openLabel || 'RSS feed') + ' (RSS feed)']),
             // So can connect cards set to show in a pop-up.
-            state.blocks.filter((b) => b.type === 'form' && b.show === 'popup').map((b) => ['form-' + b.id, '✍️ ' + String(b.title || 'Connect card').replace(/==|\*\*|__/g, '') + ' (connect card)'])) }],
+            state.blocks.filter((b) => b.type === 'form' && b.show === 'popup').map((b) => ['form-' + b.id, '✍️ ' + String(b.title || 'Connect card').replace(/==|\*\*|__/g, '') + ' (connect card)']),
+            // And Ask a question blocks set to show in a pop-up.
+            state.blocks.filter((b) => b.type === 'ask' && b.show === 'popup').map((b) => ['ask-' + b.id, '💬 ' + String(b.title || 'Ask a question').replace(/==|\*\*|__/g, '') + ' (questions)'])) }],
           copy: [{ k: 'text', t: 'textarea', l: 'Text to copy' }, { k: 'toast', t: 'text', l: 'Message after copying' }],
           phone: [{ k: 'phone', t: 'text', l: 'Phone number' }],
           sms: [{ k: 'phone', t: 'text', l: 'Phone number' }, { k: 'body', t: 'text', l: 'Starting message (optional)' }],

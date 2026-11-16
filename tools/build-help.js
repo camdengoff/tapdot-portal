@@ -79,6 +79,7 @@ const FOOT = `<footer class="foot">
   </div>
 </footer>
 <script src="/help/help.js" defer></script>
+<script src="/help/bot.js" defer></script>
 </body>
 </html>
 `;
@@ -210,7 +211,20 @@ function build(out) {
     return { slug: a.slug, title: a.title, summary: a.summary, section: sec.name, parts };
   });
   fs.writeFileSync(path.join(out, 'search.json'), JSON.stringify(index));
-  for (const f of ['help.css', 'help.js']) fs.copyFileSync(path.join(src, f), path.join(out, f));
+  // What the help bot (help/bot.js) reads: the same parts, plus each part's HTML so a signed-in
+  // person can be walked through the steps right in the chat.
+  const bot = articles.map((a) => {
+    const parts = [];
+    withIds(a.body).html.replace(/<a class="hash"[^>]*>#<\/a>/g, '').split(/(?=<h2[\s>])/).forEach((chunk) => {
+      const hm = /^<h2\s[^>]*id="([^"]+)"[^>]*>([\s\S]*?)<\/h2>/.exec(chunk);
+      if (hm && /^related guides$/i.test(plain(hm[2]))) return;
+      const html = (hm ? chunk.slice(hm[0].length) : chunk).trim();
+      if (html) parts.push({ h: hm ? plain(hm[2]).trim() : '', id: hm ? hm[1] : '', html, t: plain(html) });
+    });
+    return { slug: a.slug, title: a.title, summary: a.summary, parts };
+  });
+  fs.writeFileSync(path.join(out, 'bot.json'), JSON.stringify(bot));
+  for (const f of ['help.css', 'help.js', 'bot.js']) fs.copyFileSync(path.join(src, f), path.join(out, f));
   return articles.length;
 }
 
