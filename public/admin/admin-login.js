@@ -22,7 +22,7 @@
   function afterStep1(r, who) {
     challenge = r.challenge;
     if (r.enrolled) { $('#s2for').textContent = who; show('#step2'); return; }
-    if (via === 'google') startEnroll('').catch(() => show('#needSetup')); else show('#needSetup');
+    if (via === 'google') startEnroll('').catch((e) => { show('#needSetup'); msg(e.message); }); else show('#needSetup');
   }
   async function startEnroll(setupCode) {
     const r = await post('enroll', { challenge, setupCode });
@@ -63,7 +63,7 @@
   $('#pwLink').onclick = (e) => { e.preventDefault(); msg(''); show('#pwForm'); };
 
   fetch('/api/admin-auth/config').then((r) => r.json()).then((cfg) => {
-    $('#googleBtn').hidden = !cfg.google; $('#orLine').hidden = !cfg.google; $('#pwLink').hidden = !cfg.setupKey;
+    $('#googleBtn').hidden = !cfg.google; $('#orLine').hidden = !cfg.google; $('#pwLink').hidden = !cfg.setupKey; $('#setupGoogle').hidden = !cfg.google;
   }).catch(() => {});
 
   if (hash.get('c')) { via = 'google'; afterStep1({ challenge: hash.get('c'), enrolled: hash.get('enrolled') === '1' }, hash.get('email') || ''); }

@@ -44,6 +44,7 @@
     <form id="needSetup" hidden>
       <h1>Set up two-step sign-in</h1>
       <p class="muted small">Admins sign in with a code from an authenticator app (Google Authenticator, Microsoft Authenticator, 1Password, Authy…). To add it the first time, enter the one-time setup code a main admin gave you. Main admins can use the SETUP_KEY secret from Cloudflare, or continue with Google instead.</p>
+      <a id="setupGoogle" class="ghost wide center" href="/api/admin-auth/google" hidden>Main admin? Continue with Google instead (no setup code needed)</a>
       <label>Setup code<input id="setupCode" type="password" autocomplete="off" required /></label>
       <button class="primary wide" type="submit">Continue</button>
       <a href="./" class="muted small center">Start over</a>
