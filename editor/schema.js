@@ -465,8 +465,14 @@
                 { k: 'height', t: 'range', l: 'Banner height', min: 160, max: 420, unit: 'px' },
         ] },
       ] },
-      { k: 'signup', t: 'select', l: 'Under the title', opts: [['link', 'A button'], ['form', 'A form'], ['none', 'Nothing']],
-        hint: 'A form’s answers show in the portal with your Connect card answers.' },
+      { k: 'signup', t: 'select', l: 'Under the title', opts: [['link', 'A button'], ['invite', 'An invite message'], ['form', 'A form'], ['none', 'Nothing']],
+        hint: 'An invite message shows the whole text people copy or send to a friend, with Copy and Send buttons. A form’s answers show in the portal with your Connect card answers.' },
+      { k: 'invite', t: 'textarea', l: 'The invite people send', when: (b) => b.signup === 'invite' },
+      { k: 'inviteCopy', t: 'text', l: 'Copy button', when: (b) => b.signup === 'invite' },
+      { k: 'inviteToast', t: 'text', l: 'Message after copying', ph: 'Invite copied', when: (b) => b.signup === 'invite' },
+      { k: 'inviteSend', t: 'checkbox', l: 'Show a Send button', when: (b) => b.signup === 'invite',
+        hint: 'Opens the phone’s share sheet (Messages, WhatsApp, Instagram…) with the invite already written. Without a share sheet it opens a text message.' },
+      { k: 'sendLabel', t: 'text', l: 'Send button', when: (b) => b.signup === 'invite' && b.inviteSend },
       { k: 'btnLabel', t: 'text', l: 'Button text', when: (b) => b.signup === 'link' },
       { k: 'action', t: 'action', l: 'Button opens', when: (b) => b.signup === 'link' },
       Object.assign({}, formField('items'), { when: (b) => b.signup === 'form' }),
@@ -484,6 +490,8 @@
         { label: 'Anything we should know? (optional)', kind: 'long', options: '', ph: '', required: false },
       ],
       btnLabel: 'Learn more', action: TD.newAction('link'),
+      invite: 'Hey! I’d love for you to come to church with me this Sunday. Want to come?',
+      inviteCopy: 'Copy invite', inviteToast: 'Invite copied. Paste it in a text!', inviteSend: true, sendLabel: 'Send',
       thanks: 'Thanks! 🎉 We’ll be in touch soon.', notify: '',
     }),
     summary: (b) => (b.eyebrow ? b.eyebrow + ' · ' : '') + b.title,
@@ -510,6 +518,8 @@
       const n = Object.assign(d, b);
       // Copy boxes made before they became Invite messages keep looking the same (no Send button).
       if (b.type === 'copy' && !('send' in b)) { n.send = false; n.intro = ''; }
+      // A Spotlight button that already copies text starts its invite message with that text.
+      if (n.type === 'spotlight' && !('invite' in b) && b.action && b.action.type === 'copy' && b.action.text) n.invite = b.action.text;
       n.style = Object.assign(commonDefaults().style, b.style || {});
       n.hideIn = Array.isArray(b.hideIn) ? b.hideIn.slice() : [];
       if (b.schedule && b.schedule.on) {

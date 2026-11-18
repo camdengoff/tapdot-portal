@@ -286,7 +286,13 @@
         : pic ? '<img class="td-bap-media"' + frame + ' src="' + esc(pic) + '" alt="" loading="lazy" />' : '';
       const over = b.layout === 'over';
       const intro = b.intro ? '<div class="td-bap-intro">' + md(b.intro, true) + '</div>' : '';
-      const cta = b.signup === 'form' || b.signup === 'none' ? '' : '<div class="td-bap-cta">' + tap('td-btn td-inline-btn', b.action, esc(b.btnLabel || 'Sign up'), ctx, '', b.btnLabel) + '</div>';
+      const inv = String(b.invite || '');
+      const cta = b.signup === 'invite' ? (inv.trim() ? '<div class="td-bap-cta td-bap-invite">' +
+          '<div class="td-copy-val">' + esc(inv).replace(/\n/g, '<br>') + '</div>' +
+          '<div class="td-copy-btns"><a href="#" class="td-copy-btn td-tap" data-td-act="copy" data-td-text="' + esc(inv) + '" data-td-toast="' + esc(b.inviteToast || 'Copied!') + '">' + esc(b.inviteCopy || 'Copy') + '</a>' +
+          (b.inviteSend ? '<a href="sms:?&amp;body=' + esc(encodeURIComponent(inv)) + '" class="td-copy-btn td-copy-send td-tap" data-td-act="invite" data-td-text="' + esc(inv) + '">' + esc(b.sendLabel || 'Send') + '</a>' : '') +
+          '</div></div>' : '')
+        : b.signup === 'form' || b.signup === 'none' ? '' : '<div class="td-bap-cta">' + tap('td-btn td-inline-btn', b.action, esc(b.btnLabel || 'Sign up'), ctx, '', b.btnLabel) + '</div>';
       const form = b.signup === 'form' ? R.form(Object.assign({}, b, { title: '', intro: '' }), ctx) : '';
       const head = '<div class="td-bap-head' + (media ? '' : ' td-bap-empty') + '" style="' + (over ? 'min-' : '') + 'height:' + h + 'px">' + media +
         '<div class="td-bap-text" style="background:linear-gradient(180deg,rgba(0,0,0,' + (shade * (over ? 0.6 : 0.35)).toFixed(2) + '),rgba(0,0,0,' + shade.toFixed(2) + '))">' +
@@ -645,6 +651,11 @@ ${t.pressFx ? '.td-tap:active{transform:scale(.97)}' : ''}
 .td-bap-over .td-bap-cta{padding:14px 0 0;text-align:left}
 .td-bap-over.td-bap-center .td-bap-cta{text-align:center}
 .td-bap-over .td-bap-cta .td-inline-btn{margin-top:0}
+.td-bap-invite{text-align:left;padding-top:12px}
+.td-bap-invite .td-copy-val{white-space:normal}
+.td-bap-over .td-bap-invite .td-copy-val{background:rgba(255,255,255,.16);color:#fff;text-shadow:none;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.td-bap-over .td-bap-invite .td-copy-send{background:rgba(255,255,255,.22);color:#fff !important}
+.td-bap-over .td-bap-invite .td-copy-btn{text-shadow:none}
 /* connect card form */
 .td-form{padding:16px;display:flex;flex-direction:column;gap:14px}
 .td-form-title{font-weight:700;font-size:17px}
