@@ -131,8 +131,8 @@
     let busiest = -1;
     visits.forEach((v, i) => { if (v && (busiest < 0 || v > visits[busiest])) busiest = i; });
     const tiles = [
-      { label: 'Visits', value: num(tv), change: r.cmp ? pct(tv, wasV) : undefined, was: wasV, hi: true, note: 'Nothing earlier to compare' },
-      { label: 'Button taps', value: num(tt), change: r.cmp ? pct(tt, wasT) : undefined, was: wasT, note: 'Nothing earlier to compare' },
+      { label: 'Visits', value: num(tv), change: r.cmp ? pct(tv, wasV) : undefined, was: wasV, hi: true, note: 'No earlier stats' },
+      { label: 'Button taps', value: num(tt), change: r.cmp ? pct(tt, wasT) : undefined, was: wasT, note: 'No earlier stats' },
       { label: 'Taps per visit', value: ratio(tt, tv), note: tv ? 'Buttons tapped per visit' : 'No visits yet' },
       busiest >= 0 ? { label: 'Busiest day', value: fmtDay(days[busiest], { weekday: 'short' }), note: plural(visits[busiest], 'visit', 'visits'), small: true }
         : { label: 'Busiest day', value: '–', note: 'No visits yet', small: true },
