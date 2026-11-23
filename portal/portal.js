@@ -1154,7 +1154,8 @@
     btnMsg = (e) => {
       if (e.source !== frame.contentWindow || !e.data || e.data.dsFound == null) return;
       found = e.data.dsFound;
-      if (!found) status.textContent = 'This button isn’t on the page anymore. It may have been renamed or removed since these taps.';
+      if (!found && /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)$/.test(label)) status.textContent = 'These are taps on events in an Upcoming events list. Until November 2026 an event tap was counted under its month (“' + label + '”); now each one is counted under the event’s name.';
+      else if (!found) status.textContent = 'This button isn’t on the page anymore. It may have been renamed or removed since these taps.';
       else if (e.data.dsHidden) status.textContent = 'This button is on the page but hidden right now (for example in a closed section or another tab). Its spot is outlined.';
       else if (found > 1) status.textContent = found + ' buttons on the page have this name, and their taps are counted together. Use the arrows to see each one.';
       else status.textContent = e.data.dsSheet ? 'This button is inside a pop-up, so the pop-up is opened for you.' : 'Here it is, circled on the page.';
@@ -1168,7 +1169,7 @@
     const js = String.raw`(function(){
 var LABEL=` + JSON.stringify(label).replace(/</g, '\\u003c') + String.raw`,D=document,W=window,list=[],cur=-1,ring,allow=false;
 function firstLine(el){var t=(el.innerText||el.textContent||'').split('\n'),any='';for(var i=0;i<t.length;i++){var s=t[i].trim();if(s&&/[0-9A-Za-zÀ-￿]/.test(s.replace(/[ -⯿\uD800-\uDFFF️]/g,'')))return s;any=any||s;}return any;}
-function tapLabel(t){var l=firstLine(t)||t.getAttribute('aria-label')||t.getAttribute('title')||'';var row=t.classList.contains('td-copy-btn')&&t.closest('.td-copy-row');if(row){var w=row.querySelector('.td-tag')||row.querySelector('.td-copy-val');if(w)l+=': '+firstLine(w);}return l.replace(/\s+/g,' ').trim().slice(0,60)||'Button';}
+function tapLabel(t){var l=t.getAttribute('data-td-label')||firstLine(t)||t.getAttribute('aria-label')||t.getAttribute('title')||'';var row=t.classList.contains('td-copy-btn')&&t.closest('.td-copy-row');if(row){var w=row.querySelector('.td-tag')||row.querySelector('.td-copy-val');if(w)l+=': '+firstLine(w);}return l.replace(/\s+/g,' ').trim().slice(0,60)||'Button';}
 function counted(t){return t.classList.contains('td-tap')||!/^#/.test(t.getAttribute('href')||'#');}
 function shown(el){var r=el.getBoundingClientRect();return r.width>0&&r.height>0;}
 function find(){var out=[],h=D.documentElement;h.classList.add('ds-measure');D.querySelectorAll('.td-tap,a[href]').forEach(function(t){if(counted(t)&&tapLabel(t)===LABEL)out.push(t);});h.classList.remove('ds-measure');

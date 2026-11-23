@@ -46,7 +46,8 @@
   }
   // The name a tap is counted under: the button's own text (a copy button also names what it copies).
   function tapLabel(t) {
-    var label = firstLine(t) || t.getAttribute('aria-label') || t.getAttribute('title') || '';
+    // data-td-label names taps whose first line isn't a good name (an event row starts with its month).
+    var label = t.getAttribute('data-td-label') || firstLine(t) || t.getAttribute('aria-label') || t.getAttribute('title') || '';
     var row = t.classList.contains('td-copy-btn') && t.closest('.td-copy-row');
     if (row) { var what = row.querySelector('.td-tag') || row.querySelector('.td-copy-val'); if (what) label += ': ' + firstLine(what); }
     return label;

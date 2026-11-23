@@ -1291,7 +1291,7 @@ fieldset.td-bad legend,.td-f-check.td-bad span{color:#ef4444}
         evs = evs.sort(function (a, b) { return a.date - b.date; }).slice(0, max);
         var list = D.createElement('div'); list.className = 'td-events-list';
         evs.forEach(function (ev) {
-          var r = D.createElement('a'); r.className = 'td-ev td-tap'; r.href = '#';
+          var r = D.createElement('a'); r.className = 'td-ev td-tap'; r.href = '#'; r.setAttribute('data-td-label', ev.title); // counted under the event's name, not its month
           r.innerHTML = '<div class="td-ev-date"><span class="td-ev-mo">' + ev.date.toLocaleString('en-US', { month: 'short', timeZone: tz }) + '</span><span class="td-ev-dy">' +
             ev.date.toLocaleString('en-US', { day: 'numeric', timeZone: tz }) + '</span></div><div class="td-ev-detail"><div class="td-ev-name">' + escH(ev.title) +
             '</div><div class="td-ev-meta">' + ev.date.toLocaleString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz }) + '</div></div><div class="td-arrow">›</div>';
