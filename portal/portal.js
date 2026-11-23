@@ -397,6 +397,7 @@
         h('h1', null, church.name),
         manage ? h('button', { class: 'ghost sm wideonly', onclick: renameChurch }, 'Rename') : null,
         h('div', { class: 'grow' }),
+        h('button', { class: 'ghost', title: 'Download a PDF of visits and taps for a week, month, year or any dates', onclick: () => reportDialog(church, pages, { answers: !viewer && Object.keys(responses).length > 0, responses }) }, '⤓ ', h('span', { class: 'wideonly' }, 'PDF report'), h('span', { class: 'phoneonly' }, 'Report')),
         manage ? h('button', { class: 'ghost wideonly', title: 'A read-only page of this church’s tap stats, for people who don’t edit', onclick: () => shareDialog(church) }, '📊 Share stats') : null,
         viewer ? h('span', { class: 'pill' }, 'Stats only') : h('button', { class: 'primary newpage', onclick: () => newPage(church) }, '+ New page'),
         manage ? h('details', { class: 'more phoneonly' }, h('summary', { class: 'ghost', 'aria-label': 'More for ' + church.name }, '•••'),
@@ -981,7 +982,8 @@
     fill(body,
       h('div', { class: 'row' }, h('h2', { class: 'grow' }, p.name),
         h('select', { class: 'sm', onchange: (e) => showStats(church, p, +e.target.value) },
-          [[7, 'Last 7 days'], [30, 'Last 30 days'], [90, 'Last 90 days'], [365, 'Last year']].map(([v, l]) => h('option', { value: v, selected: v === n }, l)))),
+          [[7, 'Last 7 days'], [30, 'Last 30 days'], [90, 'Last 90 days'], [365, 'Last year']].map(([v, l]) => h('option', { value: v, selected: v === n }, l))),
+        h('button', { type: 'button', class: 'ghost sm', title: 'Download a PDF report for this page', onclick: () => reportDialog(church, [p], {}) }, '⤓ PDF')),
       // Wide screens: totals, chart and buttons on the left, the activity log on the right.
       h('div', { class: 'statcols' },
         h('div', { class: 'statcol' },
@@ -998,6 +1000,107 @@
         h('div', { class: 'statcol' }, activityLog(church, p))),
       h('p', { class: 'muted small' }, 'A visit counts once per person every 30 minutes. Visits are counted on the site’s code block and the live link. No cookies are used and nothing about visitors is stored.'),
       h('div', { class: 'row end' }, h('button', { class: 'ghost', onclick: () => dlg.close() }, 'Close')));
+  }
+
+  // ── PDF report: a church's (or one page's) tap stats for a chosen period ──
+  // The PDF is drawn in this browser by report.js (loaded the first time). Connect card answers are
+  // only counted when this person may read them: not for "Stats only" people, and on a stats link
+  // only when the link includes answers. Only counts go in the PDF, never what people wrote.
+  let reportJs = null;
+  const loadReport = () => reportJs || (reportJs = new Promise((res, rej) => {
+    if (window.DoorStepReport) return res(window.DoorStepReport);
+    const s = h('script', { src: 'report.js' });
+    s.onload = () => res(window.DoorStepReport);
+    s.onerror = () => { reportJs = null; rej(new Error('Could not load the report maker. Check your connection and try again.')); };
+    document.head.append(s);
+  }));
+  const REPORT_SPANS = [['7', 'Last 7 days'], ['30', 'Last 30 days'], ['90', 'Last 3 months'], ['365', 'Last 12 months'],
+    ['tm', 'This month so far'], ['lm', 'Last month'], ['ty', 'This year so far'], ['c', 'Pick dates…']];
+  // From and to dates (both included) for a span; stats go back 365 days, today included.
+  function reportRange(k, cFrom, cTo) {
+    const today = new Date(); today.setHours(12, 0, 0, 0);
+    const first = new Date(today); first.setDate(first.getDate() - 364);
+    const back = (n) => { const d = new Date(today); d.setDate(d.getDate() - n); return d; };
+    let a, b = new Date(today);
+    if (/^\d+$/.test(k)) a = back(+k - 1);
+    else if (k === 'tm') a = new Date(today.getFullYear(), today.getMonth(), 1, 12);
+    else if (k === 'lm') { a = new Date(today.getFullYear(), today.getMonth() - 1, 1, 12); b = new Date(today.getFullYear(), today.getMonth(), 0, 12); }
+    else if (k === 'ty') a = new Date(today.getFullYear(), 0, 1, 12);
+    else { a = cFrom ? new Date(cFrom + 'T12:00:00') : back(29); b = cTo ? new Date(cTo + 'T12:00:00') : new Date(today); }
+    if (b > today) b = new Date(today);
+    if (a > b) a = new Date(b);
+    const cut = a < first; // older than DoorStep keeps
+    if (cut) a = new Date(first);
+    const n = Math.round((b - a) / 864e5) + 1;
+    // Compare with the same number of days just before, if DoorStep still has them.
+    const ce = new Date(a); ce.setDate(ce.getDate() - 1);
+    const cs = new Date(a); cs.setDate(cs.getDate() - n);
+    return { from: ymd(a), to: ymd(b), n, cut, first: ymd(first), today: ymd(today), cmp: cs >= first ? { from: ymd(cs), to: ymd(ce) } : null };
+  }
+
+  function reportDialog(church, pages, o) {
+    o = o || {};
+    loadReport().catch(() => { /* tried again on Download */ });
+    const dlg = $('#dlg');
+    const saved = store.get('doorstep-report-span') || '30';
+    const spanSel = h('select', { name: 'span' }, REPORT_SPANS.map(([v, l]) => h('option', { value: v, selected: v === saved }, l)));
+    const r0 = reportRange('30');
+    const fromIn = h('input', { type: 'date', name: 'from', value: r0.from, min: r0.first, max: r0.today });
+    const toIn = h('input', { type: 'date', name: 'to', value: r0.today, min: r0.first, max: r0.today });
+    const custom = h('div', { class: 'row wrap reportdates' }, h('label', null, 'From', fromIn), h('label', null, 'To', toIn));
+    const pageSel = h('select', { name: 'page' }, h('option', { value: '' }, 'All pages'), pages.map((p) => h('option', { value: p.id, selected: p.id === o.page }, p.name)));
+    const detailsBox = h('input', { type: 'checkbox', checked: store.get('doorstep-report-details') === '1' });
+    const answersBox = o.answers ? h('input', { type: 'checkbox', checked: store.get('doorstep-report-answers') !== '0' }) : null;
+    const summary = h('p', { class: 'muted small' });
+    const detailsRow = h('label', { class: 'check' }, detailsBox, h('span', null, 'A page for each page', h('span', { class: 'muted small' }, 'Adds each page’s own chart and every button tapped.')));
+    const sync = () => {
+      custom.hidden = spanSel.value !== 'c';
+      detailsRow.hidden = !!pageSel.value || pages.length < 2;
+      const r = reportRange(spanSel.value, fromIn.value, toIn.value);
+      summary.textContent = shortDay(r.from) + (r.from === r.to ? '' : ' – ' + new Date(r.to + 'T12:00:00').toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }))
+        + ' · ' + plural(r.n, 'day', 'days') + (r.cmp ? ', compared with the ' + r.n + ' days before.' : '.')
+        + (r.cut ? ' DoorStep keeps one year of stats, so it starts on ' + shortDay(r.first) + '.' : '');
+    };
+    [spanSel, fromIn, toIn, pageSel].forEach((el) => el.addEventListener('change', sync));
+    const go = h('button', { type: 'button', class: 'primary', onclick: act(async () => {
+      const r = reportRange(spanSel.value, fromIn.value, toIn.value);
+      const label = (REPORT_SPANS.find((x) => x[0] === spanSel.value) || [])[1];
+      store.set('doorstep-report-span', spanSel.value);
+      store.set('doorstep-report-details', detailsBox.checked ? '1' : '0');
+      if (answersBox) store.set('doorstep-report-answers', answersBox.checked ? '1' : '0');
+      const chosen = pageSel.value ? pages.filter((p) => p.id === pageSel.value) : pages;
+      go.textContent = 'Making the PDF…';
+      try {
+        const [R, stats] = await Promise.all([loadReport(), api(cbase(church) + '/stats?days=365')]);
+        let answers = null;
+        if (answersBox && answersBox.checked) {
+          answers = {};
+          const lo = new Date(r.from + 'T00:00:00'), hi = new Date(r.to + 'T00:00:00'); hi.setDate(hi.getDate() + 1);
+          await Promise.all(chosen.filter((p) => o.responses && o.responses[p.id] && o.responses[p.id].total).map(async (p) => {
+            const list = (await api(cbase(church) + '/responses?page=' + enc(p.id))).responses || [];
+            answers[p.id] = list.filter((x) => { const t = new Date(x.createdAt); return t >= lo && t < hi; }).length;
+          }));
+        }
+        const blob = await R.make({ church, pages: chosen, stats, from: r.from, to: r.to, cmp: r.cmp, answers, details: detailsBox.checked && !pageSel.value,
+          span: spanSel.value === 'c' ? plural(r.n, 'day', 'days') : label + (r.cut ? ' (from ' + shortDay(r.first) + ')' : '') });
+        download(blob, slug(church.name) + (pageSel.value ? '-' + slug(chosen[0].name) : '') + '-stats-' + r.from + (r.from === r.to ? '' : '-to-' + r.to) + '.pdf');
+        toast('PDF report downloaded');
+        dlg.close();
+      } finally { go.textContent = '⤓ Download PDF'; }
+    }) }, '⤓ Download PDF');
+    fill($('#dlgBody'), h('form', { class: 'dlgform reportdlg', onsubmit: (e) => e.preventDefault() },
+      h('h2', null, 'PDF report'),
+      h('p', { class: 'muted' }, 'A printable summary of visits and button taps, ready to send to your team or share at a meeting.'),
+      h('label', null, 'Time period', spanSel),
+      custom,
+      pages.length > 1 ? h('label', null, 'Pages', pageSel) : null,
+      summary,
+      detailsRow,
+      answersBox ? h('label', { class: 'check' }, answersBox, h('span', null, 'Count connect card answers', h('span', { class: 'muted small' }, 'Only how many came in. What people wrote stays out of the PDF.'))) : null,
+      h('div', { class: 'row end' }, h('button', { type: 'button', class: 'ghost', onclick: () => dlg.close() }, 'Cancel'), go)));
+    sync();
+    dlg.onclose = null;
+    if (!dlg.open) dlg.showModal();
   }
 
   // One "Buttons tapped" row: name, bar, count, and a button that shows that button on the page.
@@ -1288,6 +1391,7 @@ if(D.readyState==='complete')setTimeout(start,150);else W.addEventListener('load
     fill(main,
       h('div', { class: 'head' },
         h('div', { class: 'grow' }, h('h1', null, church.name), h('p', { class: 'muted sub' }, 'How people are using your tap pages')),
+        h('button', { class: 'ghost', title: 'Download a PDF of visits and taps for a week, month, year or any dates', onclick: () => reportDialog(church, pages, { answers: !!info.answers && Object.keys(answers).length > 0, responses: answers }) }, '⤓ PDF report'),
         rangeSel),
       h('div', { class: 'card overview wideov' },
         h('div', { class: 'statbig' },

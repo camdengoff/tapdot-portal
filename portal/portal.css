@@ -647,3 +647,5 @@ body.glassy::before { content: ''; position: fixed; inset: 0; z-index: -1; point
   .dock button span:not(.di) { display: none; }
   .dock button[aria-current="page"] span:not(.di) { display: inline; white-space: nowrap; }
 }
+.reportdates { gap: 12px; }
+.reportdates label { flex: 1; min-width: 140px; }
